@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
+// Extend Window interface for PWA events
+declare global {
+  interface Window {
+    beforeinstallprompt: any;
+    appinstalled: any;
+  }
+}
+
 /**
  * A2HS prompt popup that appears at the bottom when the app is not installed and the browser supports it.
  * It listens for the beforeinstallprompt event and triggers the prompt when clicked.
@@ -29,7 +37,6 @@ export default function AddToHomeScreen() {
 
     function onBeforeInstallPrompt(e: Event) {
       e.preventDefault();
-      // @ts-expect-error: non-standard event on some browsers
       deferredPromptRef.current = e;
       setIsVisible(true);
     }
@@ -39,10 +46,10 @@ export default function AddToHomeScreen() {
       deferredPromptRef.current = null;
     }
 
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt as any);
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt as any);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
@@ -50,15 +57,17 @@ export default function AddToHomeScreen() {
   const handleClick = async () => {
     const promptEvent = deferredPromptRef.current;
     if (!promptEvent) return;
-    // @ts-expect-error: showPrompt exists on this event in Chromium
-    await promptEvent.prompt?.();
+    
     try {
+      await promptEvent.prompt?.();
       const { outcome } = await promptEvent.userChoice;
       if (outcome === "accepted") {
         setIsVisible(false);
         deferredPromptRef.current = null;
       }
-    } catch {}
+    } catch (error) {
+      console.error('Error showing install prompt:', error);
+    }
   };
 
   const handleDismiss = () => {

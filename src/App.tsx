@@ -4,6 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ExpenseTracker from "@/pages/expense-tracker";
+import { useEffect } from "react";
+import { initializeDefaultCategories } from "./lib/localStorage";
 
 function Router() {
   return (
@@ -22,10 +24,16 @@ function Router() {
 }
 
 function App() {
+  // Initialize default categories on app start
+  useEffect(() => {
+    initializeDefaultCategories();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
+
         <Router />
       </TooltipProvider>
     </QueryClientProvider>
