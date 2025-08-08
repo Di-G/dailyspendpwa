@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ExpenseTracker from "@/pages/expense-tracker";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
-import PWADebug from "@/components/PWADebug";
 import { useEffect } from "react";
 import { initializeDefaultCategories } from "./lib/localStorage";
 
@@ -28,7 +27,13 @@ function Router() {
 function App() {
   // Initialize default categories on app start
   useEffect(() => {
-    initializeDefaultCategories();
+    const initializeApp = async () => {
+      initializeDefaultCategories();
+      // Invalidate categories query to ensure fresh data is loaded
+      await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+    };
+    
+    initializeApp();
   }, []);
 
   return (
@@ -37,7 +42,6 @@ function App() {
         <Toaster />
         <Router />
         <AddToHomeScreen />
-        <PWADebug />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertCategorySchema } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { createCategory, deleteCategory } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2 } from "lucide-react";
 import type { Category } from "@shared/schema";
@@ -26,13 +27,20 @@ export default function CategoryManagement() {
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
 
   // Query
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+    staleTime: 0, // Always fetch fresh data
   });
 
   // Mutations
   const addCategoryMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/categories", data),
+    mutationFn: async (data: any) => {
+      try {
+        return createCategory(data);
+      } catch (error) {
+        throw new Error('Failed to create category');
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Success", description: "Category added successfully" });
@@ -45,10 +53,22 @@ export default function CategoryManagement() {
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/categories/${id}`),
+    mutationFn: async (id: string) => {
+      try {
+        deleteCategory(id);
+        return { success: true };
+      } catch (error) {
+        throw new Error('Failed to delete category');
+      }
+    },
     onSuccess: () => {
+      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
       toast({ title: "Success", description: "Category deleted successfully" });
     },
     onError: () => {
@@ -122,7 +142,9 @@ export default function CategoryManagement() {
       {/* Existing Categories */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-gray-700 mb-3">Existing Categories</h4>
-        {categories.length === 0 ? (
+        {categoriesLoading ? (
+          <p className="text-sm text-gray-500 text-center py-4">Loading categories...</p>
+        ) : categories.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">No categories created yet</p>
         ) : (
           categories.map((category) => (

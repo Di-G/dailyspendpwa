@@ -10,7 +10,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertExpenseSchema } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { createExpense, deleteExpense } from "@/lib/localStorage";
 import { getToday, getYesterday, formatDisplayDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, ChevronDown, Settings } from "lucide-react";
@@ -48,8 +49,9 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   const [showCategoryManagement, setShowCategoryManagement] = useState(false);
 
   // Queries
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+    staleTime: 0, // Always fetch fresh data
   });
 
   const { data: selectedDateExpenses = [] } = useQuery<ExpenseWithCategory[]>({
@@ -70,7 +72,13 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
 
   // Mutations
   const addExpenseMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/expenses", data),
+    mutationFn: async (data: any) => {
+      try {
+        return createExpense(data);
+      } catch (error) {
+        throw new Error('Failed to create expense');
+      }
+    },
     onSuccess: () => {
       // Invalidate all expense-related queries
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -92,7 +100,14 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   });
 
   const deleteExpenseMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/expenses/${id}`),
+    mutationFn: async (id: string) => {
+      try {
+        deleteExpense(id);
+        return { success: true };
+      } catch (error) {
+        throw new Error('Failed to delete expense');
+      }
+    },
     onSuccess: () => {
       // Invalidate all expense-related queries
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -194,28 +209,38 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
 
           {/* Categories Quick Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            {categories.map((category) => {
-              const categoryTotal = categoryTotals.find(ct => ct.categoryId === category.id);
-              return (
-                <div
-                  key={category.id}
-                  className="border rounded-lg p-2 sm:p-3 text-center"
-                  style={{
-                    backgroundColor: `${category.color}10`,
-                    borderColor: `${category.color}40`,
-                  }}
-                >
+            {categoriesLoading ? (
+              <div className="col-span-2 sm:col-span-4 text-center py-4">
+                <p className="text-sm text-gray-500">Loading categories...</p>
+              </div>
+            ) : categories.length === 0 ? (
+              <div className="col-span-2 sm:col-span-4 text-center py-4">
+                <p className="text-sm text-gray-500">No categories available</p>
+              </div>
+            ) : (
+              categories.map((category) => {
+                const categoryTotal = categoryTotals.find(ct => ct.categoryId === category.id);
+                return (
                   <div
-                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
-                    style={{ backgroundColor: category.color }}
-                  ></div>
-                  <p className="text-xs font-medium text-gray-700 truncate">{category.name}</p>
-                  <p className="text-xs sm:text-sm font-semibold text-gray-900">
-                    {CURRENCIES[currency].symbol}{(categoryTotal?.total || 0).toFixed(2)}
-                  </p>
-                </div>
-              );
-            })}
+                    key={category.id}
+                    className="border rounded-lg p-2 sm:p-3 text-center"
+                    style={{
+                      backgroundColor: `${category.color}10`,
+                      borderColor: `${category.color}40`,
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
+                      style={{ backgroundColor: category.color }}
+                    ></div>
+                    <p className="text-xs font-medium text-gray-700 truncate">{category.name}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-gray-900">
+                      {CURRENCIES[currency].symbol}{(categoryTotal?.total || 0).toFixed(2)}
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
         </CardContent>
       </Card>
@@ -269,17 +294,27 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                <div className="flex items-center">
-                                  <div
-                                    className="w-3 h-3 rounded-full mr-2"
-                                    style={{ backgroundColor: category.color }}
-                                  ></div>
-                                  {category.name}
-                                </div>
+                            {categoriesLoading ? (
+                              <SelectItem value="loading" disabled>
+                                Loading categories...
                               </SelectItem>
-                            ))}
+                            ) : categories.length === 0 ? (
+                              <SelectItem value="no-categories" disabled>
+                                No categories available
+                              </SelectItem>
+                            ) : (
+                              categories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  <div className="flex items-center">
+                                    <div
+                                      className="w-3 h-3 rounded-full mr-2"
+                                      style={{ backgroundColor: category.color }}
+                                    ></div>
+                                    {category.name}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                         <FormMessage />

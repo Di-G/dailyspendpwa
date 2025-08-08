@@ -72,7 +72,9 @@ const extractParams = (url: string) => {
 // Helper function to extract ID from URL path
 const extractIdFromPath = (url: string) => {
   const parts = url.split('/');
-  return parts[parts.length - 1];
+  const id = parts[parts.length - 1];
+  // Handle cases where the URL might have query parameters
+  return id.split('?')[0];
 };
 
 export async function apiRequest(
@@ -96,6 +98,9 @@ export async function apiRequest(
       result = endpoint.POST(data);
     } else if (method === 'DELETE' && endpoint.DELETE) {
       const id = extractIdFromPath(url);
+      if (!id) {
+        throw new Error('No ID provided for DELETE operation');
+      }
       result = endpoint.DELETE(id);
     } else {
       throw new Error(`Unsupported method: ${method}`);
@@ -119,6 +124,8 @@ export async function apiRequest(
     return errorResponse;
   }
 }
+
+
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

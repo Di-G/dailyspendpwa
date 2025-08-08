@@ -188,17 +188,22 @@ export const getWeeklyTotals = (date: string): Array<{ date: string; total: numb
 
 // Initialize default categories if none exist
 export const initializeDefaultCategories = (): void => {
-  const categories = getCategories();
-  if (categories.length === 0) {
-    const defaultCategories: InsertCategory[] = [
-      { name: "Food & Dining", color: "#EF4444" },
-      { name: "Transportation", color: "#3B82F6" },
-      { name: "Shopping", color: "#10B981" },
-      { name: "Entertainment", color: "#F59E0B" },
-      { name: "Bills & Utilities", color: "#8B5CF6" },
-      { name: "Healthcare", color: "#EC4899" },
-    ];
-    
-    defaultCategories.forEach(category => createCategory(category));
+  try {
+    const categories = getCategories();
+    if (categories.length === 0) {
+      const defaultCategories: InsertCategory[] = [
+        { name: "Food & Dining", color: "#EF4444" },
+        { name: "Transportation", color: "#3B82F6" },
+        { name: "Shopping", color: "#10B981" },
+        { name: "Entertainment", color: "#F59E0B" },
+        { name: "Bills & Utilities", color: "#8B5CF6" },
+        { name: "Healthcare", color: "#EC4899" },
+      ];
+      
+      defaultCategories.forEach(category => createCategory(category));
+      console.log('Default categories initialized successfully');
+    }
+  } catch (error) {
+    console.error('Error initializing default categories:', error);
   }
 };
