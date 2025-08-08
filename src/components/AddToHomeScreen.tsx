@@ -10,60 +10,81 @@ declare global {
   }
 }
 
-/**
- * A2HS prompt popup that appears at the bottom when the app is not installed and the browser supports it.
- * It listens for the beforeinstallprompt event and triggers the prompt when clicked.
- * It hides itself when running in standalone PWA mode or after successful install.
- * Users can dismiss it and it won't show again for the session.
- */
 export default function AddToHomeScreen() {
   const deferredPromptRef = useRef<any>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Hide when already installed/PWA standalone
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone;
-    if (isStandalone) {
-      setIsVisible(false);
+    // Check if already installed
+    const checkIfInstalled = () => {
+      // For iOS
+      if ('standalone' in window.navigator && (window.navigator as any).standalone) {
+        setIsInstalled(true);
+        return true;
+      }
+      
+      // For Android/Chrome
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        setIsInstalled(true);
+        return true;
+      }
+      
+      return false;
+    };
+
+    // Check if dismissed in this session
+    const isDismissed = sessionStorage.getItem('a2hs-dismissed') === 'true';
+    
+    if (checkIfInstalled() || isDismissed) {
       return;
     }
 
-    // Check if user dismissed the prompt in this session
-    if (sessionStorage.getItem("a2hs-dismissed") === "true") {
-      setIsDismissed(true);
-      return;
-    }
-
-    function onBeforeInstallPrompt(e: Event) {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      console.log('beforeinstallprompt event fired');
       e.preventDefault();
       deferredPromptRef.current = e;
-      setIsVisible(true);
-    }
+      setShowInstallPrompt(true);
+    };
 
-    function onAppInstalled() {
-      setIsVisible(false);
+    const handleAppInstalled = () => {
+      console.log('App installed successfully');
+      setIsInstalled(true);
+      setShowInstallPrompt(false);
       deferredPromptRef.current = null;
+    };
+
+    // Check if prompt is already available (for cases where event fired before component mounted)
+    if (window.beforeinstallprompt) {
+      console.log('beforeinstallprompt already available');
+      deferredPromptRef.current = window.beforeinstallprompt;
+      setShowInstallPrompt(true);
     }
 
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onAppInstalled);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onAppInstalled);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
-  const handleClick = async () => {
-    const promptEvent = deferredPromptRef.current;
-    if (!promptEvent) return;
-    
+  const handleInstallClick = async () => {
+    if (!deferredPromptRef.current) {
+      console.log('No install prompt available');
+      return;
+    }
+
     try {
-      await promptEvent.prompt?.();
-      const { outcome } = await promptEvent.userChoice;
-      if (outcome === "accepted") {
-        setIsVisible(false);
-        deferredPromptRef.current = null;
+      console.log('Showing install prompt');
+      await deferredPromptRef.current.prompt();
+      const { outcome } = await deferredPromptRef.current.userChoice;
+      console.log('Install prompt outcome:', outcome);
+      
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+        setShowInstallPrompt(false);
       }
     } catch (error) {
       console.error('Error showing install prompt:', error);
@@ -71,25 +92,28 @@ export default function AddToHomeScreen() {
   };
 
   const handleDismiss = () => {
-    setIsVisible(false);
-    setIsDismissed(true);
-    sessionStorage.setItem("a2hs-dismissed", "true");
+    setShowInstallPrompt(false);
+    sessionStorage.setItem('a2hs-dismissed', 'true');
   };
 
-  if (!isVisible || isDismissed) return null;
+  if (isInstalled || !showInstallPrompt) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg p-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
         <div className="flex-1">
           <h3 className="text-sm font-medium text-gray-900">Install DailySpend</h3>
-          <p className="text-xs text-gray-600 mt-1">Add to your home screen for quick access</p>
+          <p className="text-xs text-gray-600 mt-1">
+            Add to your home screen for quick access and offline use
+          </p>
         </div>
-        <div className="flex items-center space-x-2 ml-4">
+        <div className="flex items-center justify-end space-x-2">
           <Button 
-            onClick={handleClick} 
+            onClick={handleInstallClick} 
             size="sm"
-            className="bg-primary text-white hover:bg-blue-700"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             Install
           </Button>
@@ -97,7 +121,7 @@ export default function AddToHomeScreen() {
             onClick={handleDismiss} 
             size="sm" 
             variant="ghost"
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 p-2"
           >
             <X className="w-4 h-4" />
           </Button>

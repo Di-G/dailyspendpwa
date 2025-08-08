@@ -73,85 +73,83 @@ export default function CategoryManagement() {
   };
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Manage Categories</h3>
-        
-        {/* Add New Category */}
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mb-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Groceries" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div>
-              <FormLabel className="text-sm font-medium text-gray-700 mb-2 block">Color</FormLabel>
-              <div className="flex space-x-2">
-                {COLOR_OPTIONS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
-                      selectedColor === color ? "border-gray-600 scale-110" : "border-transparent hover:border-gray-400"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setSelectedColor(color)}
-                  />
-                ))}
-              </div>
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-900">Manage Categories</h3>
+      
+      {/* Add New Category */}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mb-6">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Category Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Groceries" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div>
+            <FormLabel className="text-sm font-medium text-gray-700 mb-2 block">Color</FormLabel>
+            <div className="flex space-x-2">
+              {COLOR_OPTIONS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
+                    selectedColor === color ? "border-gray-600 scale-110" : "border-transparent hover:border-gray-400"
+                  }`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setSelectedColor(color)}
+                />
+              ))}
             </div>
-            <Button
-              type="submit"
-              className="w-full bg-secondary hover:bg-green-700 transition duration-200 text-sm"
-              disabled={addCategoryMutation.isPending}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {addCategoryMutation.isPending ? "Adding..." : "Add Category"}
-            </Button>
-          </form>
-        </Form>
+          </div>
+          <Button
+            type="submit"
+            className="w-full bg-secondary hover:bg-green-700 transition duration-200 text-sm"
+            disabled={addCategoryMutation.isPending}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {addCategoryMutation.isPending ? "Adding..." : "Add Category"}
+          </Button>
+        </form>
+      </Form>
 
-        {/* Existing Categories */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Existing Categories</h4>
-          {categories.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No categories created yet</p>
-          ) : (
-            categories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center">
-                  <div
-                    className="w-4 h-4 rounded-full mr-3"
-                    style={{ backgroundColor: category.color }}
-                  ></div>
-                  <span className="text-sm font-medium text-gray-700">{category.name}</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-red-500 hover:text-red-700 text-sm"
-                  onClick={() => deleteCategoryMutation.mutate(category.id)}
-                  disabled={deleteCategoryMutation.isPending}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+      {/* Existing Categories */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Existing Categories</h4>
+        {categories.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">No categories created yet</p>
+        ) : (
+          categories.map((category) => (
+            <div
+              key={category.id}
+              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+            >
+              <div className="flex items-center min-w-0 flex-1">
+                <div
+                  className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                  style={{ backgroundColor: category.color }}
+                ></div>
+                <span className="text-sm font-medium text-gray-700 truncate">{category.name}</span>
               </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-500 hover:text-red-700 text-sm p-1 sm:p-2 flex-shrink-0"
+                onClick={() => deleteCategoryMutation.mutate(category.id)}
+                disabled={deleteCategoryMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

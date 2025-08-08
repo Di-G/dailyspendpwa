@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { getToday } from "@/lib/date-utils";
 import { RefreshCw, TrendingUp, Calculator, BarChart3 } from "lucide-react";
 import type { Category } from "@shared/schema";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 declare global {
   interface Window {
@@ -23,6 +24,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   const barChartRef = useRef<HTMLCanvasElement>(null);
   const pieChartInstance = useRef<any>(null);
   const barChartInstance = useRef<any>(null);
+  const isMobile = useIsMobile();
 
   const CURRENCIES = {
     USD: { symbol: "$", name: "US Dollar" },
@@ -175,25 +177,26 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Charts Header with Date Selector */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Expense Analytics</h2>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Expense Analytics</h2>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 <label className="text-sm font-medium text-gray-700">Select Date:</label>
                 <Input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent w-full sm:w-auto"
                 />
               </div>
               <Button
                 onClick={updateCharts}
-                className="bg-primary text-white hover:bg-blue-700 transition duration-200"
+                size={isMobile ? "sm" : "default"}
+                className="bg-primary text-white hover:bg-blue-700 transition duration-200 w-full sm:w-auto"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Update Charts
@@ -204,12 +207,12 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       </Card>
 
       {/* Charts Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Pie Chart */}
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Distribution</h3>
-            <div className="relative h-64">
+            <div className="relative h-48 sm:h-64">
               <canvas ref={pieChartRef} className="w-full h-full"></canvas>
             </div>
             <div className="mt-4 space-y-2">
@@ -217,14 +220,14 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 const percentage = totalExpense > 0 ? ((ct.total / totalExpense) * 100).toFixed(0) : 0;
                 return (
                   <div key={ct.categoryId} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0 flex-1">
                       <div
-                        className="w-3 h-3 rounded-full mr-2"
+                        className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
                         style={{ backgroundColor: ct.category.color }}
                       ></div>
-                      <span>{ct.category.name}</span>
+                      <span className="truncate">{ct.category.name}</span>
                     </div>
-                    <span className="font-medium">{CURRENCIES[currency].symbol}{ct.total.toFixed(2)} ({percentage}%)</span>
+                    <span className="font-medium text-sm sm:text-base flex-shrink-0">{CURRENCIES[currency].symbol}{ct.total.toFixed(2)} ({percentage}%)</span>
                   </div>
                 );
               })}
@@ -234,9 +237,9 @@ export default function ChartsView({ currency }: ChartsViewProps) {
 
         {/* Bar Chart */}
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Comparison</h3>
-            <div className="relative h-64">
+            <div className="relative h-48 sm:h-64">
               <canvas ref={barChartRef} className="w-full h-full"></canvas>
             </div>
           </CardContent>
@@ -245,27 +248,27 @@ export default function ChartsView({ currency }: ChartsViewProps) {
 
       {/* Monthly Overview */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Overview</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="text-center p-4 bg-red-50 rounded-lg">
-              <TrendingUp className="text-red-500 text-2xl mb-2 mx-auto" />
-              <p className="text-sm font-medium text-gray-700">Highest Day</p>
-              <p className="text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{monthlyHighest.toFixed(2)}</p>
+              <TrendingUp className="text-red-500 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-gray-700">Highest Day</p>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{monthlyHighest.toFixed(2)}</p>
               <p className="text-xs text-gray-500">
                 {highestDayName && highestDayDate ? `${highestDayName}, ${highestDayDate}` : 'This month'}
               </p>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <BarChart3 className="text-green-500 text-2xl mb-2 mx-auto" />
-              <p className="text-sm font-medium text-gray-700">Average Daily</p>
-              <p className="text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{monthlyAverage.toFixed(2)}</p>
+              <BarChart3 className="text-green-500 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-gray-700">Average Daily</p>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{monthlyAverage.toFixed(2)}</p>
               <p className="text-xs text-gray-500">This month</p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <Calculator className="text-blue-500 text-2xl mb-2 mx-auto" />
-              <p className="text-sm font-medium text-gray-700">Selected Date Total</p>
-              <p className="text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{dailyTotal.total.toFixed(2)}</p>
+              <Calculator className="text-blue-500 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-gray-700">Selected Date Total</p>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{dailyTotal.total.toFixed(2)}</p>
               <p className="text-xs text-gray-500">{selectedDate}</p>
             </div>
           </div>

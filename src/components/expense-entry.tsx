@@ -17,6 +17,7 @@ import { Plus, Trash2, ChevronDown, Settings } from "lucide-react";
 import CategoryManagement from "./category-management";
 import type { ExpenseWithCategory, Category } from "@shared/schema";
 import { z } from "zod";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const CURRENCIES = {
   USD: { symbol: "$", name: "US Dollar" },
@@ -32,6 +33,7 @@ interface ExpenseEntryProps {
 
 export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(getToday());
   const today = getToday();
   
@@ -145,13 +147,13 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Date and Summary Section */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
                 {selectedDate === today ? "Today's Expenses" : "Expenses"}
               </h2>
               <input
@@ -161,11 +163,11 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                 className="text-primary font-medium cursor-pointer border border-gray-300 rounded px-2 py-1 text-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
-            <div className="flex items-center space-x-6 mt-4 sm:mt-0">
+            <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-6 gap-4 sm:gap-0">
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-500">Currency</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Currency</p>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-full sm:w-32 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -178,37 +180,37 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                 </Select>
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-500">Yesterday</p>
-                <p className="text-xl font-semibold text-gray-700">{CURRENCIES[currency].symbol}{yesterdayTotal.total.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Yesterday</p>
+                <p className="text-lg sm:text-xl font-semibold text-gray-700">{CURRENCIES[currency].symbol}{yesterdayTotal.total.toFixed(2)}</p>
               </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-500">
+              <div className="text-center col-span-2 sm:col-span-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-500">
                   {selectedDate === today ? "Today" : "Selected Date"}
                 </p>
-                <p className="text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{selectedDateTotal.total.toFixed(2)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{selectedDateTotal.total.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
           {/* Categories Quick Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
             {categories.map((category) => {
               const categoryTotal = categoryTotals.find(ct => ct.categoryId === category.id);
               return (
                 <div
                   key={category.id}
-                  className="border rounded-lg p-3 text-center"
+                  className="border rounded-lg p-2 sm:p-3 text-center"
                   style={{
                     backgroundColor: `${category.color}10`,
                     borderColor: `${category.color}40`,
                   }}
                 >
                   <div
-                    className="w-4 h-4 rounded-full mx-auto mb-2"
+                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
                     style={{ backgroundColor: category.color }}
                   ></div>
-                  <p className="text-xs font-medium text-gray-700">{category.name}</p>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-xs font-medium text-gray-700 truncate">{category.name}</p>
+                  <p className="text-xs sm:text-sm font-semibold text-gray-900">
                     {CURRENCIES[currency].symbol}{(categoryTotal?.total || 0).toFixed(2)}
                   </p>
                 </div>
@@ -218,11 +220,11 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Add Expense Form */}
         <div className="lg:col-span-2">
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Expense</h3>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -317,7 +319,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
 
         {/* Category Management - Collapsible */}
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <Collapsible open={showCategoryManagement} onOpenChange={setShowCategoryManagement}>
               <CollapsibleTrigger asChild>
                 <Button
@@ -341,42 +343,42 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
 
       {/* Selected Date Expenses List */}
       <Card>
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">
             {selectedDate === today ? "Today's Expense List" : `Expenses for ${formatDisplayDate(selectedDate)}`}
           </h3>
         </div>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           {selectedDateExpenses.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p>No expenses added for this date. Start by adding your first expense above.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {selectedDateExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200"
+                  className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200"
                 >
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: expense.category?.color || "#gray" }}
                     ></div>
-                    <div>
-                      <p className="font-medium text-gray-900">{expense.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{expense.name}</p>
                       {expense.details && (
-                        <p className="text-sm text-gray-600">{expense.details}</p>
+                        <p className="text-sm text-gray-600 truncate">{expense.details}</p>
                       )}
                       <p className="text-xs text-gray-500">{formatTime(expense.createdAt!.toString())}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="font-semibold text-gray-900">{CURRENCIES[currency].symbol}{expense.amount}</span>
+                  <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+                    <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{expense.amount}</span>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500 hover:text-red-700 p-1 sm:p-2"
                       onClick={() => deleteExpenseMutation.mutate(expense.id)}
                       disabled={deleteExpenseMutation.isPending}
                     >

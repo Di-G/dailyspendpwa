@@ -5,6 +5,7 @@ import ExpenseEntry from "@/components/expense-entry";
 import ChartsView from "@/components/charts-view";
 import CalendarView from "@/components/calendar-view";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ViewType = "entry" | "charts" | "calendar";
 type CurrencyCode = "USD" | "INR";
@@ -12,39 +13,42 @@ type CurrencyCode = "USD" | "INR";
 export default function ExpenseTracker() {
   const [currentView, setCurrentView] = useState<ViewType>("entry");
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
+  const isMobile = useIsMobile();
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center cursor-pointer" onClick={() => setCurrentView("entry")}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-4 sm:py-0 sm:h-16">
+            <div className="flex items-center cursor-pointer mb-4 sm:mb-0" onClick={() => setCurrentView("entry")}>
               <Wallet className="text-primary text-2xl mr-3" />
-              <h1 className="text-xl font-semibold text-gray-900">DET</h1>
+              <h1 className="text-xl font-semibold text-gray-900">DST</h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Button
                 onClick={() => setCurrentView("calendar")}
+                size={isMobile ? "sm" : "default"}
                 className={`${
                   currentView === "calendar"
                     ? "bg-primary hover:bg-blue-700"
                     : "bg-gray-600 hover:bg-gray-700"
                 } text-white transition duration-200`}
               >
-                <Calendar className="w-4 h-4 mr-2" />
-                Calendar View
+                <Calendar className="w-4 h-4 mr-1 sm:mr-2" />
+                {isMobile ? "Calendar" : "Calendar View"}
               </Button>
               <Button
                 onClick={() => setCurrentView("charts")}
+                size={isMobile ? "sm" : "default"}
                 className={`${
                   currentView === "charts"
                     ? "bg-secondary hover:bg-green-700"
                     : "bg-gray-600 hover:bg-gray-700"
                 } text-white transition duration-200`}
               >
-                <PieChart className="w-4 h-4 mr-2" />
-                Charts
+                <PieChart className="w-4 h-4 mr-1 sm:mr-2" />
+                {isMobile ? "Charts" : "Charts"}
               </Button>
             </div>
           </div>
@@ -52,7 +56,7 @@ export default function ExpenseTracker() {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {currentView === "entry" && <ExpenseEntry currency={currency} setCurrency={setCurrency} />}
         {currentView === "charts" && <ChartsView currency={currency} />}
         {currentView === "calendar" && <CalendarView currency={currency} />}

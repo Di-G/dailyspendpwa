@@ -4,6 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ExpenseTracker from "@/pages/expense-tracker";
+import AddToHomeScreen from "@/components/AddToHomeScreen";
+import PWADebug from "@/components/PWADebug";
 import { useEffect } from "react";
 import { initializeDefaultCategories } from "./lib/localStorage";
 
@@ -33,8 +35,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-
         <Router />
+        <AddToHomeScreen />
+        <PWADebug />
       </TooltipProvider>
     </QueryClientProvider>
   );

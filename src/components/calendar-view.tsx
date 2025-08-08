@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getMonthInfo, generateCalendarDays, getToday } from "@/lib/date-utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CalendarViewProps {
   currency: "USD" | "INR";
@@ -12,6 +13,7 @@ interface CalendarViewProps {
 export default function CalendarView({ currency }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const today = getToday();
+  const isMobile = useIsMobile();
   
   const monthInfo = getMonthInfo(currentDate);
   const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
@@ -35,13 +37,13 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Calendar Header */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Monthly Calendar</h2>
-            <div className="flex items-center space-x-4">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Monthly Calendar</h2>
+            <div className="flex items-center justify-center sm:justify-start space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -66,11 +68,11 @@ export default function CalendarView({ currency }: CalendarViewProps) {
 
       {/* Calendar Grid */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           {/* Calendar Header Days */}
           <div className="grid grid-cols-7 gap-1 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-sm font-medium text-gray-600 py-3">
+              <div key={day} className="text-center text-xs sm:text-sm font-medium text-gray-600 py-2 sm:py-3">
                 {day}
               </div>
             ))}
@@ -85,7 +87,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
               return (
                 <div
                   key={index}
-                  className={`aspect-square p-2 rounded-lg cursor-pointer transition duration-200 ${
+                  className={`aspect-square p-1 sm:p-2 rounded-lg cursor-pointer transition duration-200 ${
                     day.isToday
                       ? "bg-primary text-white"
                       : day.isCurrentMonth
@@ -95,7 +97,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                       : "text-gray-400 hover:bg-gray-50"
                   }`}
                 >
-                  <div className={`text-sm font-medium ${day.isToday ? "text-white" : "text-gray-900"}`}>
+                  <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-gray-900"}`}>
                     {day.date.getDate()}
                   </div>
                   {day.isCurrentMonth && (
@@ -106,7 +108,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                         ? "text-primary" 
                         : "text-gray-500"
                     }`}>
-{total === 0 ? "0" : Math.round(total)}
+                      {total === 0 ? "0" : Math.round(total)}
                     </div>
                   )}
                 </div>
@@ -118,19 +120,19 @@ export default function CalendarView({ currency }: CalendarViewProps) {
 
       {/* Calendar Legend */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Legend</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-primary rounded"></div>
+              <div className="w-6 h-6 bg-primary rounded flex-shrink-0"></div>
               <span className="text-sm text-gray-700">Today</span>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 border-2 border-primary rounded"></div>
+              <div className="w-6 h-6 border-2 border-primary rounded flex-shrink-0"></div>
               <span className="text-sm text-gray-700">Has Expenses</span>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-gray-100 rounded"></div>
+              <div className="w-6 h-6 bg-gray-100 rounded flex-shrink-0"></div>
               <span className="text-sm text-gray-700">No Expenses</span>
             </div>
           </div>

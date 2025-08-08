@@ -108,3 +108,28 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Fix for bright placeholder text */
+@layer components {
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-gray-500 opacity-70;
+  }
+  
+  /* Better mobile touch targets */
+  @media (max-width: 768px) {
+    button, 
+    [role="button"] {
+      @apply min-h-[44px] min-w-[44px];
+    }
+  }
+  
+  /* Mobile-optimized form inputs */
+  @media (max-width: 768px) {
+    input, 
+    textarea, 
+    select {
+      @apply text-base;
+    }
+  }
+}
