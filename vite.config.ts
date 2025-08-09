@@ -4,7 +4,11 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// Allow overriding base for deployments like GitHub Pages via VITE_BASE
+const base = process.env.VITE_BASE || "/";
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     runtimeErrorOverlay(),

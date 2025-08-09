@@ -30,8 +30,8 @@ A Progressive Web App for tracking daily expenses with a beautiful, modern UI. T
 
 ### Prerequisites
 
-- Node.js 18+ 
-- npm or yarn
+- Node.js 18+ (recommended) or 20+
+- npm
 
 ### Installation
 
@@ -43,7 +43,9 @@ cd dailyspendpwa
 
 2. Install dependencies:
 ```bash
-npm install
+# If PowerShell blocks npm scripts on Windows, either use Command Prompt (cmd)
+# or run this once in PowerShell: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+npm ci
 ```
 
 3. Start the development server:
@@ -60,6 +62,12 @@ npm run build
 ```
 
 The built files will be in the `dist` directory.
+
+### Preview the production build
+
+```bash
+npm run preview
+```
 
 ## Data Storage
 
@@ -128,4 +136,4 @@ Since all data is stored locally in your browser:
 
 ## License
 
-MIT License - see LICENSE file for details. 
+MIT License - see `LICENSE` file for details. 

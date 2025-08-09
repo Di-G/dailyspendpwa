@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getToday } from "@/lib/date-utils";
 import { RefreshCw, TrendingUp, Calculator, BarChart3 } from "lucide-react";
+import { Button as UIButton } from "@/components/ui/button";
 import type { Category } from "@shared/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatAmountDisplay } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -183,7 +185,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Expense Analytics</h2>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 <label className="text-sm font-medium text-gray-700">Select Date:</label>
                 <Input
@@ -193,14 +195,14 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent w-full sm:w-auto"
                 />
               </div>
-              <Button
+                <UIButton
                 onClick={updateCharts}
                 size={isMobile ? "sm" : "default"}
                 className="bg-primary text-white hover:bg-blue-700 transition duration-200 w-full sm:w-auto"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Update Charts
-              </Button>
+                </UIButton>
             </div>
           </div>
         </CardContent>
@@ -217,7 +219,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             </div>
             <div className="mt-4 space-y-2">
               {categoryTotals.map((ct) => {
-                const percentage = totalExpense > 0 ? ((ct.total / totalExpense) * 100).toFixed(0) : 0;
+                const percentage = totalExpense > 0 ? Math.round((ct.total / totalExpense) * 100) : 0;
                 return (
                   <div key={ct.categoryId} className="flex items-center justify-between text-sm">
                     <div className="flex items-center min-w-0 flex-1">
@@ -227,7 +229,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                       ></div>
                       <span className="truncate">{ct.category.name}</span>
                     </div>
-                    <span className="font-medium text-sm sm:text-base flex-shrink-0">{CURRENCIES[currency].symbol}{ct.total.toFixed(2)} ({percentage}%)</span>
+                    <span className="font-medium text-sm sm:text-base flex-shrink-0">{CURRENCIES[currency].symbol}{formatAmountDisplay(ct.total)} ({percentage}%)</span>
                   </div>
                 );
               })}
@@ -254,7 +256,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <TrendingUp className="text-red-500 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-gray-700">Highest Day</p>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{monthlyHighest.toFixed(2)}</p>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyHighest)}</p>
               <p className="text-xs text-gray-500">
                 {highestDayName && highestDayDate ? `${highestDayName}, ${highestDayDate}` : 'This month'}
               </p>
@@ -262,14 +264,14 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <BarChart3 className="text-green-500 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-gray-700">Average Daily</p>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{monthlyAverage.toFixed(2)}</p>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyAverage)}</p>
               <p className="text-xs text-gray-500">This month</p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <Calculator className="text-blue-500 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-gray-700">Selected Date Total</p>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{dailyTotal.total.toFixed(2)}</p>
-              <p className="text-xs text-gray-500">{selectedDate}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-700">Total This Month</p>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
+              <p className="text-xs text-gray-500">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
             </div>
           </div>
         </CardContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,15 @@ const COLOR_OPTIONS = [
   "#EC4899", // pink
 ];
 
-export default function CategoryManagement() {
+interface CategoryManagementProps {
+  hideHeader?: boolean;
+}
+
+export default function CategoryManagement({ hideHeader = false }: CategoryManagementProps) {
   const { toast } = useToast();
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
+  const [customSwatchColor, setCustomSwatchColor] = useState<string>("#000000");
+  const colorInputRef = useRef<HTMLInputElement | null>(null);
 
   // Query
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -94,7 +100,9 @@ export default function CategoryManagement() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900">Manage Categories</h3>
+      {!hideHeader && (
+        <h3 className="text-lg font-semibold text-gray-900">Manage Categories</h3>
+      )}
       
       {/* Add New Category */}
       <Form {...form}>
@@ -126,6 +134,31 @@ export default function CategoryManagement() {
                   onClick={() => setSelectedColor(color)}
                 />
               ))}
+              {/* Custom color swatch (last) */}
+              <button
+                type="button"
+                className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
+                  selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-gray-600 scale-110" : "border-dashed border-gray-300 hover:border-gray-400"
+                }`}
+                style={
+                  selectedColor.toLowerCase() === customSwatchColor.toLowerCase()
+                    ? { backgroundColor: customSwatchColor }
+                    : { backgroundImage: 'linear-gradient(90deg, #EF4444, #F59E0B, #10B981, #3B82F6, #8B5CF6, #EC4899)' }
+                }
+                onClick={() => colorInputRef.current?.click()}
+                aria-label="Choose custom color"
+                title="Choose custom color"
+              />
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={customSwatchColor}
+                onChange={(e) => {
+                  setCustomSwatchColor(e.target.value);
+                  setSelectedColor(e.target.value);
+                }}
+                className="hidden"
+              />
             </div>
           </div>
           <Button

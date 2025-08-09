@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -14,11 +13,11 @@ import { queryClient } from "@/lib/queryClient";
 import { createExpense, deleteExpense } from "@/lib/localStorage";
 import { getToday, getYesterday, formatDisplayDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, ChevronDown, Settings } from "lucide-react";
-import CategoryManagement from "./category-management";
+import { Plus, Trash2 } from "lucide-react";
 import type { ExpenseWithCategory, Category } from "@shared/schema";
 import { z } from "zod";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatAmountDisplay } from "@/lib/utils";
 
 const CURRENCIES = {
   USD: { symbol: "$", name: "US Dollar" },
@@ -46,7 +45,6 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   };
   
   const yesterday = getYesterdayForDate(selectedDate);
-  const [showCategoryManagement, setShowCategoryManagement] = useState(false);
 
   // Queries
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -180,29 +178,14 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
             </div>
             <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-6 gap-4 sm:gap-0">
               <div className="text-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-500">Currency</p>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="w-full sm:w-32 text-xs sm:text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(CURRENCIES).map(([code, curr]) => (
-                      <SelectItem key={code} value={code}>
-                        {curr.symbol} {code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-center">
                 <p className="text-xs sm:text-sm font-medium text-gray-500">Yesterday</p>
-                <p className="text-lg sm:text-xl font-semibold text-gray-700">{CURRENCIES[currency].symbol}{yesterdayTotal.total.toFixed(2)}</p>
+                <p className="text-lg sm:text-xl font-semibold text-gray-700">{CURRENCIES[currency].symbol}{formatAmountDisplay(yesterdayTotal.total)}</p>
               </div>
               <div className="text-center col-span-2 sm:col-span-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-500">
                   {selectedDate === today ? "Today" : "Selected Date"}
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{selectedDateTotal.total.toFixed(2)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedDateTotal.total)}</p>
               </div>
             </div>
           </div>
@@ -235,7 +218,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     ></div>
                     <p className="text-xs font-medium text-gray-700 truncate">{category.name}</p>
                     <p className="text-xs sm:text-sm font-semibold text-gray-900">
-                      {CURRENCIES[currency].symbol}{(categoryTotal?.total || 0).toFixed(2)}
+                      {CURRENCIES[currency].symbol}{formatAmountDisplay(categoryTotal?.total || 0)}
                     </p>
                   </div>
                 );
@@ -352,28 +335,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
           </Card>
         </div>
 
-        {/* Category Management - Collapsible */}
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <Collapsible open={showCategoryManagement} onOpenChange={setShowCategoryManagement}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full flex items-center justify-between p-3 hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    <Settings className="w-4 h-4 mr-2" />
-                    <span className="text-sm font-medium">Manage Categories</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showCategoryManagement ? 'rotate-180' : ''}`} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <CategoryManagement />
-              </CollapsibleContent>
-            </Collapsible>
-          </CardContent>
-        </Card>
+        {/* Settings removed from home. Manage categories moved to Settings drawer. */}
       </div>
 
       {/* Selected Date Expenses List */}
@@ -409,7 +371,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-                    <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{expense.amount}</span>
+                    <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
                     <Button
                       size="sm"
                       variant="ghost"
