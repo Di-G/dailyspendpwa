@@ -181,7 +181,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                 <p className="text-xs sm:text-sm font-medium text-gray-500">Yesterday</p>
                 <p className="text-lg sm:text-xl font-semibold text-gray-700">{CURRENCIES[currency].symbol}{formatAmountDisplay(yesterdayTotal.total)}</p>
               </div>
-              <div className="text-center col-span-2 sm:col-span-1">
+              <div className="text-center">
                 <p className="text-xs sm:text-sm font-medium text-gray-500">
                   {selectedDate === today ? "Today" : "Selected Date"}
                 </p>

@@ -280,10 +280,30 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
         </button>
         <div className={`overflow-hidden transition-[max-height] duration-300 ${open.export ? 'max-h-96' : 'max-h-0'}`}>
           <div className="pt-2 space-y-3">
-            <div className="flex items-center space-x-2">
-              <Button disabled={exporting} onClick={() => handleExport("excel")} className="bg-primary hover:bg-blue-700">Export (Excel)</Button>
-              <Button disabled={exporting} variant="secondary" onClick={() => handleExport("pdf")}>Export (PDF)</Button>
-              <Button variant="outline" disabled={importing} onClick={() => document.getElementById("dailyspend-import-input")?.click()}>Import</Button>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Button
+                disabled={exporting}
+                onClick={() => handleExport("excel")}
+                className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
+              >
+                Export (Excel)
+              </Button>
+              <Button
+                disabled={exporting}
+                variant="secondary"
+                onClick={() => handleExport("pdf")}
+                className="w-full sm:w-auto px-4"
+              >
+                Export (PDF)
+              </Button>
+              <Button
+                variant="outline"
+                disabled={importing}
+                onClick={() => document.getElementById("dailyspend-import-input")?.click()}
+                className="w-full sm:w-auto px-4"
+              >
+                Import
+              </Button>
               <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleImportFile(file);
