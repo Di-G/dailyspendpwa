@@ -1,4 +1,5 @@
 import { Category, Expense, InsertCategory, InsertExpense, ExpenseWithCategory } from "@shared/schema";
+import { formatDate } from "./date-utils";
 
 // Storage keys
 const CATEGORIES_KEY = 'dailyspend_categories';
@@ -146,7 +147,7 @@ export const getCategoryTotals = (date: string): Array<{ categoryId: string; tot
 
 export const getMonthlyTotals = (year: number, month: number): Array<{ date: string; total: number }> => {
   const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // Last day of month
+  const endDate = formatDate(new Date(year, month, 0)); // Last day of month (month is 1-based here)
   
   const expenses = getExpensesByDateRange(startDate, endDate);
   
@@ -168,7 +169,7 @@ export const getWeeklyTotals = (date: string): Array<{ date: string; total: numb
   const startDate = new Date(currentDate);
   startDate.setDate(currentDate.getDate() - 6); // 7 days ago
   
-  const startDateStr = startDate.toISOString().split('T')[0];
+  const startDateStr = formatDate(startDate);
   const endDateStr = date;
   
   const expenses = getExpensesByDateRange(startDateStr, endDateStr);

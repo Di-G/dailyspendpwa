@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getToday } from "@/lib/date-utils";
+import { getToday, formatDate } from "@/lib/date-utils";
 import { RefreshCw, TrendingUp, Calculator, BarChart3 } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
 import type { Category } from "@shared/schema";
@@ -61,7 +61,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       const day = new Date(currentDate);
       day.setDate(currentDate.getDate() - i);
       days.push({
-        date: day.toISOString().split('T')[0],
+        date: formatDate(day),
         label: day.toLocaleDateString('en-US', { weekday: 'short' })
       });
     }

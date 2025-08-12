@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { insertExpenseSchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { createExpense, deleteExpense } from "@/lib/localStorage";
-import { getToday, getYesterday, formatDisplayDate } from "@/lib/date-utils";
+import { getToday, getYesterday, formatDisplayDate, formatDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2 } from "lucide-react";
 import type { ExpenseWithCategory, Category } from "@shared/schema";
@@ -41,7 +41,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   const getYesterdayForDate = (date: string) => {
     const d = new Date(date);
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return formatDate(d);
   };
   
   const yesterday = getYesterdayForDate(selectedDate);
