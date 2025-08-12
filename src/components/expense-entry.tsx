@@ -10,14 +10,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertExpenseSchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
-import { createExpense, deleteExpense } from "@/lib/localStorage";
+import { createExpense, deleteExpense, updateExpense } from "@/lib/localStorage";
 import { getToday, getYesterday, formatDisplayDate, formatDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import type { ExpenseWithCategory, Category } from "@shared/schema";
 import { z } from "zod";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatAmountDisplay } from "@/lib/utils";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const CURRENCIES = {
   USD: { symbol: "$", name: "US Dollar" },
@@ -116,6 +117,51 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete expense", variant: "destructive" });
+    },
+  });
+
+  // Edit dialog state
+  const [editingExpense, setEditingExpense] = useState<ExpenseWithCategory | null>(null);
+  const [editFields, setEditFields] = useState<{
+    name: string;
+    amount: string;
+    details: string;
+    categoryId: string;
+  } | null>(null);
+
+  const openEdit = (expense: ExpenseWithCategory) => {
+    setEditingExpense(expense);
+    setEditFields({
+      name: expense.name,
+      amount: expense.amount,
+      details: expense.details || "",
+      categoryId: expense.categoryId || "",
+    });
+  };
+
+  const closeEdit = () => {
+    setEditingExpense(null);
+    setEditFields(null);
+  };
+
+  const updateExpenseMutation = useMutation({
+    mutationFn: async (payload: { id: string; updates: any }) => {
+      const result = updateExpense(payload.id, payload.updates);
+      if (!result) throw new Error("Failed to update expense");
+      return result;
+    },
+    onSuccess: () => {
+      // Invalidate all expense-related queries so all views update
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
+      toast({ title: "Success", description: "Expense updated successfully" });
+      closeEdit();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update expense", variant: "destructive" });
     },
   });
 
@@ -398,6 +444,14 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="text-gray-600 hover:text-gray-900 p-1 sm:p-2"
+                      onClick={() => openEdit(expense)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="text-red-500 hover:text-red-700 p-1 sm:p-2"
                       onClick={() => deleteExpenseMutation.mutate(expense.id)}
                       disabled={deleteExpenseMutation.isPending}
@@ -411,6 +465,92 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Expense Dialog */}
+      <Dialog open={!!editingExpense} onOpenChange={(open) => { if (!open) closeEdit(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Expense</DialogTitle>
+          </DialogHeader>
+          {editFields && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Amount ({CURRENCIES[currency].symbol})</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editFields.amount}
+                    onChange={(e) => setEditFields({ ...editFields, amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Expense Name</label>
+                  <Input
+                    value={editFields.name}
+                    onChange={(e) => setEditFields({ ...editFields, name: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Category</label>
+                <Select
+                  onValueChange={(val) => setEditFields({ ...editFields, categoryId: val })}
+                  value={editFields.categoryId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: category.color }} />
+                          {category.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Additional Details</label>
+                <Textarea
+                  rows={3}
+                  value={editFields.details}
+                  onChange={(e) => setEditFields({ ...editFields, details: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={closeEdit}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!editingExpense || !editFields) return;
+                const amount = parseFloat(editFields.amount);
+                if (isNaN(amount) || amount <= 0) {
+                  toast({ title: "Error", description: "Please enter a valid amount", variant: "destructive" });
+                  return;
+                }
+                updateExpenseMutation.mutate({
+                  id: editingExpense.id,
+                  updates: {
+                    name: editFields.name,
+                    amount: amount.toString(),
+                    details: editFields.details.trim() === "" ? null : editFields.details,
+                    categoryId: editFields.categoryId ? editFields.categoryId : null,
+                  },
+                });
+              }}
+              disabled={updateExpenseMutation.isPending}
+              className="bg-primary hover:bg-blue-700"
+            >
+              {updateExpenseMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -116,6 +116,34 @@ export const deleteExpense = (id: string): void => {
   setToStorage(EXPENSES_KEY, updatedExpenses);
 };
 
+export const updateExpense = (
+  id: string,
+  data: {
+    name?: string;
+    amount?: string; // keep string format consistent with storage
+    details?: string | null;
+    categoryId?: string | null;
+    date?: string; // optional: allow moving between dates
+  }
+): Expense | null => {
+  const expenses = getExpenses();
+  let updated: Expense | null = null;
+  const updatedExpenses = expenses.map(expense => {
+    if (expense.id !== id) return expense;
+    updated = {
+      ...expense,
+      name: data.name !== undefined ? data.name : expense.name,
+      amount: data.amount !== undefined ? data.amount : expense.amount,
+      details: data.details !== undefined ? data.details : expense.details,
+      categoryId: data.categoryId !== undefined ? data.categoryId : expense.categoryId,
+      date: data.date !== undefined ? data.date : expense.date,
+    };
+    return updated;
+  });
+  setToStorage(EXPENSES_KEY, updatedExpenses);
+  return updated;
+};
+
 // Analytics
 export const getDailyTotal = (date: string): number => {
   const expenses = getExpensesByDate(date);

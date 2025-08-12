@@ -31,6 +31,12 @@ const mockApi: Record<string, ApiEndpoint> = {
     POST: (data: any) => localStorageService.createExpense(data),
     DELETE: (id: string) => localStorageService.deleteExpense(id),
   },
+
+  // Expense by id (for update via mock PUT)
+  "/api/expenses/update": {
+    GET: () => ({}),
+    POST: (data: any) => localStorageService.updateExpense(data.id, data.updates),
+  },
   
   // Analytics
   "/api/analytics/daily-total": {
