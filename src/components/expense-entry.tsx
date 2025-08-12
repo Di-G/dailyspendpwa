@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertExpenseSchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
-import { createExpense, deleteExpense, updateExpense, restoreExpense } from "@/lib/localStorage";
+import { createExpense, deleteExpense, updateExpense, restoreExpense, generateExpensesFromRecurring } from "@/lib/localStorage";
 import { getToday, getYesterday, formatDisplayDate, formatDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Pencil } from "lucide-react";
@@ -268,6 +268,52 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
       amount: amount.toString(),
     });
   };
+
+  // Effect to generate recurring expenses when date changes
+  useEffect(() => {
+    const generateRecurringExpenses = () => {
+      try {
+        const generatedExpenses = generateExpensesFromRecurring(selectedDate);
+        
+        if (generatedExpenses.length > 0) {
+          // Add each generated expense
+          generatedExpenses.forEach(expense => {
+            createExpense({
+              name: expense.name,
+              amount: expense.amount,
+              details: expense.details || undefined,
+              categoryId: expense.categoryId || undefined,
+              date: expense.date,
+            });
+          });
+          
+          // Invalidate queries to refresh the UI
+          queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+          
+          if (generatedExpenses.length === 1) {
+            toast({
+              title: "Recurring Expense Added",
+              description: `Added "${generatedExpenses[0].name}" from recurring expenses.`,
+            });
+          } else {
+            toast({
+              title: "Recurring Expenses Added",
+              description: `Added ${generatedExpenses.length} recurring expenses for this date.`,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error generating recurring expenses:", error);
+      }
+    };
+
+    // Only generate if it's not today (to avoid duplicate generation)
+    if (selectedDate !== today) {
+      generateRecurringExpenses();
+    }
+  }, [selectedDate, today]);
 
   // Compute change vs yesterday
   const todayTotalValue = selectedDateTotal.total || 0;

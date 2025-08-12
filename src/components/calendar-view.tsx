@@ -3,8 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getMonthInfo, generateCalendarDays, getToday } from "@/lib/date-utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getRecurringExpenses, generateExpensesFromRecurring } from "@/lib/localStorage";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface CalendarViewProps {
   currency: "USD" | "INR";
@@ -14,6 +17,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const today = getToday();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   
   const monthInfo = getMonthInfo(currentDate);
   const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
@@ -23,9 +27,82 @@ export default function CalendarView({ currency }: CalendarViewProps) {
     queryKey: ["/api/analytics/monthly-totals", { year: monthInfo.year, month: monthInfo.month }],
   });
 
+  // Get recurring expenses for the month
+  const recurringExpenses = getRecurringExpenses();
+
   const getTotalForDate = (dateString: string) => {
     const total = monthlyTotals.find(mt => mt.date === dateString);
     return total ? total.total : 0;
+  };
+
+  const hasRecurringExpenseOnDate = (dateString: string) => {
+    return recurringExpenses.some(recurring => {
+      if (!recurring.isActive) return false;
+      if (recurring.endDate && dateString > recurring.endDate) return false;
+      if (dateString < recurring.startDate) return false;
+      
+      const startDate = new Date(recurring.startDate);
+      const targetDate = new Date(dateString);
+      
+      switch (recurring.frequency) {
+        case 'daily':
+          return true;
+        case 'weekly':
+          const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          return daysDiff % 7 === 0;
+        case 'monthly':
+          const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                            (targetDate.getMonth() - startDate.getMonth());
+          const dayOfMonth = startDate.getDate();
+          return monthsDiff >= 0 && targetDate.getDate() === dayOfMonth;
+        case 'custom':
+          if (recurring.customDays) {
+            const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysDiff % recurring.customDays === 0;
+          }
+          return false;
+        default:
+          return false;
+      }
+    });
+  };
+
+  const generateRecurringExpensesForDate = (dateString: string) => {
+    try {
+      const generatedExpenses = generateExpensesFromRecurring(dateString);
+      
+      if (generatedExpenses.length > 0) {
+        // Invalidate queries to refresh the UI
+        queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+        
+        if (generatedExpenses.length === 1) {
+          toast({
+            title: "Recurring Expense Added",
+            description: `Added "${generatedExpenses[0].name}" from recurring expenses.`,
+          });
+        } else {
+          toast({
+            title: "Recurring Expenses Added",
+            description: `Added ${generatedExpenses.length} recurring expenses for this date.`,
+          });
+        }
+      } else {
+        toast({
+          title: "No Recurring Expenses",
+          description: "No recurring expenses are scheduled for this date.",
+        });
+      }
+    } catch (error) {
+      console.error("Error generating recurring expenses:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate recurring expenses.",
+        variant: "destructive",
+      });
+    }
   };
 
   const previousMonth = () => {
@@ -83,33 +160,48 @@ export default function CalendarView({ currency }: CalendarViewProps) {
             {calendarDays.map((day, index) => {
               const total = getTotalForDate(day.dateString);
               const hasExpenses = total > 0;
+              const hasRecurringExpense = hasRecurringExpenseOnDate(day.dateString);
               
               return (
                 <div
                   key={index}
-                  className={`aspect-square p-1 sm:p-2 rounded-lg cursor-pointer transition duration-200 ${
+                  onClick={() => {
+                    if (day.isCurrentMonth && hasRecurringExpense) {
+                      generateRecurringExpensesForDate(day.dateString);
+                    }
+                  }}
+                  className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
                     day.isToday
                       ? "bg-primary text-white"
                       : day.isCurrentMonth
-                      ? hasExpenses
-                        ? "hover:bg-gray-50 border-2 border-transparent hover:border-primary"
+                      ? hasExpenses || hasRecurringExpense
+                        ? "hover:bg-gray-50 border-2 border-transparent hover:border-primary cursor-pointer"
                         : "hover:bg-gray-50"
                       : "text-gray-400 hover:bg-gray-50"
-                  }`}
+                  } ${day.isCurrentMonth && hasRecurringExpense ? 'cursor-pointer' : ''}`}
+                  title={day.isCurrentMonth && hasRecurringExpense ? `Click to generate recurring expenses for ${day.dateString}` : ''}
                 >
                   <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-gray-900"}`}>
                     {day.date.getDate()}
                   </div>
                   {day.isCurrentMonth && (
-                    <div className={`text-xs font-medium mt-1 ${
-                      day.isToday 
-                        ? "text-white" 
-                        : hasExpenses 
-                        ? "text-primary" 
-                        : "text-gray-500"
-                    }`}>
-                      {total === 0 ? "0" : Math.round(total)}
-                    </div>
+                    <>
+                      {hasExpenses && (
+                        <div className={`text-xs font-medium mt-1 ${
+                          day.isToday 
+                            ? "text-white" 
+                            : "text-primary"
+                        }`}>
+                          {total === 0 ? "0" : Math.round(total)}
+                        </div>
+                      )}
+                      {hasRecurringExpense && (
+                        <div className="flex items-center mt-1 text-xs text-gray-500">
+                          <Repeat className="w-3 h-3 mr-1" />
+                          Recurring
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );
@@ -122,7 +214,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
       <Card>
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Legend</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="flex items-center space-x-3">
               <div className="w-6 h-6 bg-primary rounded flex-shrink-0"></div>
               <span className="text-sm text-gray-700">Today</span>
@@ -134,6 +226,12 @@ export default function CalendarView({ currency }: CalendarViewProps) {
             <div className="flex items-center space-x-3">
               <div className="w-6 h-6 bg-gray-100 rounded flex-shrink-0"></div>
               <span className="text-sm text-gray-700">No Expenses</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-6 h-6 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center">
+                <Repeat className="w-3 h-3 text-gray-500" />
+              </div>
+              <span className="text-sm text-gray-700">Recurring Expense</span>
             </div>
           </div>
         </CardContent>

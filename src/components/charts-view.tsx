@@ -23,7 +23,6 @@ interface ChartsViewProps {
 export default function ChartsView({ currency }: ChartsViewProps) {
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [chartsReady, setChartsReady] = useState(false);
-  const [weeklyChartOffset, setWeeklyChartOffset] = useState(0); // Simple offset for sliding
   const pieChartRef = useRef<HTMLCanvasElement>(null);
   const barChartRef = useRef<HTMLCanvasElement>(null);
   const pieChartInstance = useRef<any>(null);
@@ -55,17 +54,13 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     queryKey: ["/api/analytics/monthly-totals", { year: selectedMonth.getFullYear(), month: selectedMonth.getMonth() + 1 }],
   });
 
-  // Generate sliding weeks from selected date
-  const getSlidingWeeks = (date: string, offset: number) => {
+  // Generate last 7 days from selected date
+  const getLast7Days = (date: string) => {
     const days = [];
     const currentDate = new Date(date);
-    // Start from offset days ago
-    const startDate = new Date(currentDate);
-    startDate.setDate(currentDate.getDate() - offset);
-    
     for (let i = 6; i >= 0; i--) {
-      const day = new Date(startDate);
-      day.setDate(startDate.getDate() - i);
+      const day = new Date(currentDate);
+      day.setDate(currentDate.getDate() - i);
       days.push({
         date: formatDate(day),
         label: day.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -75,201 +70,43 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     return days;
   };
 
-  const weeklyDays = getSlidingWeeks(selectedDate, weeklyChartOffset);
+  const weeklyDays = getLast7Days(selectedDate);
   const weeklyData = weeklyDays.map(day => {
     const dayTotal = weeklyTotals.find(wt => wt.date === day.date);
     return dayTotal ? dayTotal.total : 0;
   });
   const weeklyLabels = weeklyDays.map(day => day.label);
 
-  // Touch/swipe support for mobile
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  // Mouse drag support for desktop
-  const [isMouseDragging, setIsMouseDragging] = useState(false);
-  const [mouseStartX, setMouseStartX] = useState<number | null>(null);
-
-  const minSwipeDistance = 50;
-  const barWidth = 100; // Approximate width of each bar in pixels
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-    setIsDragging(true);
-    setDragOffset(0);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !touchStart) return;
-    
-    const currentX = e.targetTouches[0].clientX;
-    const deltaX = currentX - touchStart;
-    
-    // Calculate how many days to offset based on drag distance
-    const dayOffset = deltaX / barWidth;
-    setDragOffset(dayOffset);
-    
-    // Update chart in real-time during drag
-    updateChartWithOffset(weeklyChartOffset + dayOffset);
-  };
-
-  const onTouchEnd = () => {
-    if (!isDragging) return;
-    
-    setIsDragging(false);
-    
-    // Calculate final position and snap to nearest complete day
-    const finalOffset = Math.round(weeklyChartOffset + dragOffset);
-    const clampedOffset = Math.max(0, finalOffset);
-    
-    // Smoothly animate to final position
-    smoothSlideTo(clampedOffset);
-    
-    setDragOffset(0);
-  };
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    setIsMouseDragging(true);
-    setMouseStartX(e.clientX);
-    setDragOffset(0);
-  };
-
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!isMouseDragging || mouseStartX === null) return;
-    
-    const deltaX = e.clientX - mouseStartX;
-    const dayOffset = deltaX / barWidth;
-    setDragOffset(dayOffset);
-    
-    // Update chart in real-time during drag
-    updateChartWithOffset(weeklyChartOffset + dayOffset);
-  };
-
-  const onMouseUp = () => {
-    if (!isMouseDragging) return;
-    
-    setIsMouseDragging(false);
-    
-    // Calculate final position and snap to nearest complete day
-    const finalOffset = Math.round(weeklyChartOffset + dragOffset);
-    const clampedOffset = Math.max(0, finalOffset);
-    
-    // Smoothly animate to final position
-    smoothSlideTo(clampedOffset);
-    
-    setDragOffset(0);
-    setMouseStartX(null);
-  };
-
-  // Update chart with continuous offset (for real-time dragging)
-  const updateChartWithOffset = (continuousOffset: number) => {
-    if (!barChartInstance.current) return;
-    
-    const chart = barChartInstance.current;
-    const clampedOffset = Math.max(0, continuousOffset);
-    
-    // Get the data for the continuous offset
-    const targetDays = getSlidingWeeks(selectedDate, clampedOffset);
-    const targetData = targetDays.map(day => {
-      const dayTotal = weeklyTotals.find(wt => wt.date === day.date);
-      return dayTotal ? dayTotal.total : 0;
-    });
-    const targetLabels = targetDays.map(day => day.label);
-    
-    // Update chart data without animation for smooth dragging
-    chart.data.labels = targetLabels;
-    chart.data.datasets[0].data = targetData;
-    chart.update('none'); // No animation during drag
-  };
-
-  // Smooth sliding function for final positioning
-  const smoothSlideTo = (newOffset: number) => {
-    if (isAnimating) return;
-    
-    setIsAnimating(true);
-    
-    // Animate the chart data transition
-    if (barChartInstance.current) {
-      const chart = barChartInstance.current;
-      
-      // Get the target data for smooth transition
-      const targetDays = getSlidingWeeks(selectedDate, newOffset);
-      const targetData = targetDays.map(day => {
-        const dayTotal = weeklyTotals.find(wt => wt.date === day.date);
-        return dayTotal ? dayTotal.total : 0;
-      });
-      const targetLabels = targetDays.map(day => day.label);
-
-      // Animate the transition
-      chart.data.labels = targetLabels;
-      chart.data.datasets[0].data = targetData;
-      
-      // Use Chart.js animation for final positioning
-      chart.update('active');
-    }
-    
-    // Update the offset after animation
-    setTimeout(() => {
-      setWeeklyChartOffset(newOffset);
-      setIsAnimating(false);
-    }, 300); // Match Chart.js animation duration
-  };
-
-  // Simple function to go back to newest (today) with smooth animation
+  // Simple function to go back to newest (today)
   const goToNewest = () => {
-    smoothSlideTo(0);
+    // No longer needed as we're back to simple 7-day view
   };
 
   // Keyboard navigation support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAnimating || isDragging || isMouseDragging) return;
-      
       if (e.key === 'ArrowLeft') {
         // Left arrow - go to newer dates
-        smoothSlideTo(Math.max(0, weeklyChartOffset - 1));
+        if (barChartInstance.current) {
+          barChartInstance.current.scrollBy({ left: -100, behavior: 'smooth' });
+        }
       } else if (e.key === 'ArrowRight') {
         // Right arrow - go to older dates
-        smoothSlideTo(weeklyChartOffset + 1);
+        if (barChartInstance.current) {
+          barChartInstance.current.scrollBy({ left: 100, behavior: 'smooth' });
+        }
       } else if (e.key === 'Home') {
         // Home key - go to newest
-        smoothSlideTo(0);
-      }
-    };
-
-    // Global mouse move listener for dragging
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (isMouseDragging && mouseStartX !== null) {
-        const deltaX = e.clientX - mouseStartX;
-        const dayOffset = deltaX / barWidth;
-        setDragOffset(dayOffset);
-        
-        // Update chart in real-time during drag
-        updateChartWithOffset(weeklyChartOffset + dayOffset);
-      }
-    };
-
-    // Global mouse up listener for dragging
-    const handleGlobalMouseUp = () => {
-      if (isMouseDragging) {
-        onMouseUp();
+        goToNewest();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    window.addEventListener('mouseup', handleGlobalMouseUp);
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [weeklyChartOffset, isAnimating, isDragging, isMouseDragging, mouseStartX]);
+  }, []);
 
   const initializeCharts = useCallback(() => {
     if (!window.Chart) return;
@@ -318,6 +155,10 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         console.error('Could not get 2D context from canvas');
         return;
       }
+      
+      console.log('Creating bar chart with data:', weeklyData);
+      console.log('Creating bar chart with labels:', weeklyLabels);
+      
       barChartInstance.current = new window.Chart(ctx, {
         type: 'bar',
         data: {
@@ -334,6 +175,18 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: {
+            duration: 300,
+            easing: 'easeInOutQuart'
+          },
+          transitions: {
+            active: {
+              animation: {
+                duration: 300,
+                easing: 'easeInOutQuart'
+              }
+            }
+          },
           plugins: {
             legend: {
               display: false
@@ -357,12 +210,26 @@ export default function ChartsView({ currency }: ChartsViewProps) {
               grid: {
                 display: true,
                 color: '#f0f0f0'
+              },
+              ticks: {
+                display: true // Always show Y-axis labels
               }
             },
             x: {
               grid: {
                 display: false
+              },
+              ticks: {
+                maxTicksLimit: 7, // Show all 7 day labels
+                maxRotation: 0,
+                display: true // Always show X-axis labels
               }
+            }
+          },
+          elements: {
+            bar: {
+              borderWidth: 1,
+              borderColor: '#1976D2'
             }
           }
         }
@@ -371,11 +238,11 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     }
 
     setChartsReady(chartsInitialized);
-  }, [categoryTotals, weeklyTotals, weeklyLabels, weeklyData, currency, weeklyDays]);
+  }, [categoryTotals, weeklyData, weeklyLabels, currency, weeklyDays]);
 
   // Reset weekly chart offset when date changes
   useEffect(() => {
-    setWeeklyChartOffset(0);
+    // No longer needed as chart is horizontally scrollable
   }, [selectedDate]);
 
   // Initialize charts when data changes
@@ -384,7 +251,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       initializeCharts();
     }, 100);
     return () => clearTimeout(timer);
-  }, [categoryTotals, weeklyTotals, selectedDate, weeklyChartOffset, initializeCharts]);
+  }, [categoryTotals, weeklyData, weeklyLabels, initializeCharts]);
 
   // Check if Chart.js is available and initialize on mount
   useEffect(() => {
@@ -474,12 +341,26 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 grid: {
                   display: true,
                   color: '#f0f0f0'
+                },
+                ticks: {
+                  display: true // Always show Y-axis labels
                 }
               },
               x: {
                 grid: {
                   display: false
+                },
+                ticks: {
+                  maxTicksLimit: 7, // Show all 7 day labels
+                  maxRotation: 0,
+                  display: true // Always show X-axis labels
                 }
+              }
+            },
+            elements: {
+              bar: {
+                borderWidth: 1,
+                borderColor: '#1976D2'
               }
             }
           }
@@ -487,7 +368,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         console.log('Weekly chart forced render successful');
       }
     }
-  }, [weeklyLabels, weeklyData, weeklyChartOffset, currency]);
+  }, [weeklyData, weeklyLabels, currency]);
 
   const updateCharts = useCallback(() => {
     initializeCharts();
@@ -585,50 +466,24 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             
             {/* Navigation Controls */}
             <div className="flex items-center justify-end mb-4">
-              <Button
-                onClick={goToNewest}
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                disabled={isAnimating}
-              >
-                {isAnimating ? '⏳' : 'Newest ⏭️'}
-              </Button>
+              {/* No navigation needed for simple 7-day view */}
             </div>
             
             <div className="relative h-48 sm:h-64">
-              {(isAnimating || isDragging || isMouseDragging) && (
-                <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-                  <div className="text-blue-600 text-sm">
-                    {isDragging || isMouseDragging ? 'Dragging...' : 'Sliding...'}
-                  </div>
-                </div>
-              )}
               <canvas 
                 ref={barChartRef} 
-                className="w-full h-full cursor-grab active:cursor-grabbing"
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEnd}
-                onMouseDown={onMouseDown}
-                onMouseMove={onMouseMove}
-                onMouseUp={onMouseUp}
-                onMouseLeave={onMouseUp}
+                className="w-full h-full"
               ></canvas>
             </div>
             
             {/* Date Range Info */}
             <div className="mt-2 text-xs text-gray-500 text-center">
-              Showing: {weeklyDays[0]?.fullDate} - {weeklyDays[6]?.fullDate}
+              Showing: {weeklyDays[6]?.fullDate} - {weeklyDays[0]?.fullDate}
             </div>
             
             {/* Navigation Hints */}
             <div className="mt-2 text-xs text-gray-400 text-center space-y-1">
-              {isMobile ? (
-                <div>💡 Drag bars left/right to smoothly slide through dates</div>
-              ) : (
-                <div>💡 Click and drag bars to slide • Use ← → arrow keys • Press Home to return to today</div>
-              )}
+              💡 Weekly comparison showing last 7 days
             </div>
           </CardContent>
         </Card>

@@ -1,9 +1,10 @@
-import { Category, Expense, InsertCategory, InsertExpense, ExpenseWithCategory } from "@shared/schema";
+import { Category, Expense, RecurringExpense, InsertCategory, InsertExpense, InsertRecurringExpense, ExpenseWithCategory, RecurringExpenseWithCategory } from "@shared/schema";
 import { formatDate } from "./date-utils";
 
 // Storage keys
 const CATEGORIES_KEY = 'dailyspend_categories';
 const EXPENSES_KEY = 'dailyspend_expenses';
+const RECURRING_EXPENSES_KEY = 'dailyspend_recurring_expenses';
 
 // Helper functions
 const generateId = (): string => {
@@ -32,6 +33,15 @@ const setToStorage = <T>(key: string, value: T): void => {
 const enrichExpensesWithCategories = (expenses: Expense[]): ExpenseWithCategory[] => {
   const categories = getCategories();
   return expenses.map(expense => ({
+    ...expense,
+    category: expense.categoryId ? categories.find(cat => cat.id === expense.categoryId) : undefined,
+  }));
+};
+
+// Helper function to enrich recurring expenses with category data
+const enrichRecurringExpensesWithCategories = (recurringExpenses: RecurringExpense[]): RecurringExpenseWithCategory[] => {
+  const categories = getCategories();
+  return recurringExpenses.map(expense => ({
     ...expense,
     category: expense.categoryId ? categories.find(cat => cat.id === expense.categoryId) : undefined,
   }));
@@ -148,6 +158,139 @@ export const updateExpense = (
   });
   setToStorage(EXPENSES_KEY, updatedExpenses);
   return updated;
+};
+
+// Recurring Expenses
+export const getRecurringExpenses = (): RecurringExpense[] => {
+  return getFromStorage<RecurringExpense[]>(RECURRING_EXPENSES_KEY, []);
+};
+
+export const getRecurringExpensesWithCategories = (): RecurringExpenseWithCategory[] => {
+  const recurringExpenses = getRecurringExpenses();
+  return enrichRecurringExpensesWithCategories(recurringExpenses);
+};
+
+export const createRecurringExpense = (data: InsertRecurringExpense): RecurringExpense => {
+  const recurringExpenses = getRecurringExpenses();
+  const newRecurringExpense: RecurringExpense = {
+    id: generateId(),
+    name: data.name,
+    amount: data.amount,
+    details: data.details || null,
+    categoryId: data.categoryId || null,
+    frequency: data.frequency,
+    customDays: data.customDays,
+    startDate: data.startDate,
+    endDate: data.endDate || null,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+  
+  const updatedRecurringExpenses = [...recurringExpenses, newRecurringExpense];
+  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  return newRecurringExpense;
+};
+
+export const updateRecurringExpense = (
+  id: string,
+  data: Partial<InsertRecurringExpense> & { isActive?: boolean }
+): RecurringExpense | null => {
+  const recurringExpenses = getRecurringExpenses();
+  let updated: RecurringExpense | null = null;
+  const updatedRecurringExpenses = recurringExpenses.map(expense => {
+    if (expense.id !== id) return expense;
+    updated = {
+      ...expense,
+      name: data.name !== undefined ? data.name : expense.name,
+      amount: data.amount !== undefined ? data.amount : expense.amount,
+      details: data.details !== undefined ? data.details : expense.details,
+      categoryId: data.categoryId !== undefined ? data.categoryId : expense.categoryId,
+      frequency: data.frequency !== undefined ? data.frequency : expense.frequency,
+      customDays: data.customDays !== undefined ? data.customDays : expense.customDays,
+      startDate: data.startDate !== undefined ? data.startDate : expense.startDate,
+      endDate: data.endDate !== undefined ? data.endDate : expense.endDate,
+      isActive: data.isActive !== undefined ? data.isActive : expense.isActive,
+    };
+    return updated;
+  });
+  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  return updated;
+};
+
+export const deleteRecurringExpense = (id: string): void => {
+  const recurringExpenses = getRecurringExpenses();
+  const updatedRecurringExpenses = recurringExpenses.filter(expense => expense.id !== id);
+  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+};
+
+export const toggleRecurringExpense = (id: string): void => {
+  const recurringExpenses = getRecurringExpenses();
+  const updatedRecurringExpenses = recurringExpenses.map(expense => 
+    expense.id === id ? { ...expense, isActive: !expense.isActive } : expense
+  );
+  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+};
+
+// Function to generate expenses from recurring expenses for a given date
+export const generateExpensesFromRecurring = (date: string): Expense[] => {
+  const recurringExpenses = getRecurringExpenses().filter(re => re.isActive);
+  const generatedExpenses: Expense[] = [];
+  
+  recurringExpenses.forEach(recurring => {
+    if (recurring.endDate && date > recurring.endDate) return;
+    if (date < recurring.startDate) return;
+    
+    let shouldGenerate = false;
+    const startDate = new Date(recurring.startDate);
+    const targetDate = new Date(date);
+    
+    switch (recurring.frequency) {
+      case 'daily':
+        shouldGenerate = true;
+        break;
+      case 'weekly':
+        const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        shouldGenerate = daysDiff % 7 === 0;
+        break;
+      case 'monthly':
+        const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                          (targetDate.getMonth() - startDate.getMonth());
+        const dayOfMonth = startDate.getDate();
+        shouldGenerate = monthsDiff >= 0 && targetDate.getDate() === dayOfMonth;
+        break;
+      case 'custom':
+        if (recurring.customDays) {
+          const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          shouldGenerate = daysDiff % recurring.customDays === 0;
+        }
+        break;
+    }
+    
+    if (shouldGenerate) {
+      // Check if expense already exists for this date
+      const existingExpenses = getExpensesByDate(date);
+      const alreadyExists = existingExpenses.some(exp => 
+        exp.name === recurring.name && 
+        exp.amount === recurring.amount && 
+        exp.categoryId === recurring.categoryId
+      );
+      
+      if (!alreadyExists) {
+        const generatedExpense: Expense = {
+          id: generateId(),
+          name: recurring.name,
+          amount: recurring.amount,
+          details: recurring.details,
+          categoryId: recurring.categoryId,
+          date: date,
+          createdAt: new Date().toISOString(),
+        };
+        generatedExpenses.push(generatedExpense);
+      }
+    }
+  });
+  
+  return generatedExpenses;
 };
 
 // Analytics
