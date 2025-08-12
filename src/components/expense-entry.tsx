@@ -151,6 +151,26 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
     });
   };
 
+  // Compute change vs yesterday
+  const todayTotalValue = selectedDateTotal.total || 0;
+  const yesterdayTotalValue = yesterdayTotal.total || 0;
+  const diffValue = todayTotalValue - yesterdayTotalValue;
+  const absDiffValue = Math.abs(diffValue);
+  const percentChange = yesterdayTotalValue > 0 ? (diffValue / yesterdayTotalValue) * 100 : null;
+  const changeColorClass = diffValue > 0
+    ? "text-green-600"
+    : diffValue < 0
+      ? "text-red-600"
+      : "text-gray-500";
+
+  const changeText = (() => {
+    if (diffValue === 0) return "No change vs yesterday";
+    if (percentChange === null) {
+      return `${diffValue > 0 ? "+" : "-"}${CURRENCIES[currency].symbol}${formatAmountDisplay(absDiffValue)} vs yesterday`;
+    }
+    return `${diffValue > 0 ? "+" : "-"}${Math.abs(percentChange).toFixed(1)}% (${diffValue > 0 ? "+" : "-"}${CURRENCIES[currency].symbol}${formatAmountDisplay(absDiffValue)}) vs yesterday`;
+  })();
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -186,6 +206,9 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                   {selectedDate === today ? "Today" : "Selected Date"}
                 </p>
                 <p className="text-xl sm:text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedDateTotal.total)}</p>
+                <p className={`mt-1 text-[10px] sm:text-xs font-medium ${changeColorClass}`}>
+                  {changeText}
+                </p>
               </div>
             </div>
           </div>
