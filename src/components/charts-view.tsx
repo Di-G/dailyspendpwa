@@ -116,9 +116,13 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       chartsInitialized = true;
     }
 
-    // Bar Chart - only render if we have weekly data
-    if (barChartRef.current && weeklyTotals.length > 0) {
+    // Bar Chart - always render (shows zero values when no data)
+    if (barChartRef.current) {
       const ctx = barChartRef.current.getContext('2d');
+      if (!ctx) {
+        console.error('Could not get 2D context from canvas');
+        return;
+      }
       barChartInstance.current = new window.Chart(ctx, {
         type: 'bar',
         data: {
@@ -164,9 +168,11 @@ export default function ChartsView({ currency }: ChartsViewProps) {
 
   // Initialize charts when data changes
   useEffect(() => {
-    const timer = setTimeout(initializeCharts, 100);
+    const timer = setTimeout(() => {
+      initializeCharts();
+    }, 100);
     return () => clearTimeout(timer);
-  }, [categoryTotals, weeklyTotals, selectedDate]);
+  }, [categoryTotals, weeklyTotals, selectedDate, initializeCharts]);
 
   // Check if Chart.js is available and initialize on mount
   useEffect(() => {
@@ -193,6 +199,59 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       }
     };
   }, []);
+
+  // Ensure weekly chart is always rendered
+  useEffect(() => {
+    if (window.Chart && barChartRef.current && weeklyLabels.length > 0) {
+      console.log('Forcing weekly chart render with labels:', weeklyLabels);
+      // Destroy existing bar chart
+      if (barChartInstance.current) {
+        barChartInstance.current.destroy();
+      }
+      
+      const ctx = barChartRef.current.getContext('2d');
+      if (ctx) {
+        barChartInstance.current = new window.Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: weeklyLabels,
+            datasets: [{
+              label: 'Daily Expenses',
+              data: weeklyData,
+              backgroundColor: '#1976D2',
+              borderColor: '#1976D2',
+              borderWidth: 1,
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: {
+                  display: true,
+                  color: '#f0f0f0'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            }
+          }
+        });
+        console.log('Weekly chart forced render successful');
+      }
+    }
+  }, [weeklyLabels, weeklyData]);
 
   const updateCharts = useCallback(() => {
     initializeCharts();
@@ -288,17 +347,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Comparison</h3>
             <div className="relative h-48 sm:h-64">
-              {weeklyTotals.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No weekly data available</p>
-                    <p className="text-xs text-gray-400">Select a date to view weekly comparison</p>
-                  </div>
-                </div>
-              ) : (
-                <canvas ref={barChartRef} className="w-full h-full"></canvas>
-              )}
+              <canvas ref={barChartRef} className="w-full h-full"></canvas>
             </div>
           </CardContent>
         </Card>
