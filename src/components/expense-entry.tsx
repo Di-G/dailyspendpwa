@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertExpenseSchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
-import { createExpense, deleteExpense, updateExpense } from "@/lib/localStorage";
+import { createExpense, deleteExpense, updateExpense, restoreExpense } from "@/lib/localStorage";
 import { getToday, getYesterday, formatDisplayDate, formatDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Pencil } from "lucide-react";
@@ -102,6 +102,12 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   const deleteExpenseMutation = useMutation({
     mutationFn: async (id: string) => {
       try {
+        // Find the expense before deleting it for undo functionality
+        const expenseToDelete = selectedDateExpenses.find(exp => exp.id === id);
+        if (expenseToDelete) {
+          setDeletedExpense(expenseToDelete);
+        }
+        
         deleteExpense(id);
         return { success: true };
       } catch (error) {
@@ -114,7 +120,28 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
-      toast({ title: "Success", description: "Expense deleted successfully" });
+      
+      // Show success toast with undo button
+      toast({
+        title: "Success",
+        description: "Expense deleted successfully",
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleUndo()}
+            className="ml-2"
+          >
+            Undo
+          </Button>
+        ),
+      });
+      
+      // Set timeout to clear deleted expense after 10 seconds
+      const timeout = setTimeout(() => {
+        setDeletedExpense(null);
+      }, 10000);
+      setUndoTimeout(timeout);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete expense", variant: "destructive" });
@@ -130,6 +157,14 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
     categoryId: string;
   } | null>(null);
   
+  // Additional details visibility state
+  const [showAddDetails, setShowAddDetails] = useState(false);
+  const [showEditDetails, setShowEditDetails] = useState(false);
+  
+  // Undo delete state
+  const [deletedExpense, setDeletedExpense] = useState<ExpenseWithCategory | null>(null);
+  const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+  
 
 
   const openEdit = (expense: ExpenseWithCategory) => {
@@ -140,11 +175,36 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
       details: expense.details || "",
       categoryId: expense.categoryId || "",
     });
+    setShowEditDetails(!!expense.details); // Show details if expense has details
   };
 
   const closeEdit = () => {
     setEditingExpense(null);
     setEditFields(null);
+    setShowEditDetails(false);
+  };
+
+  const handleUndo = () => {
+    if (deletedExpense) {
+      // Restore the expense
+      restoreExpense(deletedExpense);
+      
+      // Clear the undo state
+      setDeletedExpense(null);
+      if (undoTimeout) {
+        clearTimeout(undoTimeout);
+        setUndoTimeout(null);
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+      
+      // Show success toast
+      toast({ title: "Success", description: "Expense restored successfully" });
+    }
   };
 
   const updateExpenseMutation = useMutation({
@@ -186,6 +246,15 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
   useEffect(() => {
     form.setValue("date", selectedDate);
   }, [selectedDate, form]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimeout) {
+        clearTimeout(undoTimeout);
+      }
+    };
+  }, [undoTimeout]);
 
   const onSubmit = (data: any) => {
     const amount = parseFloat(data.amount);
@@ -376,23 +445,35 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="details"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Additional Details (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Add any additional notes about this expense..."
-                            rows={3}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <div className="space-y-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowAddDetails(!showAddDetails)}
+                      className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal"
+                    >
+                      <span className="text-sm">Additional Details (Optional)</span>
+                    </Button>
+                    {showAddDetails && (
+                      <FormField
+                        control={form.control}
+                        name="details"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Add any additional notes about this expense..."
+                                rows={3}
+                                {...field}
+                                className="transition-all duration-200 ease-in-out"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+                  </div>
                   <Button
                     type="submit"
                     className="w-full bg-primary hover:bg-blue-700 transition duration-200"
@@ -436,16 +517,16 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                       style={{ backgroundColor: expense.category?.color || "#gray" }}
                     ></div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate">{expense.name}</p>
+                      <p className="font-medium text-gray-900 whitespace-normal break-words">{expense.name}</p>
                       {expense.details && (
-                        <p className="text-sm text-gray-600 truncate">{expense.details}</p>
+                        <p className="text-sm text-gray-600 whitespace-normal break-words">{expense.details}</p>
                       )}
                       <p className="text-xs text-gray-500">{formatTime(expense.createdAt!.toString())}</p>
                     </div>
                   </div>
-                  <div className="flex-shrink-0">
-                    <span className="font-semibold text-gray-900 text-base sm:text-lg">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
-                  </div>
+                                        <div className="flex-shrink-0">
+                        <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
+                      </div>
                 </div>
               ))}
             </div>
@@ -500,13 +581,23 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Additional Details</label>
-                <Textarea
-                  rows={3}
-                  value={editFields.details}
-                  onChange={(e) => setEditFields({ ...editFields, details: e.target.value })}
-                />
+              <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowEditDetails(!showEditDetails)}
+                  className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal"
+                >
+                  <span className="text-sm">Additional Details</span>
+                </Button>
+                {showEditDetails && (
+                  <Textarea
+                    rows={3}
+                    value={editFields.details}
+                    onChange={(e) => setEditFields({ ...editFields, details: e.target.value })}
+                    className="transition-all duration-200 ease-in-out"
+                  />
+                )}
               </div>
             </div>
           )}

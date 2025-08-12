@@ -116,6 +116,12 @@ export const deleteExpense = (id: string): void => {
   setToStorage(EXPENSES_KEY, updatedExpenses);
 };
 
+export const restoreExpense = (expense: Expense): void => {
+  const expenses = getExpenses();
+  const updatedExpenses = [...expenses, expense];
+  setToStorage(EXPENSES_KEY, updatedExpenses);
+};
+
 export const updateExpense = (
   id: string,
   data: {
