@@ -452,7 +452,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 hover:text-red-700 h-6 w-6 p-0 -ml-6 sm:h-8 sm:w-8 sm:p-1 sm:-ml-4 hover:bg-transparent focus-visible:ring-0 focus:ring-0"
+                      className="text-red-500 hover:text-red-700 h-6 w-6 p-0 -ml-5 sm:h-8 sm:w-8 sm:p-1 sm:-ml-3 hover:bg-transparent focus-visible:ring-0 focus:ring-0"
                       onClick={() => deleteExpenseMutation.mutate(expense.id)}
                       disabled={deleteExpenseMutation.isPending}
                     >
