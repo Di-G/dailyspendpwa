@@ -20,6 +20,7 @@ const COLOR_OPTIONS = [
   "#F59E0B", // yellow
   "#8B5CF6", // purple
   "#EC4899", // pink
+  "#06B6D4", // cyan
 ];
 
 interface CategoryManagementProps {
@@ -122,12 +123,12 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
           />
           <div>
             <FormLabel className="text-sm font-medium text-gray-700 mb-2 block">Color</FormLabel>
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
               {COLOR_OPTIONS.map((color) => (
                 <button
                   key={color}
                   type="button"
-                  className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
                     selectedColor === color ? "border-gray-600 scale-110" : "border-transparent hover:border-gray-400"
                   }`}
                   style={{ backgroundColor: color }}
@@ -137,7 +138,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
               {/* Custom color swatch (last) */}
               <button
                 type="button"
-                className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
+                className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
                   selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-gray-600 scale-110" : "border-dashed border-gray-300 hover:border-gray-400"
                 }`}
                 style={
