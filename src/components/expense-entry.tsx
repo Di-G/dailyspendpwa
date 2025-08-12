@@ -239,12 +239,12 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="name"
+                      name="amount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Expense Name</FormLabel>
+                          <FormLabel>Amount ({CURRENCIES[currency].symbol})</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., Lunch at cafe" {...field} />
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -252,12 +252,12 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     />
                     <FormField
                       control={form.control}
-                      name="amount"
+                      name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Amount ({CURRENCIES[currency].symbol})</FormLabel>
+                          <FormLabel>Expense Name</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                            <Input placeholder="e.g., Lunch at cafe" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
