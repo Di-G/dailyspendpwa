@@ -20,6 +20,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { formatAmountDisplay } from "@/lib/utils";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+
 const CURRENCIES = {
   USD: { symbol: "$", name: "US Dollar" },
   INR: { symbol: "₹", name: "Indian Rupee" }
@@ -128,6 +129,8 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
     details: string;
     categoryId: string;
   } | null>(null);
+  
+
 
   const openEdit = (expense: ExpenseWithCategory) => {
     setEditingExpense(expense);
@@ -424,7 +427,8 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
               {selectedDateExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200"
+                  className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200 cursor-pointer"
+                  onClick={() => openEdit(expense)}
                 >
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                     <div
@@ -439,25 +443,8 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                       <p className="text-xs text-gray-500">{formatTime(expense.createdAt!.toString())}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-0 flex-shrink-0">
+                  <div className="flex-shrink-0">
                     <span className="font-semibold text-gray-900 text-base sm:text-lg">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-gray-600 hover:text-gray-900 h-6 w-6 p-0 sm:h-8 sm:w-8 sm:p-1 hover:bg-transparent focus-visible:ring-0 focus:ring-0"
-                      onClick={() => openEdit(expense)}
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-red-500 hover:text-red-700 h-6 w-6 p-0 -ml-5 sm:h-8 sm:w-8 sm:p-1 sm:-ml-3 hover:bg-transparent focus-visible:ring-0 focus:ring-0"
-                      onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                      disabled={deleteExpenseMutation.isPending}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -523,31 +510,46 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={closeEdit}>Cancel</Button>
-            <Button
-              onClick={() => {
-                if (!editingExpense || !editFields) return;
-                const amount = parseFloat(editFields.amount);
-                if (isNaN(amount) || amount <= 0) {
-                  toast({ title: "Error", description: "Please enter a valid amount", variant: "destructive" });
-                  return;
-                }
-                updateExpenseMutation.mutate({
-                  id: editingExpense.id,
-                  updates: {
-                    name: editFields.name,
-                    amount: amount.toString(),
-                    details: editFields.details.trim() === "" ? null : editFields.details,
-                    categoryId: editFields.categoryId ? editFields.categoryId : null,
-                  },
-                });
-              }}
-              disabled={updateExpenseMutation.isPending}
-              className="bg-primary hover:bg-blue-700"
-            >
-              {updateExpenseMutation.isPending ? "Saving..." : "Save Changes"}
-            </Button>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (!editingExpense) return;
+                  deleteExpenseMutation.mutate(editingExpense.id);
+                  closeEdit();
+                }}
+                disabled={deleteExpenseMutation.isPending}
+                className="flex-1 sm:flex-none"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleteExpenseMutation.isPending ? "Deleting..." : "Delete"}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!editingExpense || !editFields) return;
+                  const amount = parseFloat(editFields.amount);
+                  if (isNaN(amount) || amount <= 0) {
+                    toast({ title: "Error", description: "Please enter a valid amount", variant: "destructive" });
+                    return;
+                  }
+                  updateExpenseMutation.mutate({
+                    id: editingExpense.id,
+                    updates: {
+                      name: editFields.name,
+                      amount: amount.toString(),
+                      details: editFields.details.trim() === "" ? null : editFields.details,
+                      categoryId: editFields.categoryId ? editFields.categoryId : null,
+                    },
+                  });
+                }}
+                disabled={updateExpenseMutation.isPending}
+                className="flex-1 sm:flex-none bg-primary hover:bg-blue-700"
+              >
+                {updateExpenseMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+            <Button variant="ghost" onClick={closeEdit} className="w-full sm:w-auto">Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
