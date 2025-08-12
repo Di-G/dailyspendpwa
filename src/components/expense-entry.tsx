@@ -536,7 +536,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
 
       {/* Edit Expense Dialog */}
       <Dialog open={!!editingExpense} onOpenChange={(open) => { if (!open) closeEdit(); }}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md -mt-16 sm:mt-0">
           <DialogHeader>
             <DialogTitle>Edit Expense</DialogTitle>
           </DialogHeader>
