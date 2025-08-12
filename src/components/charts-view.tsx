@@ -23,6 +23,7 @@ interface ChartsViewProps {
 export default function ChartsView({ currency }: ChartsViewProps) {
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [chartsReady, setChartsReady] = useState(false);
+  const [weeklyChartOffset, setWeeklyChartOffset] = useState(0); // Simple offset for sliding
   const pieChartRef = useRef<HTMLCanvasElement>(null);
   const barChartRef = useRef<HTMLCanvasElement>(null);
   const pieChartInstance = useRef<any>(null);
@@ -54,27 +55,123 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     queryKey: ["/api/analytics/monthly-totals", { year: selectedMonth.getFullYear(), month: selectedMonth.getMonth() + 1 }],
   });
 
-  // Generate last 7 days from selected date
-  const getLast7Days = (date: string) => {
+  // Generate sliding weeks from selected date
+  const getSlidingWeeks = (date: string, offset: number) => {
     const days = [];
     const currentDate = new Date(date);
+    // Start from offset days ago
+    const startDate = new Date(currentDate);
+    startDate.setDate(currentDate.getDate() - offset);
+    
     for (let i = 6; i >= 0; i--) {
-      const day = new Date(currentDate);
-      day.setDate(currentDate.getDate() - i);
+      const day = new Date(startDate);
+      day.setDate(startDate.getDate() - i);
       days.push({
         date: formatDate(day),
-        label: day.toLocaleDateString('en-US', { weekday: 'short' })
+        label: day.toLocaleDateString('en-US', { weekday: 'short' }),
+        fullDate: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       });
     }
     return days;
   };
 
-  const weeklyDays = getLast7Days(selectedDate);
+  const weeklyDays = getSlidingWeeks(selectedDate, weeklyChartOffset);
   const weeklyData = weeklyDays.map(day => {
     const dayTotal = weeklyTotals.find(wt => wt.date === day.date);
     return dayTotal ? dayTotal.total : 0;
   });
   const weeklyLabels = weeklyDays.map(day => day.label);
+
+  // Touch/swipe support for mobile
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd || isAnimating) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      // Swipe left - go to newer dates
+      smoothSlideTo(Math.max(0, weeklyChartOffset - 1));
+    } else if (isRightSwipe) {
+      // Swipe right - go to older dates
+      smoothSlideTo(weeklyChartOffset + 1);
+    }
+  };
+
+  // Smooth sliding function
+  const smoothSlideTo = (newOffset: number) => {
+    if (isAnimating) return;
+    
+    setIsAnimating(true);
+    
+    // Animate the chart data transition
+    if (barChartInstance.current) {
+      const chart = barChartInstance.current;
+      
+      // Get the target data for smooth transition
+      const targetDays = getSlidingWeeks(selectedDate, newOffset);
+      const targetData = targetDays.map(day => {
+        const dayTotal = weeklyTotals.find(wt => wt.date === day.date);
+        return dayTotal ? dayTotal.total : 0;
+      });
+      const targetLabels = targetDays.map(day => day.label);
+
+      // Animate the transition
+      chart.data.labels = targetLabels;
+      chart.data.datasets[0].data = targetData;
+      
+      // Use Chart.js animation
+      chart.update('active');
+    }
+    
+    // Update the offset after animation
+    setTimeout(() => {
+      setWeeklyChartOffset(newOffset);
+      setIsAnimating(false);
+    }, 300); // Match Chart.js animation duration
+  };
+
+  // Simple function to go back to newest (today) with smooth animation
+  const goToNewest = () => {
+    smoothSlideTo(0);
+  };
+
+  // Keyboard navigation support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isAnimating) return;
+      
+      if (e.key === 'ArrowLeft') {
+        // Left arrow - go to newer dates
+        smoothSlideTo(Math.max(0, weeklyChartOffset - 1));
+      } else if (e.key === 'ArrowRight') {
+        // Right arrow - go to older dates
+        smoothSlideTo(weeklyChartOffset + 1);
+      } else if (e.key === 'Home') {
+        // Home key - go to newest
+        smoothSlideTo(0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [weeklyChartOffset, isAnimating]);
 
   const initializeCharts = useCallback(() => {
     if (!window.Chart) return;
@@ -142,6 +239,18 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           plugins: {
             legend: {
               display: false
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context: any) {
+                  const index = context[0].dataIndex;
+                  const day = weeklyDays[index];
+                  return `${day.label} - ${day.fullDate}`;
+                },
+                label: function(context: any) {
+                  return `Amount: ${CURRENCIES[currency].symbol}${formatAmountDisplay(context.parsed.y)}`;
+                }
+              }
             }
           },
           scales: {
@@ -164,7 +273,12 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     }
 
     setChartsReady(chartsInitialized);
-  }, [categoryTotals, weeklyTotals, weeklyLabels, weeklyData]);
+  }, [categoryTotals, weeklyTotals, weeklyLabels, weeklyData, currency, weeklyDays]);
+
+  // Reset weekly chart offset when date changes
+  useEffect(() => {
+    setWeeklyChartOffset(0);
+  }, [selectedDate]);
 
   // Initialize charts when data changes
   useEffect(() => {
@@ -172,7 +286,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       initializeCharts();
     }, 100);
     return () => clearTimeout(timer);
-  }, [categoryTotals, weeklyTotals, selectedDate, initializeCharts]);
+  }, [categoryTotals, weeklyTotals, selectedDate, weeklyChartOffset, initializeCharts]);
 
   // Check if Chart.js is available and initialize on mount
   useEffect(() => {
@@ -227,9 +341,33 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 300,
+              easing: 'easeInOutQuart'
+            },
+            transitions: {
+              active: {
+                animation: {
+                  duration: 300,
+                  easing: 'easeInOutQuart'
+                }
+              }
+            },
             plugins: {
               legend: {
                 display: false
+              },
+              tooltip: {
+                callbacks: {
+                  title: function(context: any) {
+                    const index = context[0].dataIndex;
+                    const day = weeklyDays[index];
+                    return `${day.label} - ${day.fullDate}`;
+                  },
+                  label: function(context: any) {
+                    return `Amount: ${CURRENCIES[currency].symbol}${formatAmountDisplay(context.parsed.y)}`;
+                  }
+                }
               }
             },
             scales: {
@@ -251,7 +389,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         console.log('Weekly chart forced render successful');
       }
     }
-  }, [weeklyLabels, weeklyData]);
+  }, [weeklyLabels, weeklyData, weeklyChartOffset, currency]);
 
   const updateCharts = useCallback(() => {
     initializeCharts();
@@ -346,8 +484,47 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         <Card>
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Comparison</h3>
+            
+            {/* Navigation Controls */}
+            <div className="flex items-center justify-end mb-4">
+              <Button
+                onClick={goToNewest}
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                disabled={isAnimating}
+              >
+                {isAnimating ? '⏳' : 'Newest ⏭️'}
+              </Button>
+            </div>
+            
             <div className="relative h-48 sm:h-64">
-              <canvas ref={barChartRef} className="w-full h-full"></canvas>
+              {isAnimating && (
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
+                  <div className="text-blue-600 text-sm">Sliding...</div>
+                </div>
+              )}
+              <canvas 
+                ref={barChartRef} 
+                className="w-full h-full"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+              ></canvas>
+            </div>
+            
+            {/* Date Range Info */}
+            <div className="mt-2 text-xs text-gray-500 text-center">
+              Showing: {weeklyDays[0]?.fullDate} - {weeklyDays[6]?.fullDate}
+            </div>
+            
+            {/* Navigation Hints */}
+            <div className="mt-2 text-xs text-gray-400 text-center space-y-1">
+              {isMobile ? (
+                <div>💡 Swipe left/right to navigate through dates</div>
+              ) : (
+                <div>💡 Use ← → arrow keys or swipe to navigate • Press Home to return to today</div>
+              )}
             </div>
           </CardContent>
         </Card>
