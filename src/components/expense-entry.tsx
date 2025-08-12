@@ -439,7 +439,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                       <p className="text-xs text-gray-500">{formatTime(expense.createdAt!.toString())}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-0 sm:gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-0 flex-shrink-0">
                     <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
                     <Button
                       size="sm"
@@ -452,7 +452,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 hover:text-red-700 h-7 w-7 p-0.5 sm:h-9 sm:w-9 sm:p-2"
+                      className="text-red-500 hover:text-red-700 h-7 w-7 p-0.5 -ml-1 sm:h-9 sm:w-9 sm:p-2"
                       onClick={() => deleteExpenseMutation.mutate(expense.id)}
                       disabled={deleteExpenseMutation.isPending}
                     >
