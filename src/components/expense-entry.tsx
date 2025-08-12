@@ -601,21 +601,22 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
               </div>
             </div>
           )}
-          <DialogFooter className="flex gap-2 w-full sm:w-auto">
+          <DialogFooter className="flex flex-row justify-end gap-2">
             <Button
               variant="destructive"
+              size="sm"
               onClick={() => {
                 if (!editingExpense) return;
                 deleteExpenseMutation.mutate(editingExpense.id);
                 closeEdit();
               }}
               disabled={deleteExpenseMutation.isPending}
-              className="flex-1 sm:flex-none"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               {deleteExpenseMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
             <Button
+              size="sm"
               onClick={() => {
                 if (!editingExpense || !editFields) return;
                 const amount = parseFloat(editFields.amount);
@@ -630,15 +631,15 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     amount: amount.toString(),
                     details: editFields.details.trim() === "" ? null : editFields.details,
                     categoryId: editFields.categoryId ? editFields.categoryId : null,
-                  },
-                });
-              }}
-              disabled={updateExpenseMutation.isPending}
-              className="flex-1 sm:flex-none bg-primary hover:bg-blue-700"
-            >
-              {updateExpenseMutation.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
+                },
+              });
+            }}
+            disabled={updateExpenseMutation.isPending}
+            className="bg-primary hover:bg-blue-700"
+          >
+            {updateExpenseMutation.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
