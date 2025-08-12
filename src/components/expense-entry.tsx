@@ -440,7 +440,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     </div>
                   </div>
                   <div className="flex items-center gap-0 flex-shrink-0">
-                    <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
+                    <span className="font-semibold text-gray-900 text-base sm:text-lg">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
                     <Button
                       size="sm"
                       variant="ghost"
