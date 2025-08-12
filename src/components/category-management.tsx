@@ -123,13 +123,13 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
           />
           <div>
             <FormLabel className="text-sm font-medium text-gray-700 mb-2 block">Color</FormLabel>
-            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+            <div className="flex space-x-2 overflow-x-auto pb-4 pt-1 -mx-2 px-2 scrollbar-hide">
               {COLOR_OPTIONS.map((color) => (
                 <button
                   key={color}
                   type="button"
                   className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
-                    selectedColor === color ? "border-gray-600 scale-110" : "border-transparent hover:border-gray-400"
+                    selectedColor === color ? "border-gray-600 scale-105" : "border-transparent hover:border-gray-400"
                   }`}
                   style={{ backgroundColor: color }}
                   onClick={() => setSelectedColor(color)}
@@ -139,7 +139,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
               <button
                 type="button"
                 className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
-                  selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-gray-600 scale-110" : "border-dashed border-gray-300 hover:border-gray-400"
+                  selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-gray-600 scale-105" : "border-dashed border-gray-300 hover:border-gray-400"
                 }`}
                 style={
                   selectedColor.toLowerCase() === customSwatchColor.toLowerCase()
