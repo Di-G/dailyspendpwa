@@ -444,19 +444,19 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-gray-600 hover:text-gray-900 h-7 w-7 p-0.5 sm:h-9 sm:w-9 sm:p-2"
+                      className="text-gray-600 hover:text-gray-900 h-6 w-6 p-0 sm:h-8 sm:w-8 sm:p-1 hover:bg-transparent focus-visible:ring-0 focus:ring-0"
                       onClick={() => openEdit(expense)}
                     >
-                      <Pencil className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <Pencil className="w-3 h-3" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 hover:text-red-700 h-7 w-7 p-0.5 -ml-1 sm:h-9 sm:w-9 sm:p-2"
+                      className="text-red-500 hover:text-red-700 h-6 w-6 p-0 -ml-7 sm:h-8 sm:w-8 sm:p-1 sm:-ml-5 hover:bg-transparent focus-visible:ring-0 focus:ring-0"
                       onClick={() => deleteExpenseMutation.mutate(expense.id)}
                       disabled={deleteExpenseMutation.isPending}
                     >
-                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
