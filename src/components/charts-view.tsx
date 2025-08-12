@@ -85,36 +85,108 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   // Touch/swipe support for mobile
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
+  // Mouse drag support for desktop
+  const [isMouseDragging, setIsMouseDragging] = useState(false);
+  const [mouseStartX, setMouseStartX] = useState<number | null>(null);
+
   const minSwipeDistance = 50;
+  const barWidth = 100; // Approximate width of each bar in pixels
 
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
+    setIsDragging(true);
+    setDragOffset(0);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (!isDragging || !touchStart) return;
+    
+    const currentX = e.targetTouches[0].clientX;
+    const deltaX = currentX - touchStart;
+    
+    // Calculate how many days to offset based on drag distance
+    const dayOffset = deltaX / barWidth;
+    setDragOffset(dayOffset);
+    
+    // Update chart in real-time during drag
+    updateChartWithOffset(weeklyChartOffset + dayOffset);
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd || isAnimating) return;
+    if (!isDragging) return;
     
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe) {
-      // Swipe left - go to newer dates
-      smoothSlideTo(Math.max(0, weeklyChartOffset - 1));
-    } else if (isRightSwipe) {
-      // Swipe right - go to older dates
-      smoothSlideTo(weeklyChartOffset + 1);
-    }
+    setIsDragging(false);
+    
+    // Calculate final position and snap to nearest complete day
+    const finalOffset = Math.round(weeklyChartOffset + dragOffset);
+    const clampedOffset = Math.max(0, finalOffset);
+    
+    // Smoothly animate to final position
+    smoothSlideTo(clampedOffset);
+    
+    setDragOffset(0);
   };
 
-  // Smooth sliding function
+  const onMouseDown = (e: React.MouseEvent) => {
+    setIsMouseDragging(true);
+    setMouseStartX(e.clientX);
+    setDragOffset(0);
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDragging || mouseStartX === null) return;
+    
+    const deltaX = e.clientX - mouseStartX;
+    const dayOffset = deltaX / barWidth;
+    setDragOffset(dayOffset);
+    
+    // Update chart in real-time during drag
+    updateChartWithOffset(weeklyChartOffset + dayOffset);
+  };
+
+  const onMouseUp = () => {
+    if (!isMouseDragging) return;
+    
+    setIsMouseDragging(false);
+    
+    // Calculate final position and snap to nearest complete day
+    const finalOffset = Math.round(weeklyChartOffset + dragOffset);
+    const clampedOffset = Math.max(0, finalOffset);
+    
+    // Smoothly animate to final position
+    smoothSlideTo(clampedOffset);
+    
+    setDragOffset(0);
+    setMouseStartX(null);
+  };
+
+  // Update chart with continuous offset (for real-time dragging)
+  const updateChartWithOffset = (continuousOffset: number) => {
+    if (!barChartInstance.current) return;
+    
+    const chart = barChartInstance.current;
+    const clampedOffset = Math.max(0, continuousOffset);
+    
+    // Get the data for the continuous offset
+    const targetDays = getSlidingWeeks(selectedDate, clampedOffset);
+    const targetData = targetDays.map(day => {
+      const dayTotal = weeklyTotals.find(wt => wt.date === day.date);
+      return dayTotal ? dayTotal.total : 0;
+    });
+    const targetLabels = targetDays.map(day => day.label);
+    
+    // Update chart data without animation for smooth dragging
+    chart.data.labels = targetLabels;
+    chart.data.datasets[0].data = targetData;
+    chart.update('none'); // No animation during drag
+  };
+
+  // Smooth sliding function for final positioning
   const smoothSlideTo = (newOffset: number) => {
     if (isAnimating) return;
     
@@ -136,7 +208,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       chart.data.labels = targetLabels;
       chart.data.datasets[0].data = targetData;
       
-      // Use Chart.js animation
+      // Use Chart.js animation for final positioning
       chart.update('active');
     }
     
@@ -155,7 +227,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   // Keyboard navigation support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAnimating) return;
+      if (isAnimating || isDragging || isMouseDragging) return;
       
       if (e.key === 'ArrowLeft') {
         // Left arrow - go to newer dates
@@ -169,9 +241,35 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       }
     };
 
+    // Global mouse move listener for dragging
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isMouseDragging && mouseStartX !== null) {
+        const deltaX = e.clientX - mouseStartX;
+        const dayOffset = deltaX / barWidth;
+        setDragOffset(dayOffset);
+        
+        // Update chart in real-time during drag
+        updateChartWithOffset(weeklyChartOffset + dayOffset);
+      }
+    };
+
+    // Global mouse up listener for dragging
+    const handleGlobalMouseUp = () => {
+      if (isMouseDragging) {
+        onMouseUp();
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [weeklyChartOffset, isAnimating]);
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [weeklyChartOffset, isAnimating, isDragging, isMouseDragging, mouseStartX]);
 
   const initializeCharts = useCallback(() => {
     if (!window.Chart) return;
@@ -499,17 +597,23 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             </div>
             
             <div className="relative h-48 sm:h-64">
-              {isAnimating && (
+              {(isAnimating || isDragging || isMouseDragging) && (
                 <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-                  <div className="text-blue-600 text-sm">Sliding...</div>
+                  <div className="text-blue-600 text-sm">
+                    {isDragging || isMouseDragging ? 'Dragging...' : 'Sliding...'}
+                  </div>
                 </div>
               )}
               <canvas 
                 ref={barChartRef} 
-                className="w-full h-full"
+                className="w-full h-full cursor-grab active:cursor-grabbing"
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
+                onMouseDown={onMouseDown}
+                onMouseMove={onMouseMove}
+                onMouseUp={onMouseUp}
+                onMouseLeave={onMouseUp}
               ></canvas>
             </div>
             
@@ -521,9 +625,9 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             {/* Navigation Hints */}
             <div className="mt-2 text-xs text-gray-400 text-center space-y-1">
               {isMobile ? (
-                <div>💡 Swipe left/right to navigate through dates</div>
+                <div>💡 Drag bars left/right to smoothly slide through dates</div>
               ) : (
-                <div>💡 Use ← → arrow keys or swipe to navigate • Press Home to return to today</div>
+                <div>💡 Click and drag bars to slide • Use ← → arrow keys • Press Home to return to today</div>
               )}
             </div>
           </CardContent>
