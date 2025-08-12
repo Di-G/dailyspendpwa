@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ interface ChartsViewProps {
 
 export default function ChartsView({ currency }: ChartsViewProps) {
   const [selectedDate, setSelectedDate] = useState(getToday());
+  const [chartsReady, setChartsReady] = useState(false);
   const pieChartRef = useRef<HTMLCanvasElement>(null);
   const barChartRef = useRef<HTMLCanvasElement>(null);
   const pieChartInstance = useRef<any>(null);
@@ -75,7 +76,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   });
   const weeklyLabels = weeklyDays.map(day => day.label);
 
-  const initializeCharts = () => {
+  const initializeCharts = useCallback(() => {
     if (!window.Chart) return;
 
     // Destroy existing charts
@@ -86,7 +87,9 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       barChartInstance.current.destroy();
     }
 
-    // Pie Chart
+    let chartsInitialized = false;
+
+    // Pie Chart - only render if we have category data
     if (pieChartRef.current && categoryTotals.length > 0) {
       const ctx = pieChartRef.current.getContext('2d');
       pieChartInstance.current = new window.Chart(ctx, {
@@ -110,10 +113,11 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           }
         }
       });
+      chartsInitialized = true;
     }
 
-    // Bar Chart
-    if (barChartRef.current) {
+    // Bar Chart - only render if we have weekly data
+    if (barChartRef.current && weeklyTotals.length > 0) {
       const ctx = barChartRef.current.getContext('2d');
       barChartInstance.current = new window.Chart(ctx, {
         type: 'bar',
@@ -152,17 +156,47 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           }
         }
       });
+      chartsInitialized = true;
     }
-  };
 
+    setChartsReady(chartsInitialized);
+  }, [categoryTotals, weeklyTotals, weeklyLabels, weeklyData]);
+
+  // Initialize charts when data changes
   useEffect(() => {
     const timer = setTimeout(initializeCharts, 100);
     return () => clearTimeout(timer);
-  }, [categoryTotals]);
+  }, [categoryTotals, weeklyTotals, selectedDate]);
 
-  const updateCharts = () => {
+  // Check if Chart.js is available and initialize on mount
+  useEffect(() => {
+    const checkChartAvailability = () => {
+      if (window.Chart) {
+        initializeCharts();
+      } else {
+        // Retry after a short delay if Chart.js isn't loaded yet
+        setTimeout(checkChartAvailability, 100);
+      }
+    };
+    
+    checkChartAvailability();
+  }, [initializeCharts]);
+
+  // Cleanup charts on unmount
+  useEffect(() => {
+    return () => {
+      if (pieChartInstance.current) {
+        pieChartInstance.current.destroy();
+      }
+      if (barChartInstance.current) {
+        barChartInstance.current.destroy();
+      }
+    };
+  }, []);
+
+  const updateCharts = useCallback(() => {
     initializeCharts();
-  };
+  }, [initializeCharts]);
 
   const totalExpense = categoryTotals.reduce((sum, ct) => sum + ct.total, 0);
   
@@ -215,25 +249,37 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Distribution</h3>
             <div className="relative h-48 sm:h-64">
-              <canvas ref={pieChartRef} className="w-full h-full"></canvas>
-            </div>
-            <div className="mt-4 space-y-2">
-              {categoryTotals.map((ct) => {
-                const percentage = totalExpense > 0 ? Math.round((ct.total / totalExpense) * 100) : 0;
-                return (
-                  <div key={ct.categoryId} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center min-w-0 flex-1">
-                      <div
-                        className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                        style={{ backgroundColor: ct.category.color }}
-                      ></div>
-                      <span className="truncate">{ct.category.name}</span>
-                    </div>
-                    <span className="font-medium text-sm sm:text-base flex-shrink-0">{CURRENCIES[currency].symbol}{formatAmountDisplay(ct.total)} ({percentage}%)</span>
+              {categoryTotals.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No category data available</p>
+                    <p className="text-xs text-gray-400">Select a date to view category distribution</p>
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                <canvas ref={pieChartRef} className="w-full h-full"></canvas>
+              )}
             </div>
+            {categoryTotals.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {categoryTotals.map((ct) => {
+                  const percentage = totalExpense > 0 ? Math.round((ct.total / totalExpense) * 100) : 0;
+                  return (
+                    <div key={ct.categoryId} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center min-w-0 flex-1">
+                        <div
+                          className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                          style={{ backgroundColor: ct.category.color }}
+                        ></div>
+                        <span className="truncate">{ct.category.name}</span>
+                      </div>
+                      <span className="font-medium text-sm sm:text-base flex-shrink-0">{CURRENCIES[currency].symbol}{formatAmountDisplay(ct.total)} ({percentage}%)</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -242,7 +288,17 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Comparison</h3>
             <div className="relative h-48 sm:h-64">
-              <canvas ref={barChartRef} className="w-full h-full"></canvas>
+              {weeklyTotals.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No weekly data available</p>
+                    <p className="text-xs text-gray-400">Select a date to view weekly comparison</p>
+                  </div>
+                </div>
+              ) : (
+                <canvas ref={barChartRef} className="w-full h-full"></canvas>
+              )}
             </div>
           </CardContent>
         </Card>
