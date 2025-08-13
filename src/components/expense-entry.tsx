@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,13 +31,16 @@ type CurrencyCode = keyof typeof CURRENCIES;
 interface ExpenseEntryProps {
   currency: CurrencyCode;
   setCurrency: (currency: CurrencyCode) => void;
+  focusAmountTrigger?: number;
 }
 
-export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProps) {
+export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger }: ExpenseEntryProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(getToday());
   const today = getToday();
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
+  const addExpenseSectionRef = useRef<HTMLDivElement | null>(null);
   
   // Calculate yesterday relative to selected date
   const getYesterdayForDate = (date: string) => {
@@ -256,6 +259,19 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
     };
   }, [undoTimeout]);
 
+  // When triggered, scroll to the add expense section and focus the amount input
+  useEffect(() => {
+    if (typeof focusAmountTrigger === "number") {
+      addExpenseSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Focus immediately and once more after scrolling finishes
+      amountInputRef.current?.focus({ preventScroll: true });
+      const id = window.setTimeout(() => {
+        amountInputRef.current?.focus({ preventScroll: true });
+      }, 350);
+      return () => window.clearTimeout(id);
+    }
+  }, [focusAmountTrigger]);
+
   const onSubmit = (data: any) => {
     const amount = parseFloat(data.amount);
     if (isNaN(amount) || amount <= 0) {
@@ -373,7 +389,7 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Add Expense Form */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2" ref={addExpenseSectionRef}>
           <Card>
             <CardContent className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Expense</h3>
@@ -387,7 +403,16 @@ export default function ExpenseEntry({ currency, setCurrency }: ExpenseEntryProp
                         <FormItem>
                           <FormLabel>Amount ({CURRENCIES[currency].symbol})</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              {...field}
+                              ref={(el) => {
+                                field.ref(el);
+                                amountInputRef.current = el;
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

@@ -23,6 +23,12 @@ export default function ExpenseTracker() {
     return saved || "USD";
   });
   const isMobile = useIsMobile();
+  const [focusAmountTrigger, setFocusAmountTrigger] = useState(0);
+
+  const handleFabClick = () => {
+    setCurrentView("entry");
+    setFocusAmountTrigger((t) => t + 1);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -104,14 +110,14 @@ export default function ExpenseTracker() {
 
       {/* Main Content */}
       <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
-        {currentView === "entry" && <ExpenseEntry currency={currency} setCurrency={setCurrency} />}
+        {currentView === "entry" && <ExpenseEntry currency={currency} setCurrency={setCurrency} focusAmountTrigger={focusAmountTrigger} />}
         {currentView === "charts" && <ChartsView currency={currency} />}
         {currentView === "calendar" && <CalendarView currency={currency} />}
         {currentView === "recurring" && <RecurringExpenses currency={currency} />}
       </div>
 
       {/* Floating Action Button - Mobile only */}
-      <FloatingActionButton onClick={() => setCurrentView("entry")} />
+      <FloatingActionButton onClick={handleFabClick} />
 
       {/* Bottom Navigation - Mobile only */}
       <BottomNavigation currentView={currentView} onViewChange={setCurrentView} />
