@@ -59,6 +59,17 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
       return;
     }
 
+    // Disallow start date before today
+    const todayStr = formatDate(new Date());
+    if (formData.startDate < todayStr) {
+      toast({
+        title: "Validation Error",
+        description: "Start date cannot be in the past.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (formData.frequency === "custom" && !formData.customDays) {
       toast({
         title: "Validation Error",
@@ -318,6 +329,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    min={formatDate(new Date())}
                     required
                   />
                 </div>

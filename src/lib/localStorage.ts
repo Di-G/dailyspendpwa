@@ -173,6 +173,11 @@ export const getRecurringExpensesWithCategories = (): RecurringExpenseWithCatego
 
 export const createRecurringExpense = (data: InsertRecurringExpense): RecurringExpense => {
   const recurringExpenses = getRecurringExpenses();
+  // Enforce no past start dates
+  const todayStr = formatDate(new Date());
+  if (data.startDate < todayStr) {
+    throw new Error('Start date cannot be in the past');
+  }
   const newRecurringExpense: RecurringExpense = {
     id: generateId(),
     name: data.name,
@@ -229,6 +234,15 @@ export const updateRecurringExpense = (
   let updated: RecurringExpense | null = null;
   const updatedRecurringExpenses = recurringExpenses.map(expense => {
     if (expense.id !== id) return expense;
+    // Enforce no past start dates when updating, but allow keeping an existing past start date
+    const todayStr = formatDate(new Date());
+    if (
+      data.startDate !== undefined &&
+      data.startDate !== expense.startDate &&
+      data.startDate < todayStr
+    ) {
+      throw new Error('Start date cannot be in the past');
+    }
     updated = {
       ...expense,
       name: data.name !== undefined ? data.name : expense.name,

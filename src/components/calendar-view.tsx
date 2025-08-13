@@ -46,6 +46,26 @@ export default function CalendarView({ currency }: CalendarViewProps) {
     !previewExpenses.some((exp) => exp.name === item.name && exp.amount === item.amount)
   );
 
+  // Build a combined preview list: existing expenses + missing recurring items
+  const combinedPreviewItems = (
+    previewDate
+      ? [
+          ...previewExpenses.map(exp => ({
+            key: exp.id,
+            name: exp.name,
+            amount: exp.amount,
+            isRecurring: false,
+          })),
+          ...missingRecurringItems.map((item, idx) => ({
+            key: `rec-${idx}-${item.name}-${item.amount}`,
+            name: item.name,
+            amount: item.amount,
+            isRecurring: true,
+          })),
+        ]
+      : []
+  );
+
   const getTotalForDate = (dateString: string) => {
     const total = monthlyTotals.find(mt => mt.date === dateString);
     return total ? total.total : 0;
@@ -222,34 +242,16 @@ export default function CalendarView({ currency }: CalendarViewProps) {
         </CardContent>
       </Card>
 
-      {previewDate && (
+      {previewDate && combinedPreviewItems.length > 0 && (
         <Card>
           <CardContent className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Expenses on {previewDate}</h3>
-            {previewExpenses.length === 0 ? (
-              <div className="text-sm text-gray-600">No expenses for this date.</div>
-            ) : (
-              <div className="space-y-2">
-                {previewExpenses.map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-900 font-medium">{exp.name}</span>
-                    <span className="text-sm text-gray-900 font-semibold">{CURRENCIES[currency].symbol}{exp.amount}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {missingRecurringItems.length > 0 && previewDate && (
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Recurring on {previewDate}</h3>
             <div className="space-y-2">
-              {missingRecurringItems.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-900 font-medium">{item.name}</span>
+              {combinedPreviewItems.map((item) => (
+                <div key={item.key} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-900 font-medium flex items-center gap-1">
+                    {item.isRecurring && <Repeat className="w-3 h-3 text-gray-500" aria-label="Recurring" />}
+                    {item.name}
+                  </span>
                   <span className="text-sm text-gray-900 font-semibold">{CURRENCIES[currency].symbol}{item.amount}</span>
                 </div>
               ))}
