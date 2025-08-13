@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { getMonthInfo, generateCalendarDays, getToday } from "@/lib/date-utils";
 import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getRecurringExpenses, generateExpensesFromRecurring } from "@/lib/localStorage";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { getRecurringExpenses } from "@/lib/localStorage";
+import type { RecurringExpense, ExpenseWithCategory } from "@shared/schema";
 
 interface CalendarViewProps {
   currency: "USD" | "INR";
@@ -17,7 +16,8 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const today = getToday();
   const isMobile = useIsMobile();
-  const { toast } = useToast();
+  const [previewItems, setPreviewItems] = useState<Array<{ name: string; amount: string }>>([]);
+  const [previewDate, setPreviewDate] = useState<string | null>(null);
   
   const monthInfo = getMonthInfo(currentDate);
   const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
@@ -29,6 +29,22 @@ export default function CalendarView({ currency }: CalendarViewProps) {
 
   // Get recurring expenses for the month
   const recurringExpenses = getRecurringExpenses();
+
+  const CURRENCIES = {
+    USD: { symbol: "$" },
+    INR: { symbol: "₹" }
+  } as const;
+
+  // Expenses for the clicked date
+  const { data: previewExpenses = [] } = useQuery<ExpenseWithCategory[]>({
+    queryKey: ["/api/expenses", previewDate ? { date: previewDate } : {}],
+    enabled: !!previewDate,
+  });
+
+  // Determine which recurring items are not yet present in the expense list for the selected date
+  const missingRecurringItems = previewItems.filter((item) =>
+    !previewExpenses.some((exp) => exp.name === item.name && exp.amount === item.amount)
+  );
 
   const getTotalForDate = (dateString: string) => {
     const total = monthlyTotals.find(mt => mt.date === dateString);
@@ -67,42 +83,36 @@ export default function CalendarView({ currency }: CalendarViewProps) {
     });
   };
 
-  const generateRecurringExpensesForDate = (dateString: string) => {
-    try {
-      const generatedExpenses = generateExpensesFromRecurring(dateString);
-      
-      if (generatedExpenses.length > 0) {
-        // Invalidate queries to refresh the UI
-        queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
-        
-        if (generatedExpenses.length === 1) {
-          toast({
-            title: "Recurring Expense Added",
-            description: `Added "${generatedExpenses[0].name}" from recurring expenses.`,
-          });
-        } else {
-          toast({
-            title: "Recurring Expenses Added",
-            description: `Added ${generatedExpenses.length} recurring expenses for this date.`,
-          });
+  const getRecurringItemsForDate = (dateString: string): RecurringExpense[] => {
+    return recurringExpenses.filter(recurring => {
+      if (!recurring.isActive) return false;
+      if (recurring.endDate && dateString > recurring.endDate) return false;
+      if (dateString < recurring.startDate) return false;
+      const startDate = new Date(recurring.startDate);
+      const targetDate = new Date(dateString);
+      switch (recurring.frequency) {
+        case 'daily':
+          return true;
+        case 'weekly': {
+          const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          return daysDiff % 7 === 0;
         }
-      } else {
-        toast({
-          title: "No Recurring Expenses",
-          description: "No recurring expenses are scheduled for this date.",
-        });
+        case 'monthly': {
+          const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
+          const dayOfMonth = startDate.getDate();
+          return monthsDiff >= 0 && targetDate.getDate() === dayOfMonth;
+        }
+        case 'custom': {
+          if (recurring.customDays) {
+            const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysDiff % recurring.customDays === 0;
+          }
+          return false;
+        }
+        default:
+          return false;
       }
-    } catch (error) {
-      console.error("Error generating recurring expenses:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate recurring expenses.",
-        variant: "destructive",
-      });
-    }
+    });
   };
 
   const previousMonth = () => {
@@ -167,7 +177,12 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                   key={index}
                   onClick={() => {
                     if (day.isCurrentMonth && hasRecurringExpense) {
-                      generateRecurringExpensesForDate(day.dateString);
+                      const items = getRecurringItemsForDate(day.dateString).map(i => ({ name: i.name, amount: i.amount }));
+                      setPreviewItems(items);
+                      setPreviewDate(day.dateString);
+                    } else {
+                      setPreviewItems([]);
+                      setPreviewDate(null);
                     }
                   }}
                   className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
@@ -179,7 +194,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                         : "hover:bg-gray-50"
                       : "text-gray-400 hover:bg-gray-50"
                   } ${day.isCurrentMonth && hasRecurringExpense ? 'cursor-pointer' : ''}`}
-                  title={day.isCurrentMonth && hasRecurringExpense ? `Click to generate recurring expenses for ${day.dateString}` : ''}
+                  title={day.isCurrentMonth && hasRecurringExpense ? `Recurring expenses on ${day.dateString}` : ''}
                 >
                   <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-gray-900"}`}>
                     {day.date.getDate()}
@@ -209,32 +224,43 @@ export default function CalendarView({ currency }: CalendarViewProps) {
         </CardContent>
       </Card>
 
-      {/* Calendar Legend */}
-      <Card>
-        <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Legend</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-primary rounded flex-shrink-0"></div>
-              <span className="text-sm text-gray-700">Today</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 border-2 border-primary rounded flex-shrink-0"></div>
-              <span className="text-sm text-gray-700">Has Expenses</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-gray-100 rounded flex-shrink-0"></div>
-              <span className="text-sm text-gray-700">No Expenses</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center">
-                <Repeat className="w-3 h-3 text-gray-500" />
+      {previewDate && (
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Expenses on {previewDate}</h3>
+            {previewExpenses.length === 0 ? (
+              <div className="text-sm text-gray-600">No expenses for this date.</div>
+            ) : (
+              <div className="space-y-2">
+                {previewExpenses.map((exp) => (
+                  <div key={exp.id} className="flex items-center justify-between">
+                    <span className="text-sm text-gray-900 font-medium">{exp.name}</span>
+                    <span className="text-sm text-gray-900 font-semibold">{CURRENCIES[currency].symbol}{exp.amount}</span>
+                  </div>
+                ))}
               </div>
-              <span className="text-sm text-gray-700">Recurring Expense</span>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {missingRecurringItems.length > 0 && previewDate && (
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Recurring on {previewDate}</h3>
+            <div className="space-y-2">
+              {missingRecurringItems.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-900 font-medium">{item.name}</span>
+                  <span className="text-sm text-gray-900 font-semibold">{CURRENCIES[currency].symbol}{item.amount}</span>
+                </div>
+              ))}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Legend removed as requested */}
     </div>
   );
 }

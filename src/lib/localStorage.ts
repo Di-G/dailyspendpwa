@@ -5,6 +5,7 @@ import { formatDate } from "./date-utils";
 const CATEGORIES_KEY = 'dailyspend_categories';
 const EXPENSES_KEY = 'dailyspend_expenses';
 const RECURRING_EXPENSES_KEY = 'dailyspend_recurring_expenses';
+const LAST_PROCESSED_DATE_KEY = 'dailyspend_last_processed_date';
 
 // Helper functions
 const generateId = (): string => {
@@ -188,6 +189,35 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
   
   const updatedRecurringExpenses = [...recurringExpenses, newRecurringExpense];
   setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+
+  // If a recurring expense starts today, immediately add today's occurrence only
+  try {
+    const todayStr = formatDate(new Date());
+    if (
+      newRecurringExpense.isActive &&
+      newRecurringExpense.startDate === todayStr &&
+      (!newRecurringExpense.endDate || todayStr <= newRecurringExpense.endDate)
+    ) {
+      const existingExpenses = getExpensesByDate(todayStr);
+      const alreadyExists = existingExpenses.some(exp =>
+        exp.name === newRecurringExpense.name &&
+        exp.amount === newRecurringExpense.amount &&
+        exp.categoryId === newRecurringExpense.categoryId
+      );
+      if (!alreadyExists) {
+        createExpense({
+          name: newRecurringExpense.name,
+          amount: newRecurringExpense.amount,
+          details: newRecurringExpense.details || undefined,
+          categoryId: newRecurringExpense.categoryId || undefined,
+          date: todayStr,
+        });
+      }
+    }
+  } catch (e) {
+    // Fail-safe: do not block creation on immediate-add errors
+    console.error('Error adding immediate occurrence for recurring expense:', e);
+  }
   return newRecurringExpense;
 };
 
@@ -291,6 +321,24 @@ export const generateExpensesFromRecurring = (date: string): Expense[] => {
   });
   
   return generatedExpenses;
+};
+
+// Persist generated expenses for a specific date and return how many were saved
+export const processRecurringForDate = (date: string): number => {
+  const expensesToAdd = generateExpensesFromRecurring(date);
+  if (expensesToAdd.length === 0) return 0;
+  const current = getExpenses();
+  const updated = [...current, ...expensesToAdd];
+  setToStorage(EXPENSES_KEY, updated);
+  return expensesToAdd.length;
+};
+
+export const getLastProcessedDate = (): string | null => {
+  return getFromStorage<string | null>(LAST_PROCESSED_DATE_KEY, null);
+};
+
+export const setLastProcessedDate = (date: string): void => {
+  setToStorage(LAST_PROCESSED_DATE_KEY, date);
 };
 
 // Analytics

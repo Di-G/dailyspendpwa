@@ -6,7 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ExpenseTracker from "@/pages/expense-tracker";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import { useEffect } from "react";
-import { initializeDefaultCategories } from "./lib/localStorage";
+import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "./lib/localStorage";
+import { formatDate } from "./lib/date-utils";
 
 function Router() {
   return (
@@ -34,6 +35,49 @@ function App() {
     };
     
     initializeApp();
+  }, []);
+
+  // Process recurring expenses for today on app load (once per day) and schedule midnight processing
+  useEffect(() => {
+    const processTodayIfNeeded = async () => {
+      const todayStr = formatDate(new Date());
+      const lastProcessed = getLastProcessedDate();
+      if (lastProcessed !== todayStr) {
+        const added = processRecurringForDate(todayStr);
+        if (added > 0) {
+          await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+        }
+        setLastProcessedDate(todayStr);
+      }
+    };
+
+    const scheduleMidnightRun = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 0, 0);
+      const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+      const timeoutId = window.setTimeout(async () => {
+        const runDate = formatDate(new Date());
+        const added = processRecurringForDate(runDate);
+        if (added > 0) {
+          await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+        }
+        setLastProcessedDate(runDate);
+        // Schedule the next midnight run
+        scheduleMidnightRun();
+      }, msUntilMidnight);
+      return timeoutId;
+    };
+
+    processTodayIfNeeded();
+    const id = scheduleMidnightRun();
+    return () => window.clearTimeout(id);
   }, []);
 
   return (
