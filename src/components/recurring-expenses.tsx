@@ -364,10 +364,10 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
             {recurringExpenses.map((expense) => (
               <Card key={expense.id}>
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="font-medium text-gray-900">{expense.name}</h4>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3 mb-2 min-w-0">
+                        <h4 className="font-medium text-gray-900 truncate">{expense.name}</h4>
                         <Badge variant={expense.isActive ? "default" : "secondary"}>
                           {expense.isActive ? "Active" : "Inactive"}
                         </Badge>
@@ -376,7 +376,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                         </Badge>
                       </div>
                       
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <div className="flex items-center space-x-4 text-sm text-gray-600 min-w-0">
                         <span className="flex items-center">
                           <span className="font-medium text-gray-900">
                             {CURRENCIES[currency].symbol}{expense.amount}
@@ -407,7 +407,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                       </div>
                       
                       {expense.details && (
-                        <p className="text-sm text-gray-600 mt-2">{expense.details}</p>
+                        <p className="text-sm text-gray-600 mt-2 break-words">{expense.details}</p>
                       )}
                       
                       <div className="mt-2 text-sm text-gray-500">
@@ -415,7 +415,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2 ml-4">
+                    <div className="flex items-center space-x-2 ml-4 shrink-0">
                       <Switch
                         checked={expense.isActive}
                         onCheckedChange={() => handleToggle(expense.id)}
