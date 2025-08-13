@@ -23,11 +23,11 @@ export default function ExpenseTracker() {
     return saved || "USD";
   });
   const isMobile = useIsMobile();
-  const [focusAmountTrigger, setFocusAmountTrigger] = useState(0);
+  const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
 
   const handleFabClick = () => {
     setCurrentView("entry");
-    setFocusAmountTrigger((t) => t + 1);
+    setFocusAmountTrigger((t) => (t ?? 0) + 1);
   };
 
   return (

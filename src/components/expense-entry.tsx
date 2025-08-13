@@ -31,7 +31,7 @@ type CurrencyCode = keyof typeof CURRENCIES;
 interface ExpenseEntryProps {
   currency: CurrencyCode;
   setCurrency: (currency: CurrencyCode) => void;
-  focusAmountTrigger?: number;
+  focusAmountTrigger?: number | null;
 }
 
 export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger }: ExpenseEntryProps) {
@@ -261,7 +261,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
 
   // When triggered, scroll to the add expense section and focus the amount input
   useEffect(() => {
-    if (typeof focusAmountTrigger === "number") {
+    if (typeof focusAmountTrigger === "number" && focusAmountTrigger > 0) {
       addExpenseSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       // Focus immediately and once more after scrolling finishes
       amountInputRef.current?.focus({ preventScroll: true });
