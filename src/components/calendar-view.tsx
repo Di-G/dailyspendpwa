@@ -196,9 +196,8 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                         </div>
                       )}
                       {hasRecurringExpense && (
-                        <div className="flex items-center mt-1 text-xs text-gray-500">
-                          <Repeat className="w-3 h-3 mr-1" />
-                          Recurring
+                        <div className="flex items-center justify-center mt-1">
+                          <Repeat className="w-3 h-3 text-gray-500" aria-label="Recurring" />
                         </div>
                       )}
                     </>

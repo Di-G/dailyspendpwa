@@ -197,10 +197,10 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
         </div>
         <Button
           onClick={() => setIsAddingNew(true)}
-          className="bg-primary hover:bg-blue-700 text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3"
+          aria-label="Add Recurring"
+          className="bg-primary hover:bg-blue-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          <span className="whitespace-nowrap">Add Recurring</span>
+          <Plus className="w-5 h-5" />
         </Button>
       </div>
 
