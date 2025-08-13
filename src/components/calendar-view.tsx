@@ -176,25 +176,23 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                 <div
                   key={index}
                   onClick={() => {
-                    if (day.isCurrentMonth && hasRecurringExpense) {
-                      const items = getRecurringItemsForDate(day.dateString).map(i => ({ name: i.name, amount: i.amount }));
-                      setPreviewItems(items);
-                      setPreviewDate(day.dateString);
-                    } else {
+                    if (!day.isCurrentMonth) {
                       setPreviewItems([]);
                       setPreviewDate(null);
+                      return;
                     }
+                    setPreviewDate(day.dateString);
+                    const items = getRecurringItemsForDate(day.dateString).map(i => ({ name: i.name, amount: i.amount }));
+                    setPreviewItems(items);
                   }}
                   className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
                     day.isToday
                       ? "bg-primary text-white"
                       : day.isCurrentMonth
-                      ? hasExpenses || hasRecurringExpense
-                        ? "hover:bg-gray-50 border-2 border-transparent hover:border-primary cursor-pointer"
-                        : "hover:bg-gray-50"
+                      ? "hover:bg-gray-50 border-2 border-transparent hover:border-primary cursor-pointer"
                       : "text-gray-400 hover:bg-gray-50"
-                  } ${day.isCurrentMonth && hasRecurringExpense ? 'cursor-pointer' : ''}`}
-                  title={day.isCurrentMonth && hasRecurringExpense ? `Recurring expenses on ${day.dateString}` : ''}
+                  } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
+                  title={day.isCurrentMonth ? `View details for ${day.dateString}` : ''}
                 >
                   <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-gray-900"}`}>
                     {day.date.getDate()}

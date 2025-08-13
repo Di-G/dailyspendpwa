@@ -32,15 +32,17 @@ interface ExpenseEntryProps {
   currency: CurrencyCode;
   setCurrency: (currency: CurrencyCode) => void;
   focusAmountTrigger?: number | null;
+  onFocusAmountConsumed?: () => void;
 }
 
-export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger }: ExpenseEntryProps) {
+export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger, onFocusAmountConsumed }: ExpenseEntryProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(getToday());
   const today = getToday();
   const amountInputRef = useRef<HTMLInputElement | null>(null);
   const addExpenseSectionRef = useRef<HTMLDivElement | null>(null);
+  const handledTriggerRef = useRef<number | null>(null);
   
   // Calculate yesterday relative to selected date
   const getYesterdayForDate = (date: string) => {
@@ -261,13 +263,20 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
 
   // When triggered, scroll to the add expense section and focus the amount input
   useEffect(() => {
-    if (typeof focusAmountTrigger === "number" && focusAmountTrigger > 0) {
+    if (
+      typeof focusAmountTrigger === "number" &&
+      focusAmountTrigger > 0 &&
+      focusAmountTrigger !== handledTriggerRef.current
+    ) {
       addExpenseSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       // Focus immediately and once more after scrolling finishes
       amountInputRef.current?.focus({ preventScroll: true });
       const id = window.setTimeout(() => {
         amountInputRef.current?.focus({ preventScroll: true });
       }, 350);
+      handledTriggerRef.current = focusAmountTrigger;
+      // Inform parent to clear the trigger so it does not re-run on return to Home
+      onFocusAmountConsumed?.();
       return () => window.clearTimeout(id);
     }
   }, [focusAmountTrigger]);
