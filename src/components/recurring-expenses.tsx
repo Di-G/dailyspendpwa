@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Edit, Plus, Calendar, Repeat } from "lucide-react";
+import { Edit, Plus, Calendar, Repeat } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getCategories, getRecurringExpensesWithCategories, createRecurringExpense, updateRecurringExpense, deleteRecurringExpense, toggleRecurringExpense } from "@/lib/localStorage";
 import { InsertRecurringExpense, RecurringExpenseWithCategory, Category } from "@shared/schema";
@@ -334,10 +334,15 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                 </div>
               </div>
 
-              <div className="flex space-x-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button type="submit" className="bg-primary hover:bg-blue-700">
                   {editingId ? "Update" : "Create"}
                 </Button>
+                {editingId && (
+                  <Button type="button" variant="destructive" onClick={() => handleDelete(editingId!)}>
+                    Delete
+                  </Button>
+                )}
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancel
                 </Button>
@@ -427,15 +432,6 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                         onClick={() => handleEdit(expense)}
                       >
                         <Edit className="w-4 h-4" />
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(expense.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
