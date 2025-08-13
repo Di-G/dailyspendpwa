@@ -41,7 +41,7 @@ export default function BottomNavigation({ currentView, onViewChange }: BottomNa
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-stretch h-16">
         {navigationItems.map((item) => {
           const Icon = item.icon;

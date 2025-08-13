@@ -14,7 +14,7 @@ export default function FloatingActionButton({ onClick }: FloatingActionButtonPr
   }
 
   return (
-    <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-40">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] left-1/2 -translate-x-1/2 z-40 will-change-transform">
       <Button
         onClick={onClick}
         size="lg"

@@ -103,7 +103,7 @@ export default function ExpenseTracker() {
       )}
 
       {/* Main Content */}
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-24' : ''}`}>
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
         {currentView === "entry" && <ExpenseEntry currency={currency} setCurrency={setCurrency} />}
         {currentView === "charts" && <ChartsView currency={currency} />}
         {currentView === "calendar" && <CalendarView currency={currency} />}
