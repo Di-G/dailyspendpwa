@@ -373,12 +373,6 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-3 mb-2 min-w-0">
                         <h4 className="font-medium text-gray-900 truncate">{expense.name}</h4>
-                        <Badge variant={expense.isActive ? "default" : "secondary"}>
-                          {expense.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                        <Badge variant="outline">
-                          {getFrequencyLabel(expense.frequency, expense.customDays)}
-                        </Badge>
                       </div>
                       
                       <div className="flex items-center space-x-4 text-sm text-gray-600 min-w-0">
@@ -397,26 +391,30 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                             {expense.category.name}
                           </span>
                         )}
-                        
-                        <span className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          Starts: {formatDate(new Date(expense.startDate))}
-                        </span>
-                        
-                        {expense.endDate && (
-                          <span className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            Ends: {formatDate(new Date(expense.endDate))}
-                          </span>
-                        )}
                       </div>
                       
                       {expense.details && (
                         <p className="text-sm text-gray-600 mt-2 break-words">{expense.details}</p>
                       )}
                       
-                      <div className="mt-2 text-sm text-gray-500">
-                        Next occurrence: {getNextOccurrence(expense)}
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={expense.isActive ? "default" : "secondary"}>
+                            {expense.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          <Badge variant="outline">
+                            {getFrequencyLabel(expense.frequency, expense.customDays)}
+                          </Badge>
+                        </div>
+                        {expense.endDate && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Calendar className="w-4 h-4 mr-1" />
+                            Ends: {formatDate(new Date(expense.endDate))}
+                          </div>
+                        )}
+                        <div className="text-sm text-gray-500">
+                          Next occurrence: {getNextOccurrence(expense)}
+                        </div>
                       </div>
                     </div>
                     
