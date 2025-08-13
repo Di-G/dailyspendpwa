@@ -36,7 +36,14 @@ export default function ExpenseTracker() {
     await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
   }, []);
 
-  usePullToRefresh(handleRefresh, { thresholdPx: 12, enabled: true });
+  // Visual pull-down feedback
+  const [pullPx, setPullPx] = useState(0);
+  usePullToRefresh(handleRefresh, {
+    thresholdPx: 12,
+    enabled: true,
+    maxPullPx: 64,
+    onPullChange: (px, state) => setPullPx(state === "pulling" || state === "refreshing" ? px : 0),
+  });
 
   const handleFabClick = () => {
     setCurrentView("entry");
@@ -44,7 +51,7 @@ export default function ExpenseTracker() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" style={{ transform: pullPx ? `translateY(${pullPx}px)` : undefined, transition: pullPx ? "none" : "transform 200ms ease" }}>
       {/* Title Bar */}
       <header className="bg-card shadow-sm border-b border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -3,15 +3,18 @@ import { useEffect, useRef } from "react";
 type UsePullToRefreshOptions = {
   thresholdPx?: number;
   enabled?: boolean;
+  maxPullPx?: number;
+  onPullChange?: (pullPx: number, state: "idle" | "pulling" | "refreshing") => void;
 };
 
 export function usePullToRefresh(
   onRefresh: () => void | Promise<void>,
   options: UsePullToRefreshOptions = {}
 ) {
-  const { thresholdPx = 12, enabled = true } = options;
+  const { thresholdPx = 12, enabled = true, maxPullPx = 60, onPullChange } = options;
   const startYRef = useRef<number | null>(null);
   const triggeredRef = useRef<boolean>(false);
+  const touchingRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -22,21 +25,37 @@ export function usePullToRefresh(
       if (e.touches.length !== 1) return;
       startYRef.current = e.touches[0].clientY;
       triggeredRef.current = false;
+      touchingRef.current = true;
+      onPullChange?.(0, "idle");
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (startYRef.current === null || triggeredRef.current) return;
       const currentY = e.touches[0].clientY;
       const deltaY = currentY - startYRef.current;
-      if (deltaY >= thresholdPx && window.scrollY <= 0) {
-        triggeredRef.current = true;
-        Promise.resolve(onRefresh()).catch(() => {});
+      if (deltaY > 0 && window.scrollY <= 0) {
+        const pullPx = Math.min(maxPullPx, deltaY * 0.5);
+        onPullChange?.(pullPx, "pulling");
+        if (deltaY >= thresholdPx) {
+          triggeredRef.current = true;
+          onPullChange?.(pullPx, "refreshing");
+          Promise.resolve(onRefresh())
+            .catch(() => {})
+            .finally(() => {
+              // If touch already ended, reset immediately here; otherwise touchend will reset
+              if (!touchingRef.current) {
+                onPullChange?.(0, "idle");
+              }
+            });
+        }
       }
     };
 
     const handleTouchEnd = () => {
       startYRef.current = null;
       triggeredRef.current = false;
+      touchingRef.current = false;
+      onPullChange?.(0, "idle");
     };
 
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
