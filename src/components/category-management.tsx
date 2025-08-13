@@ -102,7 +102,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
   return (
     <div className="space-y-4">
       {!hideHeader && (
-        <h3 className="text-lg font-semibold text-gray-900">Manage Categories</h3>
+      <h3 className="text-lg font-semibold text-foreground">Manage Categories</h3>
       )}
       
       {/* Add New Category */}
@@ -122,7 +122,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
             )}
           />
           <div>
-            <FormLabel className="text-sm font-medium text-gray-700 mb-2 block">Color</FormLabel>
+      <FormLabel className="text-sm font-medium text-foreground/80 mb-2 block">Color</FormLabel>
             <div className="flex space-x-2 overflow-x-auto pb-4 pt-1 -mx-2 px-2 scrollbar-hide">
               {COLOR_OPTIONS.map((color) => (
                 <button
@@ -139,7 +139,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
               <button
                 type="button"
                 className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
-                  selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-gray-600 scale-105" : "border-dashed border-gray-300 hover:border-gray-400"
+                selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-muted-foreground scale-105" : "border-dashed border hover:border-muted-foreground"
                 }`}
                 style={
                   selectedColor.toLowerCase() === customSwatchColor.toLowerCase()
@@ -175,23 +175,23 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
 
       {/* Existing Categories */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Existing Categories</h4>
+      <h4 className="text-sm font-medium text-foreground/80 mb-3">Existing Categories</h4>
         {categoriesLoading ? (
-          <p className="text-sm text-gray-500 text-center py-4">Loading categories...</p>
+        <p className="text-sm text-muted-foreground text-center py-4">Loading categories...</p>
         ) : categories.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">No categories created yet</p>
+        <p className="text-sm text-muted-foreground text-center py-4">No categories created yet</p>
         ) : (
           categories.map((category) => (
             <div
               key={category.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+          className="flex items-center justify-between p-3 bg-muted rounded-lg"
             >
               <div className="flex items-center min-w-0 flex-1">
                 <div
                   className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
                   style={{ backgroundColor: category.color }}
                 ></div>
-                <span className="text-sm font-medium text-gray-700 truncate">{category.name}</span>
+            <span className="text-sm font-medium text-foreground truncate">{category.name}</span>
               </div>
               <Button
                 size="sm"

@@ -203,8 +203,8 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Recurring Expenses</h2>
-          <p className="text-gray-600">Manage your recurring expenses and subscriptions</p>
+          <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
+          <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
         </div>
         <Button
           onClick={() => setIsAddingNew(true)}
@@ -330,6 +330,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                     min={formatDate(new Date())}
+                    className="bg-card text-foreground"
                     required
                   />
                 </div>
@@ -342,6 +343,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     min={formData.startDate}
+                    className="bg-card text-foreground"
                   />
                 </div>
               </div>
@@ -366,14 +368,14 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
 
       {/* Recurring Expenses List */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Active Recurring Expenses</h3>
+        <h3 className="text-lg font-semibold text-foreground">Active Recurring Expenses</h3>
         
         {recurringExpenses.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <Repeat className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Recurring Expenses</h4>
-              <p className="text-gray-600">Create your first recurring expense to get started.</p>
+              <h4 className="text-lg font-medium text-foreground mb-2">No Recurring Expenses</h4>
+              <p className="text-muted-foreground">Create your first recurring expense to get started.</p>
             </CardContent>
           </Card>
         ) : (
@@ -384,10 +386,10 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-3 mb-2 min-w-0">
-                        <h4 className="font-medium text-gray-900 truncate">{expense.name}</h4>
+                        <h4 className="font-medium text-foreground truncate">{expense.name}</h4>
                       </div>
                       
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 min-w-0">
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0">
                         <span className="flex items-center">
                           <span className="font-medium text-gray-900">
                             {CURRENCIES[currency].symbol}{expense.amount}
@@ -406,7 +408,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                       </div>
                       
                       {expense.details && (
-                        <p className="text-sm text-gray-600 mt-2 break-words">{expense.details}</p>
+                        <p className="text-sm text-muted-foreground mt-2 break-words">{expense.details}</p>
                       )}
                       
                       <div className="mt-3 space-y-1">
@@ -419,12 +421,12 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                           </Badge>
                         </div>
                         {expense.endDate && (
-                          <div className="flex items-center text-sm text-gray-600">
+                          <div className="flex items-center text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4 mr-1" />
                             Ends: {formatDate(new Date(expense.endDate))}
                           </div>
                         )}
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-muted-foreground">
                           Next occurrence: {getNextOccurrence(expense)}
                         </div>
                       </div>

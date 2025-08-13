@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Wallet, Calendar, PieChart, Settings as SettingsIcon, User } from "lucide-react";
 import ExpenseEntry from "@/components/expense-entry";
@@ -12,6 +12,8 @@ import ThemeToggle from "@/components/theme-toggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import SettingsDrawer from "@/components/settings-drawer";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { queryClient } from "@/lib/queryClient";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
 type CurrencyCode = "USD" | "INR";
@@ -25,20 +27,31 @@ export default function ExpenseTracker() {
   const isMobile = useIsMobile();
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
 
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
+  }, []);
+
+  usePullToRefresh(handleRefresh, { thresholdPx: 12, enabled: true });
+
   const handleFabClick = () => {
     setCurrentView("entry");
     setFocusAmountTrigger((t) => (t ?? 0) + 1);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Title Bar */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-card shadow-sm border-b border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center cursor-pointer" onClick={() => setCurrentView("entry") }>
               <Wallet className="text-primary text-2xl mr-3" />
-              <h1 className="text-xl font-semibold text-gray-900">Daily Spends</h1>
+              <h1 className="text-xl font-semibold text-foreground">Daily Spends</h1>
             </div>
             <div className="flex items-center space-x-2">
               <ThemeToggle />
@@ -51,8 +64,8 @@ export default function ExpenseTracker() {
                     <SettingsIcon className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="bg-white p-0 flex flex-col">
-                  <div className="p-6 border-b">
+                 <SheetContent side="right" className="bg-card p-0 flex flex-col">
+                  <div className="p-6 border-b border">
                     <SheetHeader>
                       <SheetTitle>Settings</SheetTitle>
                     </SheetHeader>
@@ -69,7 +82,7 @@ export default function ExpenseTracker() {
 
       {/* Secondary Nav Bar - Only show on desktop */}
       {!isMobile && (
-        <div className="bg-white border-b border-gray-200">
+        <div className="bg-card border-b border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center space-x-2 sm:space-x-4 h-12">
               <Button

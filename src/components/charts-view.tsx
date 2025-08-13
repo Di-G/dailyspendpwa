@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { getToday, formatDate } from "@/lib/date-utils";
 import { RefreshCw, TrendingUp, Calculator, BarChart3 } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
@@ -121,6 +122,12 @@ export default function ChartsView({ currency }: ChartsViewProps) {
 
     let chartsInitialized = false;
 
+    // Resolve theme colors from CSS variables
+    const css = getComputedStyle(document.documentElement);
+    const colorPrimary = css.getPropertyValue('--primary').trim() || '#1976D2';
+    const colorBorder = css.getPropertyValue('--border').trim() || 'rgba(0,0,0,0.1)';
+    const colorMutedForeground = css.getPropertyValue('--muted-foreground').trim() || '#6b7280';
+
     // Pie Chart - only render if we have category data
     if (pieChartRef.current && categoryTotals.length > 0) {
       const ctx = pieChartRef.current.getContext('2d');
@@ -131,8 +138,8 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           datasets: [{
             data: categoryTotals.map(ct => ct.total),
             backgroundColor: categoryTotals.map(ct => ct.category.color),
-            borderWidth: 2,
-            borderColor: '#ffffff'
+            borderWidth: 0,
+            borderColor: 'transparent'
           }]
         },
         options: {
@@ -166,8 +173,8 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           datasets: [{
             label: 'Daily Expenses',
             data: weeklyData,
-            backgroundColor: '#1976D2',
-            borderColor: '#1976D2',
+            backgroundColor: colorPrimary,
+            borderColor: colorPrimary,
             borderWidth: 1,
             borderRadius: 4
           }]
@@ -209,10 +216,11 @@ export default function ChartsView({ currency }: ChartsViewProps) {
               beginAtZero: true,
               grid: {
                 display: true,
-                color: '#f0f0f0'
+                color: colorBorder
               },
               ticks: {
-                display: true // Always show Y-axis labels
+                display: true,
+                color: colorMutedForeground
               }
             },
             x: {
@@ -222,14 +230,15 @@ export default function ChartsView({ currency }: ChartsViewProps) {
               ticks: {
                 maxTicksLimit: 7, // Show all 7 day labels
                 maxRotation: 0,
-                display: true // Always show X-axis labels
+                display: true,
+                color: colorMutedForeground
               }
             }
           },
           elements: {
             bar: {
               borderWidth: 1,
-              borderColor: '#1976D2'
+              borderColor: colorPrimary
             }
           }
         }
@@ -290,6 +299,10 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       
       const ctx = barChartRef.current.getContext('2d');
       if (ctx) {
+        const css = getComputedStyle(document.documentElement);
+        const colorPrimary = css.getPropertyValue('--primary').trim() || '#1976D2';
+        const colorBorder = css.getPropertyValue('--border').trim() || 'rgba(0,0,0,0.1)';
+        const colorMutedForeground = css.getPropertyValue('--muted-foreground').trim() || '#6b7280';
         barChartInstance.current = new window.Chart(ctx, {
           type: 'bar',
           data: {
@@ -297,8 +310,8 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             datasets: [{
               label: 'Daily Expenses',
               data: weeklyData,
-              backgroundColor: '#1976D2',
-              borderColor: '#1976D2',
+              backgroundColor: colorPrimary,
+              borderColor: colorPrimary,
               borderWidth: 1,
               borderRadius: 4
             }]
@@ -340,10 +353,11 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 beginAtZero: true,
                 grid: {
                   display: true,
-                  color: '#f0f0f0'
+                  color: colorBorder
                 },
                 ticks: {
-                  display: true // Always show Y-axis labels
+                  display: true,
+                  color: colorMutedForeground
                 }
               },
               x: {
@@ -353,14 +367,15 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 ticks: {
                   maxTicksLimit: 7, // Show all 7 day labels
                   maxRotation: 0,
-                  display: true // Always show X-axis labels
+                  display: true,
+                  color: colorMutedForeground
                 }
               }
             },
             elements: {
               bar: {
                 borderWidth: 1,
-                borderColor: '#1976D2'
+                borderColor: colorPrimary
               }
             }
           }
@@ -394,16 +409,11 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       <Card>
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Expense Analytics</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Expense Analytics</h2>
               <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                <label className="text-sm font-medium text-gray-700">Select Date:</label>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent w-full sm:w-auto"
-                />
+                <label className="text-sm font-medium text-foreground/80">Select Date:</label>
+                <DatePicker value={selectedDate} onChange={setSelectedDate} className="h-9" />
               </div>
                 <UIButton
                 onClick={updateCharts}
@@ -423,14 +433,14 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         {/* Pie Chart */}
         <Card>
           <CardContent className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Distribution</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Category Distribution</h3>
             <div className="relative h-48 sm:h-64">
               {categoryTotals.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="flex items-center justify-center h-full text-muted-foreground">
                   <div className="text-center">
                     <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                     <p className="text-sm">No category data available</p>
-                    <p className="text-xs text-gray-400">Select a date to view category distribution</p>
+                    <p className="text-xs text-muted-foreground">Select a date to view category distribution</p>
                   </div>
                 </div>
               ) : (
@@ -462,7 +472,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         {/* Bar Chart */}
         <Card>
           <CardContent className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Comparison</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Weekly Comparison</h3>
             
             {/* Navigation Controls */}
             <div className="flex items-center justify-end mb-4">
@@ -477,12 +487,12 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             </div>
             
             {/* Date Range Info */}
-            <div className="mt-2 text-xs text-gray-500 text-center">
+            <div className="mt-2 text-xs text-muted-foreground text-center">
               Showing: {weeklyDays[6]?.fullDate} - {weeklyDays[0]?.fullDate}
             </div>
             
             {/* Navigation Hints */}
-            <div className="mt-2 text-xs text-gray-400 text-center space-y-1">
+            <div className="mt-2 text-xs text-muted-foreground text-center space-y-1">
               💡 Weekly comparison showing last 7 days
             </div>
           </CardContent>
@@ -492,27 +502,27 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       {/* Monthly Overview */}
       <Card>
         <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Overview</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Overview</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <TrendingUp className="text-red-500 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-gray-700">Highest Day</p>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyHighest)}</p>
-              <p className="text-xs text-gray-500">
+            <div className="text-center p-4 bg-muted border rounded-lg">
+              <TrendingUp className="text-red-500 dark:text-red-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyHighest)}</p>
+              <p className="text-xs text-muted-foreground">
                 {highestDayName && highestDayDate ? `${highestDayName}, ${highestDayDate}` : 'This month'}
               </p>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <BarChart3 className="text-green-500 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-gray-700">Average Daily</p>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyAverage)}</p>
-              <p className="text-xs text-gray-500">This month</p>
+            <div className="text-center p-4 bg-muted border rounded-lg">
+              <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyAverage)}</p>
+              <p className="text-xs text-muted-foreground">This month</p>
             </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <Calculator className="text-blue-500 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-gray-700">Total This Month</p>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
-              <p className="text-xs text-gray-500">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+            <div className="text-center p-4 bg-muted border rounded-lg">
+              <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
+              <p className="text-xs text-muted-foreground">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
             </div>
           </div>
         </CardContent>

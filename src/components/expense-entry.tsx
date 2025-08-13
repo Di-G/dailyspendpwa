@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
@@ -331,27 +332,26 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">
                 {selectedDate === today ? "Today's Expenses" : "Expenses"}
               </h2>
-              <input
-                type="date"
+              <DatePicker
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="text-primary font-medium cursor-pointer border border-gray-300 rounded px-2 py-1 text-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={setSelectedDate}
+                className="h-8 text-sm"
               />
             </div>
             <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-6 gap-4 sm:gap-0">
               <div className="text-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-500">Yesterday</p>
-                <p className="text-lg sm:text-xl font-semibold text-gray-700">{CURRENCIES[currency].symbol}{formatAmountDisplay(yesterdayTotal.total)}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Yesterday</p>
+                <p className="text-lg sm:text-xl font-semibold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(yesterdayTotal.total)}</p>
               </div>
               <div className="text-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-500">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                   {selectedDate === today ? "Today" : "Selected Date"}
                 </p>
                 <p className="text-xl sm:text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedDateTotal.total)}</p>
-                <p className={`mt-1 text-[10px] sm:text-xs font-medium ${changeColorClass}`}>
+                <p className={`mt-1 text-[10px] sm:text-xs font-medium ${changeColorClass.replace('text-gray-500','text-muted-foreground')}`}>
                   {changeText}
                 </p>
               </div>
@@ -362,11 +362,11 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
             {categoriesLoading ? (
               <div className="col-span-2 sm:col-span-4 text-center py-4">
-                <p className="text-sm text-gray-500">Loading categories...</p>
+                <p className="text-sm text-muted-foreground">Loading categories...</p>
               </div>
             ) : categories.length === 0 ? (
               <div className="col-span-2 sm:col-span-4 text-center py-4">
-                <p className="text-sm text-gray-500">No categories available</p>
+                <p className="text-sm text-muted-foreground">No categories available</p>
               </div>
             ) : (
               categories.map((category) => {
@@ -384,8 +384,8 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                       className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
                       style={{ backgroundColor: category.color }}
                     ></div>
-                    <p className="text-xs font-medium text-gray-700 truncate">{category.name}</p>
-                    <p className="text-xs sm:text-sm font-semibold text-gray-900">
+                    <p className="text-xs font-medium text-muted-foreground truncate">{category.name}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-foreground">
                       {CURRENCIES[currency].symbol}{formatAmountDisplay(categoryTotal?.total || 0)}
                     </p>
                   </div>
@@ -401,7 +401,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
         <div className="lg:col-span-2" ref={addExpenseSectionRef}>
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Expense</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Add New Expense</h3>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -529,14 +529,14 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
 
       {/* Selected Date Expenses List */}
       <Card>
-        <div className="p-4 sm:p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
+            <div className="p-4 sm:p-6 border-b border">
+              <h3 className="text-lg font-semibold text-foreground">
             {selectedDate === today ? "Today's Expense List" : `Expenses for ${formatDisplayDate(selectedDate)}`}
           </h3>
         </div>
         <CardContent className="p-4 sm:p-6">
           {selectedDateExpenses.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               <p>No expenses added for this date. Start by adding your first expense above.</p>
             </div>
           ) : (
@@ -544,7 +544,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
               {selectedDateExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200 cursor-pointer"
+                  className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg hover:bg-muted/70 transition duration-200 cursor-pointer"
                   onClick={() => openEdit(expense)}
                 >
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
@@ -553,15 +553,15 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                       style={{ backgroundColor: expense.category?.color || "#gray" }}
                     ></div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 whitespace-normal break-words">{expense.name}</p>
+                      <p className="font-medium text-foreground whitespace-normal break-words">{expense.name}</p>
                       {expense.details && (
-                        <p className="text-sm text-gray-600 whitespace-normal break-words">{expense.details}</p>
+                        <p className="text-sm text-muted-foreground whitespace-normal break-words">{expense.details}</p>
                       )}
-                      <p className="text-xs text-gray-500">{formatTime(expense.createdAt!.toString())}</p>
+                      <p className="text-xs text-muted-foreground">{formatTime(expense.createdAt!.toString())}</p>
                     </div>
                   </div>
                                         <div className="flex-shrink-0">
-                        <span className="font-semibold text-gray-900 text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
+                        <span className="font-semibold text-foreground text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
                       </div>
                 </div>
               ))}
@@ -580,7 +580,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Amount ({CURRENCIES[currency].symbol})</label>
+                  <label className="text-sm font-medium text-foreground/80">Amount ({CURRENCIES[currency].symbol})</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -589,7 +589,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Expense Name</label>
+                <label className="text-sm font-medium text-foreground/80">Expense Name</label>
                   <Input
                     value={editFields.name}
                     onChange={(e) => setEditFields({ ...editFields, name: e.target.value })}
@@ -597,7 +597,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Category</label>
+              <label className="text-sm font-medium text-foreground/80">Category</label>
                 <Select
                   onValueChange={(val) => setEditFields({ ...editFields, categoryId: val })}
                   value={editFields.categoryId}

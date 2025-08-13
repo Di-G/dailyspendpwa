@@ -149,22 +149,22 @@ export default function CalendarView({ currency }: CalendarViewProps) {
       <Card>
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-0">Monthly Calendar</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Monthly Calendar</h2>
             <div className="flex items-center justify-center sm:justify-start space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={previousMonth}
-                className="p-2 text-gray-600 hover:text-gray-900"
+                className="p-2 text-muted-foreground hover:text-foreground"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-lg font-medium text-gray-900">{monthInfo.monthName}</span>
+              <span className="text-lg font-medium text-foreground">{monthInfo.monthName}</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={nextMonth}
-                className="p-2 text-gray-600 hover:text-gray-900"
+                className="p-2 text-muted-foreground hover:text-foreground"
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -179,7 +179,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
           {/* Calendar Header Days */}
           <div className="grid grid-cols-7 gap-1 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-xs sm:text-sm font-medium text-gray-600 py-2 sm:py-3">
+              <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2 sm:py-3">
                 {day}
               </div>
             ))}
@@ -209,28 +209,22 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                     day.isToday
                       ? "bg-primary text-white"
                       : day.isCurrentMonth
-                      ? "hover:bg-gray-50 border-2 border-transparent hover:border-primary cursor-pointer"
-                      : "text-gray-400 hover:bg-gray-50"
+                      ? "hover:bg-muted border-2 border-transparent hover:border-primary cursor-pointer"
+                      : "text-muted-foreground hover:bg-muted"
                   } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                   title={day.isCurrentMonth ? `View details for ${day.dateString}` : ''}
                 >
-                  <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-gray-900"}`}>
+                  <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-foreground"}`}>
                     {day.date.getDate()}
                   </div>
                   {day.isCurrentMonth && (
                     <>
                       {hasExpenses && (
-                        <div className={`text-xs font-medium mt-1 ${
-                          day.isToday 
-                            ? "text-white" 
-                            : "text-primary"
-                        }`}>
-                          {total === 0 ? "0" : Math.round(total)}
-                        </div>
+                        <div className={`text-xs font-medium mt-1 ${day.isToday ? "text-white" : "text-foreground"}`}>${total === 0 ? "0" : Math.round(total)}</div>
                       )}
                       {hasRecurringExpense && (
                         <div className="flex items-center justify-center mt-1">
-                          <Repeat className="w-3 h-3 text-gray-500" aria-label="Recurring" />
+                          <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />
                         </div>
                       )}
                     </>
@@ -248,11 +242,11 @@ export default function CalendarView({ currency }: CalendarViewProps) {
             <div className="space-y-2">
               {combinedPreviewItems.map((item) => (
                 <div key={item.key} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-900 font-medium flex items-center gap-1">
-                    {item.isRecurring && <Repeat className="w-3 h-3 text-gray-500" aria-label="Recurring" />}
+                  <span className="text-sm text-foreground font-medium flex items-center gap-1">
+                    {item.isRecurring && <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />}
                     {item.name}
                   </span>
-                  <span className="text-sm text-gray-900 font-semibold">{CURRENCIES[currency].symbol}{item.amount}</span>
+                  <span className="text-sm text-foreground font-semibold">{CURRENCIES[currency].symbol}{item.amount}</span>
                 </div>
               ))}
             </div>

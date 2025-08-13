@@ -228,7 +228,7 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
       {/* Currency */}
       <div>
         <button
-          className="w-full text-left text-sm font-medium text-gray-900 py-2"
+          className="w-full text-left text-sm font-medium text-foreground py-2"
           onClick={() => toggle("currency")}
         >
           Currency
@@ -256,7 +256,7 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
       {/* Manage Categories */}
       <div>
         <button
-          className="w-full text-left text-sm font-medium text-gray-900 py-2"
+          className="w-full text-left text-sm font-medium text-foreground py-2"
           onClick={() => toggle("categories")}
         >
           Manage Categories
@@ -273,7 +273,7 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
       {/* Export / Import */}
       <div>
         <button
-          className="w-full text-left text-sm font-medium text-gray-900 py-2"
+          className="w-full text-left text-sm font-medium text-foreground py-2"
           onClick={() => toggle("export")}
         >
           Export / Import
@@ -309,7 +309,7 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
                 if (file) handleImportFile(file);
               }} />
             </div>
-            <p className="text-xs text-gray-500">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
+            <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
           </div>
         </div>
       </div>

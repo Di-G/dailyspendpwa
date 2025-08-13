@@ -101,10 +101,10 @@ export default function AddToHomeScreen() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg p-4">
+  <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border shadow-lg p-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
         <div className="flex-1">
-          <h3 className="text-sm font-medium text-gray-900">Install DailySpend</h3>
+        <h3 className="text-sm font-medium text-foreground">Install DailySpend</h3>
           <p className="text-xs text-gray-600 mt-1">
             Add to your home screen for quick access and offline use
           </p>
