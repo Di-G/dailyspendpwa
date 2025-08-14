@@ -536,9 +536,14 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       <Card>
             <div className="p-4 sm:p-6 border-b border">
               <h3 className="text-lg font-semibold text-foreground">
-            {selectedDate === today ? "Today's Expense List" : `Expenses for ${formatDisplayDate(selectedDate)}`}
-          </h3>
-        </div>
+                {selectedDate === today ? "Today's Expense List" : "Expense list"}
+              </h3>
+              {selectedDate !== today && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              )}
+            </div>
         <CardContent className="p-4 sm:p-6">
           {selectedDateExpenses.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
