@@ -7,12 +7,7 @@ export function useTheme() {
     // Check localStorage first, then system preference
     const saved = localStorage.getItem("dailyspend_theme") as Theme;
     if (saved) return saved;
-    
-    // Check system preference
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-    
+    // Default to light on first open
     return "light";
   });
 

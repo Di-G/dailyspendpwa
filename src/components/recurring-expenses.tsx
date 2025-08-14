@@ -7,6 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Edit, Plus, Calendar, Repeat } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getCategories, getRecurringExpensesWithCategories, createRecurringExpense, updateRecurringExpense, deleteRecurringExpense, toggleRecurringExpense } from "@/lib/localStorage";
 import { InsertRecurringExpense, RecurringExpenseWithCategory, Category } from "@shared/schema";
@@ -21,6 +31,8 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
   const [categories, setCategories] = useState<Category[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<InsertRecurringExpense>({
     name: "",
     amount: "",
@@ -121,14 +133,8 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this recurring expense?")) {
-      deleteRecurringExpense(id);
-      loadData();
-      toast({
-        title: "Success",
-        description: "Recurring expense deleted successfully.",
-      });
-    }
+    setPendingDeleteId(id);
+    setShowDeleteDialog(true);
   };
 
   const handleToggle = (id: string) => {
@@ -365,6 +371,35 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Recurring Expense</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the recurring expense.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDeleteDialog(false); setPendingDeleteId(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDeleteId) {
+                  deleteRecurringExpense(pendingDeleteId);
+                  loadData();
+                  resetForm();
+                  toast({ title: "Success", description: "Recurring expense deleted successfully." });
+                }
+                setShowDeleteDialog(false);
+                setPendingDeleteId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Recurring Expenses List */}
       <div className="space-y-4">

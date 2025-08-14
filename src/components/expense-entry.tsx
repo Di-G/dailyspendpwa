@@ -304,9 +304,9 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
   const absDiffValue = Math.abs(diffValue);
   const percentChange = yesterdayTotalValue > 0 ? (diffValue / yesterdayTotalValue) * 100 : null;
   const changeColorClass = diffValue > 0
-    ? "text-green-600"
+    ? "text-red-600"
     : diffValue < 0
-      ? "text-red-600"
+      ? "text-green-600"
       : "text-gray-500";
 
   const changeText = (() => {
@@ -332,9 +332,14 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">
-                {selectedDate === today ? "Today's Expenses" : "Expenses"}
+              <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-1">
+                {selectedDate === today ? "Today's Expenses" : "Expense list"}
               </h2>
+              {selectedDate !== today && (
+                <p className="text-xs text-muted-foreground mb-1">
+                  {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              )}
               <DatePicker
                 value={selectedDate}
                 onChange={setSelectedDate}

@@ -220,7 +220,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                   {day.isCurrentMonth && (
                     <>
                       {hasExpenses && (
-                        <div className={`text-xs font-medium mt-1 ${day.isToday ? "text-white" : "text-foreground"}`}>${total === 0 ? "0" : Math.round(total)}</div>
+                        <div className={`text-xs font-medium mt-1 ${day.isToday ? "text-white" : "text-foreground"}`}>{total === 0 ? "0" : Math.round(total)}</div>
                       )}
                       {hasRecurringExpense && (
                         <div className="flex items-center justify-center mt-1">
