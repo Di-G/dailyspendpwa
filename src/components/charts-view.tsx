@@ -504,7 +504,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Overview</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-            <div className="text-center p-4 bg-muted border rounded-lg">
+            <div className="text-center p-4 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
               <TrendingUp className="text-red-500 dark:text-red-300 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyHighest)}</p>
@@ -512,13 +512,13 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 {highestDayName && highestDayDate ? `${highestDayName}, ${highestDayDate}` : 'This month'}
               </p>
             </div>
-            <div className="text-center p-4 bg-muted border rounded-lg">
+            <div className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
               <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyAverage)}</p>
               <p className="text-xs text-muted-foreground">This month</p>
             </div>
-            <div className="text-center p-4 bg-muted border rounded-lg">
+            <div className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
               <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>

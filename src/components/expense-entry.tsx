@@ -540,30 +540,32 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
               <p>No expenses added for this date. Start by adding your first expense above.</p>
             </div>
           ) : (
-            <div className="space-y-3 sm:space-y-4">
+            <div className="rounded-lg overflow-hidden">
               {selectedDateExpenses.map((expense) => (
-                <div
+                <button
                   key={expense.id}
-                  className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg hover:bg-muted/70 transition duration-200 cursor-pointer"
+                  className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors hover:bg-muted/30"
                   onClick={() => openEdit(expense)}
                 >
-                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: expense.category?.color || "#gray" }}
-                    ></div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-foreground whitespace-normal break-words">{expense.name}</p>
-                      {expense.details && (
-                        <p className="text-sm text-muted-foreground whitespace-normal break-words">{expense.details}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">{formatTime(expense.createdAt!.toString())}</p>
+                  <div className="flex items-center justify-between p-3 sm:p-4">
+                    <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 border"
+                        style={{ backgroundColor: expense.category?.color || "#9ca3af", borderColor: (expense.category?.color || "#9ca3af") + "55" }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground truncate">{expense.name}</p>
+                        {expense.details && (
+                          <p className="text-xs sm:text-sm text-muted-foreground whitespace-normal break-words">{expense.details}</p>
+                        )}
+                        <p className="text-[11px] sm:text-xs text-muted-foreground">{formatTime(expense.createdAt!.toString())}</p>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 ml-3 sm:ml-4">
+                      <span className="font-semibold text-foreground text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
                     </div>
                   </div>
-                                        <div className="flex-shrink-0">
-                        <span className="font-semibold text-foreground text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
-                      </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
