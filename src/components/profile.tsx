@@ -201,7 +201,7 @@ export default function Profile() {
                         <AlertDescription>{infoMessage}</AlertDescription>
                       </Alert>
                     )}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2">
                       <Button variant="outline" onClick={handleSendVerify}>
                         <MailCheck className="w-4 h-4 mr-1" /> Send verification email
                       </Button>
