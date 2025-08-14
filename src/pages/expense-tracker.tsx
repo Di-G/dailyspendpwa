@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon, User } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon } from "lucide-react";
 import ExpenseEntry from "@/components/expense-entry";
 import ChartsView from "@/components/charts-view";
 import CalendarView from "@/components/calendar-view";
@@ -9,6 +9,7 @@ import AddToHomeScreen from "@/components/AddToHomeScreen";
 import BottomNavigation from "@/components/bottom-navigation";
 import FloatingActionButton from "@/components/floating-action-button";
 import ThemeToggle from "@/components/theme-toggle";
+import Profile from "@/components/profile";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import SettingsDrawer from "@/components/settings-drawer";
@@ -62,9 +63,7 @@ export default function ExpenseTracker() {
             </div>
             <div className="flex items-center space-x-2">
               <ThemeToggle />
-              <Button variant="ghost" size="icon" aria-label="Profile">
-                <User className="w-5 h-5" />
-              </Button>
+              <Profile />
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" aria-label="Open Settings">

@@ -24,6 +24,7 @@ A Progressive Web App for tracking daily expenses with a beautiful, modern UI. T
 - **Charts**: Chart.js for data visualization
 - **Routing**: Wouter for lightweight routing
 - **Storage**: Browser localStorage for data persistence
+- **Auth**: Firebase Authentication (passwordless email link)
 - **Build Tool**: Vite with PWA plugin
 
 ## Getting Started
@@ -46,6 +47,17 @@ cd dailyspendpwa
 # If PowerShell blocks npm scripts on Windows, either use Command Prompt (cmd)
 # or run this once in PowerShell: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 npm ci
+```
+
+3. Create a `.env` file with your Firebase config (for local dev) or set these in Vercel Project → Settings → Environment Variables:
+```
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_MEASUREMENT_ID=...
 ```
 
 3. Start the development server:
