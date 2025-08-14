@@ -1,4 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 function readEnv(name: string): string | undefined {
@@ -41,12 +42,13 @@ if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.proj
 const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig as any);
 
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Persist auth state across reloads/PWA restarts
 setPersistence(auth, browserLocalPersistence).catch(() => {
   // non-blocking if persistence fails (e.g., private mode)
 });
 
-export { app, auth };
+export { app, auth, db };
 
 

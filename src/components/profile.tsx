@@ -217,7 +217,10 @@ export default function Profile() {
             <Alert className="mt-2">
               <MailCheck className="h-4 w-4" />
               <AlertTitle>Status</AlertTitle>
-              <AlertDescription>You can use all features now, congrats!</AlertDescription>
+              <AlertDescription>
+                Your data is now syncing securely to our servers. Any entry you add or edit is uploaded instantly.
+                Sign in with this email on any device to access your data automatically.
+              </AlertDescription>
             </Alert>
           ) : null}
         </div>

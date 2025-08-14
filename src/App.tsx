@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ExpenseTracker from "@/pages/expense-tracker";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import { useEffect } from "react";
+import { useRealtimeSync } from "@/lib/syncClient";
 import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "./lib/localStorage";
 import { formatDate } from "./lib/date-utils";
 
@@ -26,6 +27,7 @@ function Router() {
 }
 
 function App() {
+  useRealtimeSync();
   // Initialize default categories on app start
   useEffect(() => {
     const initializeApp = async () => {

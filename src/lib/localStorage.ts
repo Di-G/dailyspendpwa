@@ -1,5 +1,6 @@
 import { Category, Expense, RecurringExpense, InsertCategory, InsertExpense, InsertRecurringExpense, ExpenseWithCategory, RecurringExpenseWithCategory } from "@shared/schema";
 import { formatDate } from "./date-utils";
+import { emitDataChanged } from "./syncBridge";
 
 // Storage keys
 const CATEGORIES_KEY = 'dailyspend_categories';
@@ -64,6 +65,7 @@ export const createCategory = (data: InsertCategory): Category => {
   
   const updatedCategories = [...categories, newCategory];
   setToStorage(CATEGORIES_KEY, updatedCategories);
+  emitDataChanged();
   return newCategory;
 };
 
@@ -71,6 +73,7 @@ export const deleteCategory = (id: string): void => {
   const categories = getCategories();
   const updatedCategories = categories.filter(cat => cat.id !== id);
   setToStorage(CATEGORIES_KEY, updatedCategories);
+  emitDataChanged();
   
   // Also remove category from expenses
   const expenses = getExpenses();
@@ -118,6 +121,7 @@ export const createExpense = (data: InsertExpense): Expense => {
   
   const updatedExpenses = [...expenses, newExpense];
   setToStorage(EXPENSES_KEY, updatedExpenses);
+  emitDataChanged();
   return newExpense;
 };
 
@@ -125,12 +129,14 @@ export const deleteExpense = (id: string): void => {
   const expenses = getExpenses();
   const updatedExpenses = expenses.filter(expense => expense.id !== id);
   setToStorage(EXPENSES_KEY, updatedExpenses);
+  emitDataChanged();
 };
 
 export const restoreExpense = (expense: Expense): void => {
   const expenses = getExpenses();
   const updatedExpenses = [...expenses, expense];
   setToStorage(EXPENSES_KEY, updatedExpenses);
+  emitDataChanged();
 };
 
 export const updateExpense = (
@@ -158,6 +164,7 @@ export const updateExpense = (
     return updated;
   });
   setToStorage(EXPENSES_KEY, updatedExpenses);
+  emitDataChanged();
   return updated;
 };
 
@@ -194,6 +201,7 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
   
   const updatedRecurringExpenses = [...recurringExpenses, newRecurringExpense];
   setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  emitDataChanged();
 
   // If a recurring expense starts today, immediately add today's occurrence only
   try {
@@ -258,6 +266,7 @@ export const updateRecurringExpense = (
     return updated;
   });
   setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  emitDataChanged();
   return updated;
 };
 
@@ -265,6 +274,7 @@ export const deleteRecurringExpense = (id: string): void => {
   const recurringExpenses = getRecurringExpenses();
   const updatedRecurringExpenses = recurringExpenses.filter(expense => expense.id !== id);
   setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  emitDataChanged();
 };
 
 export const toggleRecurringExpense = (id: string): void => {
@@ -273,6 +283,7 @@ export const toggleRecurringExpense = (id: string): void => {
     expense.id === id ? { ...expense, isActive: !expense.isActive } : expense
   );
   setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  emitDataChanged();
 };
 
 // Function to generate expenses from recurring expenses for a given date
@@ -344,6 +355,7 @@ export const processRecurringForDate = (date: string): number => {
   const current = getExpenses();
   const updated = [...current, ...expensesToAdd];
   setToStorage(EXPENSES_KEY, updated);
+  emitDataChanged();
   return expensesToAdd.length;
 };
 
