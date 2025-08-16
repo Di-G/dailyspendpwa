@@ -646,10 +646,23 @@ export default function ExpenseEntry({
                         <p className="text-sm text-muted-foreground mb-1">{expense.details}</p>
                       )}
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="flex items-center space-x-2 ml-4">
                       <p className="text-lg font-semibold text-foreground">
                         {CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}
                       </p>
+                      {!isFriendMode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-muted/50 text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteExpenseMutation.mutate(expense.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
