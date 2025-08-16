@@ -8,7 +8,7 @@ import { useRealtimeSync } from "@/lib/syncClient";
 import { useAuth } from "@/lib/auth";
 import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "@/lib/localStorage";
 import { formatDate } from "@/lib/date-utils";
-// import DataConflictSheet from "@/components/DataConflictSheet";
+import DataConflictDialog from "@/components/DataConflictDialog";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import ExpenseTracker from "@/pages/expense-tracker";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ function App() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { 
+    conflictDialogOpen,
     pendingConflict, 
     onConflictResolve, 
     onConflictDialogClose 
@@ -121,15 +122,15 @@ function App() {
         <Router />
         <AddToHomeScreen />
         
-        {/* Data Conflict Resolution Sheet */}
-        {/* {pendingConflict && (
-          <DataConflictSheet
+        {/* Data Conflict Resolution Dialog */}
+        {pendingConflict && (
+          <DataConflictDialog
             open={conflictDialogOpen}
             onClose={onConflictDialogClose}
             conflict={pendingConflict}
             onResolve={onConflictResolve}
           />
-        )} */}
+        )}
       </TooltipProvider>
     </QueryClientProvider>
   );
