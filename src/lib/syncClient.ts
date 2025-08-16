@@ -75,7 +75,13 @@ export function useRealtimeSync() {
       }
       
       // Scenario 2: Some local data, but no online data - ask user to upload local data
+      // Do NOT treat default categories-only as meaningful local data
       if (conflict.hasLocalData && !conflict.hasOnlineData) {
+        if (isLocalDataOnlyDefaultCategories(localData)) {
+          console.log('[Sync] Only default categories found locally; skipping upload prompt');
+          // Nothing to do; keep local defaults and wait for user to add real data
+          return;
+        }
         console.log('[Sync] Local data exists but no online data, prompting user to upload');
         setUploadPromptOpen(true);
         return;
