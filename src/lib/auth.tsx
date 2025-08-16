@@ -43,10 +43,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const lastAuthStateRef = useRef<User | null>(null);
   const isRefreshingRef = useRef<boolean>(false); // Track if a refresh operation is in progress
   const networkRetryCountRef = useRef<number>(0); // Track network retry attempts
+  const lastStableUserRef = useRef<User | null>(null); // Track the last stable user state
+  const protectedUserRef = useRef<User | null>(null); // Protected user state during refresh
+  const authListenerRef = useRef<(() => void) | null>(null); // Reference to the auth listener
 
   // Function to temporarily disable auth state changes during refresh operations
   const setRefreshingState = (isRefreshing: boolean) => {
     isRefreshingRef.current = isRefreshing;
+    if (import.meta.env.DEV) {
+      console.log('[Auth] Refresh state changed:', isRefreshing);
+    }
+    
+    // When starting refresh, protect the current user state
+    if (isRefreshing && user) {
+      protectedUserRef.current = user;
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Protecting user state during refresh:', user.uid);
+      }
+      
+      // Temporarily disable the auth listener during refresh
+      if (authListenerRef.current) {
+        if (import.meta.env.DEV) {
+          console.log('[Auth] Temporarily disabling Firebase auth listener during refresh');
+        }
+        authListenerRef.current();
+        authListenerRef.current = null;
+      }
+    } else if (!isRefreshing) {
+      // When refresh ends, clear the protected state and re-enable the listener
+      protectedUserRef.current = null;
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Clearing protected user state after refresh');
+      }
+      
+      // Re-enable the auth listener after refresh
+      if (!authListenerRef.current) {
+        if (import.meta.env.DEV) {
+          console.log('[Auth] Re-enabling Firebase auth listener after refresh');
+        }
+        setupAuthListener();
+      }
+    }
   };
 
   // Helper function to process auth state changes
@@ -69,15 +106,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Update previous user ID
     if (u) {
       previousUserId.current = u.uid;
+      lastStableUserRef.current = u; // Update stable user reference
     } else {
       previousUserId.current = null;
+      lastStableUserRef.current = null;
     }
 
     // Update the last known auth state
     lastAuthStateRef.current = u;
   }, []);
 
-  useEffect(() => {
+  // Helper function to setup the auth listener
+  const setupAuthListener = useCallback(() => {
+    if (authListenerRef.current) {
+      return; // Already set up
+    }
+
     const unsub = onAuthStateChanged(auth, (u) => {
       // If we're in the middle of a refresh operation, ignore auth state changes
       if (isRefreshingRef.current) {
@@ -98,15 +142,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Only process if the auth state actually changed meaningfully
         const currentUser = lastAuthStateRef.current;
         const newUser = u;
+        const stableUser = lastStableUserRef.current;
+        const protectedUser = protectedUserRef.current;
         
         // Debug logging for auth state changes
         if (import.meta.env.DEV) {
           console.log('[Auth] Auth state change detected:', {
             currentUser: currentUser?.uid || 'null',
             newUser: newUser?.uid || 'null',
+            stableUser: stableUser?.uid || 'null',
+            protectedUser: protectedUser?.uid || 'null',
             isLoading,
             timestamp: new Date().toISOString()
           });
+        }
+        
+        // CRITICAL: If we have a protected user during refresh and the new user is null,
+        // this is definitely a false logout - ignore it completely
+        if (protectedUser && !newUser) {
+          if (import.meta.env.DEV) {
+            console.log('[Auth] CRITICAL: False logout detected during refresh, maintaining protected user state');
+          }
+          return;
+        }
+        
+        // CRITICAL: If we have a stable user and the new user is null, 
+        // this is likely a false logout during refresh - ignore it
+        if (stableUser && !newUser && isRefreshingRef.current === false) {
+          if (import.meta.env.DEV) {
+            console.log('[Auth] CRITICAL: Potential false logout detected, checking Firebase state...');
+          }
+          
+          // Double-check with Firebase directly
+          if (auth.currentUser && auth.currentUser.uid === stableUser.uid) {
+            if (import.meta.env.DEV) {
+              console.log('[Auth] Firebase confirms user is still authenticated, ignoring false logout');
+            }
+            return;
+          }
         }
         
         // Check if this is a meaningful change (not just a temporary token refresh)
@@ -188,18 +261,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (import.meta.env.DEV) {
           console.log('[Auth] Ignoring non-meaningful auth state change');
         }
-      }, 150); // Increased to 150ms debounce for better stability
+      }, 200); // Increased to 200ms debounce for better stability
+      
+      authListenerRef.current = unsub;
     });
+  }, [isLoading, processAuthStateChange]);
+
+  useEffect(() => {
+    // Listen for global refresh events
+    const handleRefreshStart = () => {
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Global refresh event detected, protecting auth state');
+      }
+      setRefreshingState(true);
+    };
+
+    const handleRefreshEnd = () => {
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Global refresh event ended, re-enabling auth state changes');
+      }
+      setRefreshingState(false);
+    };
+
+    // Listen for custom refresh events
+    window.addEventListener('dailyspend:refresh-start', handleRefreshStart);
+    window.addEventListener('dailyspend:refresh-end', handleRefreshEnd);
+
+    // Setup the initial auth listener
+    setupAuthListener();
     
     return () => {
       if (authStateChangeTimeoutRef.current) {
         clearTimeout(authStateChangeTimeoutRef.current);
       }
-      unsub();
+      if (authListenerRef.current) {
+        authListenerRef.current();
+      }
+      window.removeEventListener('dailyspend:refresh-start', handleRefreshStart);
+      window.removeEventListener('dailyspend:refresh-end', handleRefreshEnd);
     };
-  }, [isLoading, processAuthStateChange]);
-
-  const isVerified = user?.emailVerified === true;
+  }, [setupAuthListener]);
 
   const saveDisplayName = async () => {
     if (user && displayName) {
@@ -255,9 +356,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      user,
+      user: protectedUserRef.current || user, // Return protected user during refresh, otherwise current user
       isLoading,
-      isVerified,
+      isVerified: (protectedUserRef.current || user)?.emailVerified === true,
       displayName,
       emailForSignIn,
       setDisplayName,
@@ -271,7 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOutUser,
       setRefreshingState, // Expose this function for external use
     }),
-    [user, isLoading, isVerified, displayName, emailForSignIn]
+    [user, isLoading, displayName, emailForSignIn]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

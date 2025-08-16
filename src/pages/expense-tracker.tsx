@@ -87,6 +87,9 @@ export default function ExpenseTracker() {
       return;
     }
     
+    // Dispatch global refresh start event
+    window.dispatchEvent(new CustomEvent('dailyspend:refresh-start'));
+    
     // Protect against auth state changes during refresh
     setRefreshingState(true);
     
@@ -102,6 +105,9 @@ export default function ExpenseTracker() {
     } finally {
       // Re-enable auth state changes after refresh
       setRefreshingState(false);
+      
+      // Dispatch global refresh end event
+      window.dispatchEvent(new CustomEvent('dailyspend:refresh-end'));
     }
   }, [setRefreshingState]);
 
