@@ -93,7 +93,16 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 py-4 pb-24">
+        <div className="space-y-4 py-4 pb-24 overflow-y-auto max-h-[calc(100vh-200px)]">
+          {/* Scroll Indicator */}
+          <div className="flex justify-center pb-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="w-1 h-1 bg-muted-foreground/50 rounded-full animate-pulse"></div>
+              <span>Scroll down to see action buttons</span>
+              <div className="w-1 h-1 bg-muted-foreground/50 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+
           {/* Conflict Summary */}
           <Alert>
             <Info className="h-4 w-4" />
@@ -218,7 +227,7 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
             </div>
           </div>
 
-          {/* Warning for data loss */}
+          {/* Full Warning - Back to normal size */}
           {selectedResolution === 'overwrite-local' && (
             <Alert variant="destructive" className="text-sm">
               <AlertTriangle className="h-4 w-4" />
@@ -229,10 +238,13 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
               </AlertDescription>
             </Alert>
           )}
+
+          {/* Bottom Spacing for Buttons */}
+          <div className="h-8"></div>
         </div>
 
-        {/* Fixed Bottom Action Buttons */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t">
+        {/* Fixed Bottom Action Buttons - Always visible */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
           <div className="flex gap-3">
             <Button 
               variant="outline" 
