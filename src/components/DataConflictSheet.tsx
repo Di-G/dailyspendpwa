@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Merge, Download, Upload, Info, CheckCircle } from "lucide-react";
+import { AlertTriangle, Merge, Download, Upload, Info, CheckCircle, ChevronDown } from "lucide-react";
 import { DataConflict, ConflictResolution } from "@/lib/dataConflictResolver";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +18,7 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
   const { toast } = useToast();
   const [selectedResolution, setSelectedResolution] = useState<ConflictResolution | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleResolve = async () => {
     if (!selectedResolution) return;
@@ -54,9 +55,33 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
     return count > 0 ? `${count} ${label}` : `No ${label}`;
   };
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
+      <SheetContent 
+        side="bottom" 
+        className={`transition-all duration-300 ease-in-out ${
+          isExpanded ? 'h-[95vh]' : 'h-[70vh]'
+        } overflow-y-auto`}
+      >
+        {/* Draggable Handle */}
+        <div className="flex justify-center pb-2">
+          <button
+            onClick={toggleExpanded}
+            className="w-12 h-1.5 bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors cursor-pointer"
+            aria-label={isExpanded ? "Collapse sheet" : "Expand sheet"}
+          >
+            <ChevronDown 
+              className={`w-4 h-4 mx-auto transition-transform duration-300 ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+        </div>
+
         <SheetHeader className="pb-4 border-b">
           <SheetTitle className="flex items-center gap-2 text-lg">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
