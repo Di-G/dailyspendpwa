@@ -152,7 +152,7 @@ export default function ExpenseEntry({
     mutationFn: async (id: string) => {
       try {
         // Find the expense before deleting it for undo functionality
-        const expenseToDelete = selectedDateExpenses.find(exp => exp.id === id);
+        const expenseToDelete = expenses.find((exp: ExpenseWithCategory) => exp.id === id);
         if (expenseToDelete) {
           setDeletedExpense(expenseToDelete);
         }
@@ -418,7 +418,7 @@ export default function ExpenseEntry({
               </div>
             ) : (
               categories.map((category) => {
-                const categoryTotal = categoryTotalsData.find(ct => ct.categoryId === category.id);
+                const categoryTotal = categoryTotalsData.find((ct: any) => ct.categoryId === category.id);
                 return (
                   <div
                     key={category.id}
@@ -434,7 +434,7 @@ export default function ExpenseEntry({
                     ></div>
                     <p className="text-xs font-medium text-muted-foreground truncate">{category.name}</p>
                     <p className="text-xs sm:text-sm font-semibold text-foreground">
-                      {CURRENCIES[currency].symbol}{formatAmountDisplay(categoryTotal?.total || 0)}
+                      {CURRENCIES[currency].symbol}{formatAmountDisplay((categoryTotal as any)?.total || 0)}
                     </p>
                   </div>
                 );
@@ -624,7 +624,7 @@ export default function ExpenseEntry({
             </div>
           ) : (
             <div className="rounded-lg overflow-hidden space-y-2">
-              {expenses.map((expense) => (
+              {expenses.map((expense: ExpenseWithCategory) => (
                 <div
                   key={expense.id}
                   className="w-full text-left p-4 rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
@@ -650,19 +650,6 @@ export default function ExpenseEntry({
                       <p className="text-lg font-semibold text-foreground">
                         {CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}
                       </p>
-                      {!isFriendMode && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-muted/50 text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteExpenseMutation.mutate(expense.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
