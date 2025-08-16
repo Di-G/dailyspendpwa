@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { downloadAllForUser, uploadAllForUser } from "@/lib/sync";
+import { downloadAllForUser, uploadAllForUser, manualUploadData, forceOverwriteOnlineData } from "@/lib/sync";
 import { getCategories, getExpenses, getRecurringExpenses, getFriends, updateAllData } from "@/lib/localStorage";
 import { 
   analyzeDataConflicts, 
@@ -17,6 +17,7 @@ export function useRealtimeSync() {
   const hasInitialized = useRef(false);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<DataConflict | null>(null);
+  const [uploadPromptOpen, setUploadPromptOpen] = useState(false);
 
   // Function to show toast notifications
   const showToast = (title: string, description: string, variant: 'default' | 'destructive' = 'default') => {
@@ -33,27 +34,6 @@ export function useRealtimeSync() {
 
     // Initial sync with conflict resolution
     handleInitialSync();
-
-    // Listen for local changes and push immediately
-    // COMMENTED OUT: This was causing continuous background sync without user choice
-    // const onChanged = async () => {
-    //   try {
-    //     await uploadAllForUser(user.uid, {
-    //       categories: getCategories(user.uid),
-    //       expenses: getExpenses(user.uid),
-    //       recurring: getRecurringExpenses(user.uid),
-    //       friends: getFriends(user.uid),
-    //     });
-    //   } catch (e) {
-    //     console.error('Background upload failed', e);
-    //   }
-    // };
-
-    // window.addEventListener('dailyspend:data-changed', onChanged);
-    
-    // return () => {
-    //   window.removeEventListener('dailyspend:data-changed', onChanged);
-    // };
   }, [user, isVerified]);
 
   const handleInitialSync = async () => {
@@ -83,17 +63,25 @@ export function useRealtimeSync() {
         conflicts: conflict.conflicts
       });
       
-      // Special case: No local data, but online data exists - automatically download all online data
+      // Scenario 1: No local data, but online data exists - automatically download all online data
       if (!conflict.hasLocalData && conflict.hasOnlineData) {
         console.log('[Sync] No local data found, automatically downloading online data');
         showToast(
           "Data Restored", 
           "Your online data has been automatically downloaded to your device."
         );
-        await performSync(conflict, 'overwrite-local');
+        await performSync(conflict, 'replace-local-with-online');
         return;
       }
       
+      // Scenario 2: Some local data, but no online data - ask user to upload local data
+      if (conflict.hasLocalData && !conflict.hasOnlineData) {
+        console.log('[Sync] Local data exists but no online data, prompting user to upload');
+        setUploadPromptOpen(true);
+        return;
+      }
+      
+      // Scenario 3: Both local and online data exist
       if (conflict.hasLocalData && conflict.hasOnlineData) {
         // Check if local data consists only of default categories and should be replaced
         if (isLocalDataOnlyDefaultCategories(localData)) {
@@ -106,48 +94,23 @@ export function useRealtimeSync() {
           return;
         }
         
-        // Check if local data is a continuation of online data (offline additions)
-        // COMMENTED OUT: This was automatically syncing without user choice
-        // if (isLocalDataContinuation(localData, remoteData as any)) {
-        //   console.log('[Sync] Local data is continuation of online data, auto-syncing');
-        //   console.log('[Sync] Local data counts:', {
-        //     categories: localData.categories.length,
-        //     expenses: localData.expenses.length,
-        //     recurring: localData.recurring.length,
-        //     friends: localData.friends.length
-        //   });
-        //   console.log('[Sync] Online data counts:', {
-        //     categories: (remoteData as any)?.categories?.length || 0,
-        //     expenses: (remoteData as any)?.expenses?.length || 0,
-        //     recurring: (remoteData as any)?.recurring?.length || 0,
-        //     friends: (remoteData as any)?.friends?.length || 0
-        //   });
-        //   // Local data contains all online data plus new additions - auto-sync
-        //   showToast(
-        //     "Smart Sync Complete", 
-        //     "Your offline additions have been automatically synced to the cloud."
-        //   );
-        //   await performSync(conflict, 'overwrite-online');
-        //   return;
-        // }
-
         // Check if there are actual conflicts OR if local data differs from online data
         const hasConflicts = conflict.conflicts.categories || 
                            conflict.conflicts.expenses || 
-                           conflict.conflicts.recurring;
+                           conflict.conflicts.recurring ||
+                           conflict.conflicts.friends;
         
-        // Show conflict dialog if there are differences OR if both local and online data exist
-        if (hasConflicts || (conflict.hasLocalData && conflict.hasOnlineData)) {
+        // Show conflict resolution dialog if there are differences
+        if (hasConflicts) {
           console.log('[Sync] Differences detected, showing conflict resolution dialog');
-          // Show conflict resolution dialog for user to choose
           setPendingConflict(conflict);
           setConflictDialogOpen(true);
           return;
         }
+        
+        // No conflicts, data is already in sync
+        console.log('[Sync] No conflicts detected, data is already in sync');
       }
-      
-      // No automatic sync - user must choose how to handle any differences
-      console.log('[Sync] No automatic sync - user must choose resolution method');
       
     } catch (e) {
       console.error('[Sync] Initial sync failed:', e);
@@ -159,7 +122,7 @@ export function useRealtimeSync() {
     try {
       const resolvedData = applyConflictResolution(resolution, conflict.localData, conflict.onlineData);
       
-      // Update local storage with resolved data using the new function
+      // Update local storage with resolved data
       updateAllData(
         resolvedData.categories,
         resolvedData.expenses,
@@ -169,7 +132,13 @@ export function useRealtimeSync() {
       );
       
       // Upload resolved data to cloud
-      await uploadAllForUser(user!.uid, resolvedData);
+      if (resolution === 'overwrite-online') {
+        // Force overwrite online data completely
+        await forceOverwriteOnlineData(user!.uid, resolvedData);
+      } else {
+        // Normal upload
+        await uploadAllForUser(user!.uid, resolvedData);
+      }
       
       // Emit change event to refresh UI
       window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));
@@ -193,11 +162,29 @@ export function useRealtimeSync() {
     }
   };
 
+  const handleUploadLocalData = async () => {
+    try {
+      const localData = getCurrentLocalData(user!.uid);
+      await forceOverwriteOnlineData(user!.uid, localData);
+      showToast(
+        "Data Uploaded", 
+        "Your local data has been successfully uploaded to the cloud."
+      );
+      setUploadPromptOpen(false);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      throw error;
+    }
+  };
+
   return {
     conflictDialogOpen,
     pendingConflict,
+    uploadPromptOpen,
     onConflictResolve: handleConflictResolution,
-    onConflictDialogClose: () => setConflictDialogOpen(false)
+    onConflictDialogClose: () => setConflictDialogOpen(false),
+    onUploadPromptClose: () => setUploadPromptOpen(false),
+    onUploadLocalData: handleUploadLocalData
   };
 }
 

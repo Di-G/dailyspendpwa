@@ -4,7 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories, clearAllData } from "@/lib/localStorage";
+import { getExpenses, getCategories, clearAllData, updateAllData, getRecurringExpenses, getFriends } from "@/lib/localStorage";
+import { manualDownloadData, manualUploadData, forceOverwriteOnlineData } from "@/lib/sync";
 import { useAuth } from "@/lib/auth";
 
 type CurrencyCode = "USD" | "INR";
@@ -25,11 +26,13 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [erasing, setErasing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [open, setOpen] = useState<{
     currency: boolean;
     categories: boolean;
     export: boolean;
-  }>({ currency: false, categories: false, export: false });
+    sync: boolean;
+  }>({ currency: false, categories: false, export: false, sync: false });
 
   // Persist currency preference
   const onCurrencyChange = (value: string) => {
@@ -224,6 +227,111 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
     return result;
   };
 
+  const handleManualDownload = async () => {
+    if (!user?.uid) return;
+    
+    setSyncing(true);
+    try {
+      const onlineData = await manualDownloadData(user.uid);
+      if (onlineData) {
+        // Update local storage with online data
+        updateAllData(
+          onlineData.categories as any[],
+          onlineData.expenses as any[],
+          onlineData.recurring as any[],
+          onlineData.friends as any[],
+          user.uid
+        );
+        
+        // Emit change event to refresh UI
+        window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));
+        
+        toast({ 
+          title: "Data Downloaded", 
+          description: "Online data has been successfully downloaded to your device." 
+        });
+      } else {
+        toast({ 
+          title: "No Online Data", 
+          description: "No data found in your online account." 
+        });
+      }
+    } catch (error) {
+      console.error('Manual download failed:', error);
+      toast({ 
+        title: "Download Failed", 
+        description: "Failed to download online data. Please try again.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleManualUpload = async () => {
+    if (!user?.uid) return;
+    
+    setSyncing(true);
+    try {
+      const localData = {
+        categories: getCategories(user.uid),
+        expenses: getExpenses(user.uid),
+        recurring: getRecurringExpenses(user.uid),
+        friends: getFriends(user.uid)
+      };
+      
+      await manualUploadData(user.uid, localData);
+      
+      toast({ 
+        title: "Data Uploaded", 
+        description: "Your local data has been successfully uploaded to the cloud." 
+      });
+    } catch (error) {
+      console.error('Manual upload failed:', error);
+      toast({ 
+        title: "Upload Failed", 
+        description: "Failed to upload local data. Please try again.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleForceUpload = async () => {
+    if (!user?.uid) return;
+    
+    if (!confirm("This will completely replace all online data with your local data. Any online data not present locally will be permanently lost. Are you sure?")) {
+      return;
+    }
+    
+    setSyncing(true);
+    try {
+      const localData = {
+        categories: getCategories(user.uid),
+        expenses: getExpenses(user.uid),
+        recurring: getRecurringExpenses(user.uid),
+        friends: getFriends(user.uid)
+      };
+      
+      await forceOverwriteOnlineData(user.uid, localData);
+      
+      toast({ 
+        title: "Data Force Uploaded", 
+        description: "Your local data has completely replaced all online data." 
+      });
+    } catch (error) {
+      console.error('Force upload failed:', error);
+      toast({ 
+        title: "Force Upload Failed", 
+        description: "Failed to force upload local data. Please try again.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const toggle = (key: keyof typeof open) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
@@ -350,6 +458,59 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
           </div>
         </div>
       </div>
+
+      {/* Data Synchronization */}
+      {user && (
+        <>
+          <Separator />
+          <div>
+            <button
+              className="w-full text-left text-sm font-medium text-foreground py-2"
+              onClick={() => toggle("sync")}
+            >
+              Data Synchronization
+            </button>
+            <div className={`overflow-hidden transition-[max-height] duration-300 ${open.sync ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="pt-2 space-y-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <Button
+                    disabled={syncing}
+                    onClick={handleManualDownload}
+                    variant="outline"
+                    className="w-full sm:w-auto px-4"
+                  >
+                    {syncing ? "Downloading..." : "Download Online Data"}
+                  </Button>
+                  <Button
+                    disabled={syncing}
+                    onClick={handleManualUpload}
+                    variant="outline"
+                    className="w-full sm:w-auto px-4"
+                  >
+                    {syncing ? "Uploading..." : "Upload Local Data"}
+                  </Button>
+                  <Button
+                    disabled={syncing}
+                    onClick={handleForceUpload}
+                    variant="destructive"
+                    className="w-full sm:w-auto px-4"
+                  >
+                    {syncing ? "Force Uploading..." : "Force Upload Local Data"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  • <strong>Download Online Data:</strong> Downloads your online data to this device<br />
+                  • <strong>Upload Local Data:</strong> Uploads your local data to the cloud (merges with existing)<br />
+                  • <strong>Force Upload Local Data:</strong> Completely replaces online data with local data<br />
+                  <span className="block mt-1 text-orange-600">
+                    ⚠️ Force Upload will permanently delete any online data not present locally
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

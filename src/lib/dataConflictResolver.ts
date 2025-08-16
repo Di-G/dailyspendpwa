@@ -41,23 +41,18 @@ export function analyzeDataConflicts(
     (onlineData.friends && onlineData.friends.length > 0)
   );
 
-  // If no local data exists, online data should be automatically downloaded
-  // This case is handled specially in the sync client to avoid showing conflict resolution
-  if (!hasLocalData || !hasOnlineData) {
-    return {
-      hasLocalData,
-      hasOnlineData: !!hasOnlineData,
-      conflicts: { categories: false, expenses: false, recurring: false, friends: false },
-      localData,
-      onlineData: onlineData || { categories: [], expenses: [], recurring: [], friends: [] }
-    };
-  }
+  // Check for conflicts by comparing data (only if both exist)
+  let categoriesConflict = false;
+  let expensesConflict = false;
+  let recurringConflict = false;
+  let friendsConflict = false;
 
-  // Check for conflicts by comparing data
-  const categoriesConflict = !areArraysEqual(localData.categories, onlineData.categories || []);
-  const expensesConflict = !areArraysEqual(localData.expenses, onlineData.expenses || []);
-  const recurringConflict = !areArraysEqual(localData.recurring, onlineData.recurring || []);
-  const friendsConflict = !areArraysEqual(localData.friends, onlineData.friends || []);
+  if (hasLocalData && hasOnlineData) {
+    categoriesConflict = !areArraysEqual(localData.categories, onlineData.categories || []);
+    expensesConflict = !areArraysEqual(localData.expenses, onlineData.expenses || []);
+    recurringConflict = !areArraysEqual(localData.recurring, onlineData.recurring || []);
+    friendsConflict = !areArraysEqual(localData.friends, onlineData.friends || []);
+  }
 
   return {
     hasLocalData,

@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "@/lib/localStorage";
 import { formatDate } from "@/lib/date-utils";
 import DataConflictDialog from "@/components/DataConflictDialog";
+import DataUploadPrompt from "@/components/DataUploadPrompt";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import ExpenseTracker from "@/pages/expense-tracker";
 import { useToast } from "@/hooks/use-toast";
@@ -35,8 +36,11 @@ function App() {
   const { 
     conflictDialogOpen,
     pendingConflict, 
+    uploadPromptOpen,
     onConflictResolve, 
-    onConflictDialogClose 
+    onConflictDialogClose,
+    onUploadPromptClose,
+    onUploadLocalData
   } = useRealtimeSync();
 
   // Listen for toast events from sync client
@@ -129,6 +133,16 @@ function App() {
             onClose={onConflictDialogClose}
             conflict={pendingConflict}
             onResolve={onConflictResolve}
+          />
+        )}
+
+        {/* Data Upload Prompt */}
+        {user && (
+          <DataUploadPrompt
+            open={uploadPromptOpen}
+            onClose={onUploadPromptClose}
+            onUpload={onUploadLocalData}
+            userId={user.uid}
           />
         )}
       </TooltipProvider>
