@@ -35,24 +35,25 @@ export function useRealtimeSync() {
     handleInitialSync();
 
     // Listen for local changes and push immediately
-    const onChanged = async () => {
-      try {
-        await uploadAllForUser(user.uid, {
-          categories: getCategories(user.uid),
-          expenses: getExpenses(user.uid),
-          recurring: getRecurringExpenses(user.uid),
-          friends: getFriends(user.uid),
-        });
-      } catch (e) {
-        console.error('Background upload failed', e);
-      }
-    };
+    // COMMENTED OUT: This was causing continuous background sync without user choice
+    // const onChanged = async () => {
+    //   try {
+    //     await uploadAllForUser(user.uid, {
+    //       categories: getCategories(user.uid),
+    //       expenses: getExpenses(user.uid),
+    //       recurring: getRecurringExpenses(user.uid),
+    //       friends: getFriends(user.uid),
+    //     });
+    //   } catch (e) {
+    //     console.error('Background upload failed', e);
+    //   }
+    // };
 
-    window.addEventListener('dailyspend:data-changed', onChanged);
+    // window.addEventListener('dailyspend:data-changed', onChanged);
     
-    return () => {
-      window.removeEventListener('dailyspend:data-changed', onChanged);
-    };
+    // return () => {
+    //   window.removeEventListener('dailyspend:data-changed', onChanged);
+    // };
   }, [user, isVerified]);
 
   const handleInitialSync = async () => {
@@ -106,36 +107,38 @@ export function useRealtimeSync() {
         }
         
         // Check if local data is a continuation of online data (offline additions)
-        if (isLocalDataContinuation(localData, remoteData as any)) {
-          console.log('[Sync] Local data is continuation of online data, auto-syncing');
-          console.log('[Sync] Local data counts:', {
-            categories: localData.categories.length,
-            expenses: localData.expenses.length,
-            recurring: localData.recurring.length,
-            friends: localData.friends.length
-          });
-          console.log('[Sync] Online data counts:', {
-            categories: (remoteData as any)?.categories?.length || 0,
-            expenses: (remoteData as any)?.expenses?.length || 0,
-            recurring: (remoteData as any)?.recurring?.length || 0,
-            friends: (remoteData as any)?.friends?.length || 0
-          });
-          // Local data contains all online data plus new additions - auto-sync
-          showToast(
-            "Smart Sync Complete", 
-            "Your offline additions have been automatically synced to the cloud."
-          );
-          await performSync(conflict, 'overwrite-online');
-          return;
-        }
+        // COMMENTED OUT: This was automatically syncing without user choice
+        // if (isLocalDataContinuation(localData, remoteData as any)) {
+        //   console.log('[Sync] Local data is continuation of online data, auto-syncing');
+        //   console.log('[Sync] Local data counts:', {
+        //     categories: localData.categories.length,
+        //     expenses: localData.expenses.length,
+        //     recurring: localData.recurring.length,
+        //     friends: localData.friends.length
+        //   });
+        //   console.log('[Sync] Online data counts:', {
+        //     categories: (remoteData as any)?.categories?.length || 0,
+        //     expenses: (remoteData as any)?.expenses?.length || 0,
+        //     recurring: (remoteData as any)?.recurring?.length || 0,
+        //     friends: (remoteData as any)?.friends?.length || 0
+        //   });
+        //   // Local data contains all online data plus new additions - auto-sync
+        //   showToast(
+        //     "Smart Sync Complete", 
+        //     "Your offline additions have been automatically synced to the cloud."
+        //   );
+        //   await performSync(conflict, 'overwrite-online');
+        //   return;
+        // }
 
-        // Check if there are actual conflicts
+        // Check if there are actual conflicts OR if local data differs from online data
         const hasConflicts = conflict.conflicts.categories || 
                            conflict.conflicts.expenses || 
                            conflict.conflicts.recurring;
         
-        if (hasConflicts) {
-          console.log('[Sync] Conflicts detected, showing conflict resolution dialog');
+        // Show conflict dialog if there are differences OR if both local and online data exist
+        if (hasConflicts || (conflict.hasLocalData && conflict.hasOnlineData)) {
+          console.log('[Sync] Differences detected, showing conflict resolution dialog');
           // Show conflict resolution dialog for user to choose
           setPendingConflict(conflict);
           setConflictDialogOpen(true);
@@ -143,9 +146,8 @@ export function useRealtimeSync() {
         }
       }
       
-      console.log('[Sync] No conflicts, proceeding with normal sync');
-      // No conflicts or no data overlap - proceed with normal sync
-      await performSync(conflict, 'merge');
+      // No automatic sync - user must choose how to handle any differences
+      console.log('[Sync] No automatic sync - user must choose resolution method');
       
     } catch (e) {
       console.error('[Sync] Initial sync failed:', e);
