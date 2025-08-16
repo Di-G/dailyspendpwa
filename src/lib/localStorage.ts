@@ -459,3 +459,22 @@ export const initializeDefaultCategories = (): void => {
     console.error('Error initializing default categories:', error);
   }
 };
+
+/**
+ * Update all data at once (used for conflict resolution)
+ */
+export const updateAllData = (
+  categories: Category[],
+  expenses: Expense[],
+  recurring: RecurringExpense[]
+): void => {
+  try {
+    setToStorage(CATEGORIES_KEY, categories);
+    setToStorage(EXPENSES_KEY, expenses);
+    setToStorage(RECURRING_EXPENSES_KEY, recurring);
+    emitDataChanged();
+  } catch (error) {
+    console.error('Error updating all data:', error);
+    throw error;
+  }
+};

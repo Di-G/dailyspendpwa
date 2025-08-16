@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ExpenseTracker from "@/pages/expense-tracker";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
+import DataConflictDialog from "@/components/DataConflictDialog";
 import { useEffect } from "react";
 import { useRealtimeSync } from "@/lib/syncClient";
 import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "./lib/localStorage";
@@ -27,7 +28,13 @@ function Router() {
 }
 
 function App() {
-  useRealtimeSync();
+  const { 
+    conflictDialogOpen, 
+    pendingConflict, 
+    onConflictResolve, 
+    onConflictDialogClose 
+  } = useRealtimeSync();
+
   // Initialize default categories on app start
   useEffect(() => {
     const initializeApp = async () => {
@@ -88,6 +95,16 @@ function App() {
         <Toaster />
         <Router />
         <AddToHomeScreen />
+        
+        {/* Data Conflict Resolution Dialog */}
+        {pendingConflict && (
+          <DataConflictDialog
+            open={conflictDialogOpen}
+            onClose={onConflictDialogClose}
+            conflict={pendingConflict}
+            onResolve={onConflictResolve}
+          />
+        )}
       </TooltipProvider>
     </QueryClientProvider>
   );
