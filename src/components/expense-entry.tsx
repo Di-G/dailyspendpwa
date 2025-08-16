@@ -627,7 +627,8 @@ export default function ExpenseEntry({
               {expenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="w-full text-left p-4 border-b border last:border-b-0 hover:bg-muted/30 transition-colors"
+                  className="w-full text-left p-4 border-b border last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => !isFriendMode && openEdit(expense)}
                 >
                   {/* Expense content - non-editable in friend mode */}
                   <div className="flex items-center justify-between">
@@ -653,10 +654,41 @@ export default function ExpenseEntry({
                         {new Date(expense.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="flex items-center space-x-2 ml-4">
                       <p className="text-lg font-semibold text-foreground">
                         {CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}
                       </p>
+                      {!isFriendMode && (
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-muted/50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(expense);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-muted/50 text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (editingExpense?.id === expense.id) {
+                                deleteExpenseMutation.mutate(expense.id);
+                              } else {
+                                setEditingExpense(expense);
+                                deleteExpenseMutation.mutate(expense.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
