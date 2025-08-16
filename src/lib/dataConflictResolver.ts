@@ -205,6 +205,54 @@ function mergeArraysByTimestamp<T extends { id: string; createdAt: string }>(
 }
 
 /**
+ * Checks if local data is a continuation of online data (i.e., local contains all online data plus new additions)
+ * This helps avoid conflicts when user goes offline, adds new data, then comes back online
+ */
+export function isLocalDataContinuation(
+  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] },
+  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] } | null
+): boolean {
+  if (!onlineData) return false;
+  
+  // Check if local data contains all online data
+  const categoriesContinuation = isArrayContinuation(localData.categories, onlineData.categories || []);
+  const expensesContinuation = isArrayContinuation(localData.expenses, onlineData.expenses || []);
+  const recurringContinuation = isArrayContinuation(localData.recurring, onlineData.recurring || []);
+  const friendsContinuation = isArrayContinuation(localData.friends, onlineData.friends || []);
+  
+  // For expenses, we're more lenient - if local has all online expenses plus new ones, it's a continuation
+  // This handles cases where user might have deleted some expenses locally but added new ones
+  const expensesLenient = expensesContinuation || (
+    onlineData.expenses && onlineData.expenses.length > 0 &&
+    localData.expenses.length >= onlineData.expenses.length &&
+    // Check if at least 90% of online expenses exist in local data
+    (onlineData.expenses.filter(onlineExpense => 
+      localData.expenses.some(localExpense => localExpense.id === onlineExpense.id)
+    ).length / onlineData.expenses.length) >= 0.9
+  );
+  
+  return categoriesContinuation && expensesLenient && recurringContinuation && friendsContinuation;
+}
+
+/**
+ * Helper function to check if one array is a continuation of another
+ * Array A is a continuation of Array B if A contains all items from B plus potentially new ones
+ */
+function isArrayContinuation<T extends { id: string }>(local: T[], online: T[]): boolean {
+  if (online.length === 0) return true; // No online data means local is always a continuation
+  if (local.length < online.length) return false; // Local must have at least as many items
+  
+  // Check if all online items exist in local data
+  for (const onlineItem of online) {
+    if (!local.some(localItem => localItem.id === onlineItem.id)) {
+      return false; // Online item not found in local data
+    }
+  }
+  
+  return true;
+}
+
+/**
  * Gets current local data for conflict analysis
  */
 export function getCurrentLocalData() {

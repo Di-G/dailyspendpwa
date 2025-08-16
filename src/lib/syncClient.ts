@@ -6,6 +6,7 @@ import {
   analyzeDataConflicts, 
   applyConflictResolution, 
   getCurrentLocalData,
+  isLocalDataContinuation,
   type DataConflict,
   type ConflictResolution 
 } from "./dataConflictResolver";
@@ -15,6 +16,14 @@ export function useRealtimeSync() {
   const hasInitialized = useRef(false);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<DataConflict | null>(null);
+
+  // Function to show toast notifications
+  const showToast = (title: string, description: string, variant: 'default' | 'destructive' = 'default') => {
+    // Dispatch a custom event that the App component can listen to
+    window.dispatchEvent(new CustomEvent('dailyspend:show-toast', {
+      detail: { title, description, variant }
+    }));
+  };
 
   useEffect(() => {
     if (!user || !isVerified) return;
@@ -73,6 +82,30 @@ export function useRealtimeSync() {
       });
       
       if (conflict.hasLocalData && conflict.hasOnlineData) {
+        // Check if local data is a continuation of online data (offline additions)
+        if (isLocalDataContinuation(localData, remoteData as any)) {
+          console.log('[Sync] Local data is continuation of online data, auto-syncing');
+          console.log('[Sync] Local data counts:', {
+            categories: localData.categories.length,
+            expenses: localData.expenses.length,
+            recurring: localData.recurring.length,
+            friends: localData.friends.length
+          });
+          console.log('[Sync] Online data counts:', {
+            categories: (remoteData as any)?.categories?.length || 0,
+            expenses: (remoteData as any)?.expenses?.length || 0,
+            recurring: (remoteData as any)?.recurring?.length || 0,
+            friends: (remoteData as any)?.friends?.length || 0
+          });
+          // Local data contains all online data plus new additions - auto-sync
+          showToast(
+            "Smart Sync Complete", 
+            "Your offline additions have been automatically synced to the cloud."
+          );
+          await performSync(conflict, 'overwrite-online');
+          return;
+        }
+        
         // Check if there are actual conflicts
         const hasConflicts = conflict.conflicts.categories || 
                            conflict.conflicts.expenses || 
