@@ -123,10 +123,14 @@ export function useRealtimeSync() {
                            conflict.conflicts.recurring;
         
         if (hasConflicts) {
-          console.log('[Sync] Conflicts detected, showing resolution dialog');
-          // Show conflict resolution dialog
-          setPendingConflict(conflict);
-          setConflictDialogOpen(true);
+          console.log('[Sync] Conflicts detected, automatically using merge resolution (dialog disabled)');
+          // Temporarily disabled: show conflict resolution dialog
+          // setPendingConflict(conflict);
+          // setConflictDialogOpen(true);
+          // return;
+          
+          // Auto-resolve conflicts using merge strategy
+          await performSync(conflict, 'merge');
           return;
         }
       }

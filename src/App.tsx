@@ -5,10 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
 import { useRealtimeSync } from "@/lib/syncClient";
-import { initializeDefaultCategories } from "@/lib/localStorage";
-import { processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "@/lib/localStorage";
+import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "@/lib/localStorage";
 import { formatDate } from "@/lib/date-utils";
-import DataConflictSheet from "@/components/DataConflictSheet";
+// import DataConflictSheet from "@/components/DataConflictSheet";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import ExpenseTracker from "@/pages/expense-tracker";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +31,6 @@ function Router() {
 function App() {
   const { toast } = useToast();
   const { 
-    conflictDialogOpen, 
     pendingConflict, 
     onConflictResolve, 
     onConflictDialogClose 
@@ -114,14 +112,14 @@ function App() {
         <AddToHomeScreen />
         
         {/* Data Conflict Resolution Sheet */}
-        {pendingConflict && (
+        {/* {pendingConflict && (
           <DataConflictSheet
             open={conflictDialogOpen}
             onClose={onConflictDialogClose}
             conflict={pendingConflict}
             onResolve={onConflictResolve}
           />
-        )}
+        )} */}
       </TooltipProvider>
     </QueryClientProvider>
   );
