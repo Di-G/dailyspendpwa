@@ -5,6 +5,8 @@ import {
   signOut,
   updateProfile,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   type User,
 } from "firebase/auth";
@@ -279,6 +281,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Setup the initial auth listener
     setupAuthListener();
+    // Handle redirect result from signInWithRedirect (mobile/PWA fallback)
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          if (import.meta.env.DEV) {
+            console.log('[Auth] Google redirect sign-in succeeded:', result.user.uid);
+          }
+          // onAuthStateChanged will update state
+        }
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn('[Auth] getRedirectResult error:', e);
+        }
+      }
+    })();
     
     return () => {
       if (authStateChangeTimeoutRef.current) {
@@ -304,7 +322,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-    await signInWithPopup(auth, provider);
+    const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches === true;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    try {
+      if (isStandalone || isIOS) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (
+        code === 'auth/operation-not-supported-in-this-environment' ||
+        code === 'auth/popup-blocked' ||
+        code === 'auth/popup-closed-by-user'
+      ) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      throw err;
+    }
   };
 
   const signOutUser = async () => {
