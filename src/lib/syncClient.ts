@@ -13,7 +13,7 @@ import {
 } from "./dataConflictResolver";
 
 export function useRealtimeSync() {
-  const { user, isVerified } = useAuth();
+  const { user } = useAuth();
   const hasInitialized = useRef(false);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<DataConflict | null>(null);
@@ -28,13 +28,13 @@ export function useRealtimeSync() {
   };
 
   useEffect(() => {
-    if (!user || !isVerified) return;
+    if (!user) return;
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
     // Initial sync with conflict resolution
     handleInitialSync();
-  }, [user, isVerified]);
+  }, [user]);
 
   const handleInitialSync = async () => {
     try {

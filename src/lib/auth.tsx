@@ -2,13 +2,10 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useRef,
 import { auth } from "@/lib/firebase";
 import {
   onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendEmailVerification,
-  sendPasswordResetEmail,
   signOut,
   updateProfile,
-  reload,
+  signInWithPopup,
+  GoogleAuthProvider,
   type User,
 } from "firebase/auth";
 import { clearAllData } from "./localStorage";
@@ -16,19 +13,12 @@ import { clearAllData } from "./localStorage";
 type AuthContextValue = {
   user: User | null;
   isLoading: boolean;
-  isVerified: boolean;
   displayName: string;
-  emailForSignIn: string;
   setDisplayName: (name: string) => void;
-  setEmailForSignIn: (email: string) => void;
   saveDisplayName: () => Promise<void>;
-  signUpWithEmailPassword: (email: string, password: string) => Promise<void>;
-  signInWithEmailPassword: (email: string, password: string) => Promise<void>;
-  sendVerificationEmail: () => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>;
-  refreshUser: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
-  setRefreshingState: (isRefreshing: boolean) => void; // Add this to the type
+  setRefreshingState: (isRefreshing: boolean) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -37,7 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
-  const [emailForSignIn, setEmailForSignIn] = useState<string>(() => localStorage.getItem("dailyspend_emailForSignIn") || "");
   const previousUserId = useRef<string | null>(null);
   const authStateChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastAuthStateRef = useRef<User | null>(null);
@@ -100,7 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     setUser(u);
-    setDisplayName(u?.displayName || localStorage.getItem("dailyspend_displayName") || "");
+    const storedPerUserName = u ? localStorage.getItem(`dailyspend_user_${u.uid}_name`) : null;
+    setDisplayName(u?.displayName || storedPerUserName || localStorage.getItem("dailyspend_displayName") || "");
     setIsLoading(false);
     
     // Update previous user ID
@@ -305,45 +295,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const saveDisplayName = async () => {
     if (user && displayName) {
       await updateProfile(user, { displayName });
+      localStorage.setItem(`dailyspend_user_${user.uid}_name`, displayName);
     } else {
       localStorage.setItem("dailyspend_displayName", displayName);
     }
   };
 
-  const signUpWithEmailPassword = async (email: string, password: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    if (displayName) {
-      await updateProfile(cred.user, { displayName });
-    }
-    try {
-      await sendEmailVerification(cred.user);
-    } catch {}
-    setEmailForSignIn(email);
-  };
-
-  const signInWithEmailPassword = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-    setEmailForSignIn(email);
-  };
-
-  const sendVerificationEmail = async () => {
-    if (!auth.currentUser) return;
-    await sendEmailVerification(auth.currentUser);
-  };
-
-  const sendPasswordReset = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
-  };
-
-  const refreshUser = async () => {
-    if (!auth.currentUser) return;
-    setRefreshingState(true);
-    try {
-      await reload(auth.currentUser);
-      setUser({ ...auth.currentUser });
-    } finally {
-      setRefreshingState(false);
-    }
+  const signInWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithPopup(auth, provider);
   };
 
   const signOutUser = async () => {
@@ -371,23 +332,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      user: protectedUserRef.current || user, // Return protected user during refresh, otherwise current user
+      user: protectedUserRef.current || user,
       isLoading,
-      isVerified: (protectedUserRef.current || user)?.emailVerified === true,
       displayName,
-      emailForSignIn,
       setDisplayName,
-      setEmailForSignIn,
       saveDisplayName,
-      signUpWithEmailPassword,
-      signInWithEmailPassword,
-      sendVerificationEmail,
-      sendPasswordReset,
-      refreshUser,
+      signInWithGoogle,
       signOutUser,
-      setRefreshingState, // Expose this function for external use
+      setRefreshingState,
     }),
-    [user, isLoading, displayName, emailForSignIn]
+    [user, isLoading, displayName]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

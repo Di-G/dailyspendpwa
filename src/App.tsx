@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +6,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
 import { useRealtimeSync } from "@/lib/syncClient";
 import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "@/lib/localStorage";
 import { formatDate } from "@/lib/date-utils";
 import DataConflictDialog from "@/components/DataConflictDialog";
@@ -31,7 +34,13 @@ function Router() {
 }
 
 function App() {
-  const { user } = useAuth();
+  const { user, displayName, setDisplayName, saveDisplayName, signInWithGoogle } = useAuth();
+  const [askNameOpen, setAskNameOpen] = useState(false);
+  const shouldAskName = useMemo(() => {
+    if (!user) return false;
+    const perUserName = localStorage.getItem(`dailyspend_user_${user.uid}_name`);
+    return !user.displayName && !perUserName && !displayName;
+  }, [user, displayName]);
   const { toast } = useToast();
   const { 
     conflictDialogOpen,
@@ -42,6 +51,71 @@ function App() {
     onUploadPromptClose,
     onUploadLocalData
   } = useRealtimeSync();
+  // Gate: require authentication
+  const GatedApp = (
+    <>
+      <Router />
+      <AddToHomeScreen />
+      {/* Data Conflict Resolution Dialog */}
+      {pendingConflict && (
+        <DataConflictDialog
+          open={conflictDialogOpen}
+          onClose={onConflictDialogClose}
+          conflict={pendingConflict}
+          onResolve={onConflictResolve}
+        />
+      )}
+      {/* Data Upload Prompt */}
+      {user && (
+        <DataUploadPrompt
+          open={uploadPromptOpen}
+          onClose={onUploadPromptClose}
+          onUpload={onUploadLocalData}
+          userId={user.uid}
+        />
+      )}
+    </>
+  );
+
+  const SignInScreen = (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background">
+      <div className="text-center space-y-4">
+        <h1 className="text-2xl font-bold text-foreground">Welcome to Daily Spends</h1>
+        <p className="text-muted-foreground">Please sign in with Google to continue.</p>
+        <Button onClick={signInWithGoogle}>Sign in with Google</Button>
+      </div>
+    </div>
+  );
+
+  useEffect(() => {
+    setAskNameOpen(shouldAskName);
+  }, [shouldAskName]);
+
+  const NameDialog = (
+    <Dialog open={askNameOpen} onOpenChange={() => {}}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>What should we call you?</DialogTitle>
+        </DialogHeader>
+        <Input
+          placeholder="Your name"
+          value={displayName || ""}
+          onChange={(e) => setDisplayName(e.target.value)}
+        />
+        <DialogFooter>
+          <Button
+            onClick={async () => {
+              await saveDisplayName();
+              setAskNameOpen(false);
+            }}
+            disabled={!displayName}
+          >
+            Continue
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   // Listen for toast events from sync client
   useEffect(() => {
@@ -123,28 +197,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
-        <AddToHomeScreen />
-        
-        {/* Data Conflict Resolution Dialog */}
-        {pendingConflict && (
-          <DataConflictDialog
-            open={conflictDialogOpen}
-            onClose={onConflictDialogClose}
-            conflict={pendingConflict}
-            onResolve={onConflictResolve}
-          />
-        )}
-
-        {/* Data Upload Prompt */}
-        {user && (
-          <DataUploadPrompt
-            open={uploadPromptOpen}
-            onClose={onUploadPromptClose}
-            onUpload={onUploadLocalData}
-            userId={user.uid}
-          />
-        )}
+        {user ? GatedApp : SignInScreen}
+        {user ? NameDialog : null}
       </TooltipProvider>
     </QueryClientProvider>
   );

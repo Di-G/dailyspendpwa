@@ -173,26 +173,6 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                   <input
                     type="radio"
                     name="resolution"
-                    value="overwrite-online"
-                    checked={selectedResolution === 'overwrite-online'}
-                    onChange={() => setSelectedResolution('overwrite-online')}
-                    className="h-4 w-4"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Upload className="h-4 w-4 text-green-500" />
-                      <span className="font-medium">Use Local Data</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Upload your local data to the cloud, completely replacing online data.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="resolution"
                     value="replace-local-with-online"
                     checked={selectedResolution === 'replace-local-with-online'}
                     onChange={() => setSelectedResolution('replace-local-with-online')}
@@ -204,7 +184,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                       <span className="font-medium">Use Online Data</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Download online data, replacing your local data.
+                      Download online data and discard the offline data created while you were offline.
                     </p>
                   </div>
                 </label>
@@ -224,16 +204,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
             )}
 
             {/* Warning for online data loss */}
-            {selectedResolution === 'overwrite-online' && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Warning: Online Data Will Be Permanently Lost</AlertTitle>
-                <AlertDescription>
-                  This action will completely replace all online data with your local data. 
-                  Any online data not present in your local storage will be permanently lost from the server.
-                </AlertDescription>
-              </Alert>
-            )}
+            {null}
           </div>
         </ScrollArea>
 
