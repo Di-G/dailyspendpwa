@@ -175,35 +175,37 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
 
       {/* Existing Categories */}
       <div className="space-y-2">
-      <h4 className="text-sm font-medium text-foreground/80 mb-3">Existing Categories</h4>
+        <h4 className="text-sm font-medium text-foreground/80 mb-3">Existing Categories</h4>
         {categoriesLoading ? (
-        <p className="text-sm text-muted-foreground text-center py-4">Loading categories...</p>
+          <p className="text-sm text-muted-foreground text-center py-4">Loading categories...</p>
         ) : categories.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">No categories created yet</p>
+          <p className="text-sm text-muted-foreground text-center py-4">No categories created yet</p>
         ) : (
-          categories.map((category) => (
-            <div
-              key={category.id}
-          className="flex items-center justify-between p-3 bg-muted rounded-lg"
-            >
-              <div className="flex items-center min-w-0 flex-1">
-                <div
-                  className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
-                  style={{ backgroundColor: category.color }}
-                ></div>
-            <span className="text-sm font-medium text-foreground truncate">{category.name}</span>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-red-500 hover:text-red-700 text-sm p-1 sm:p-2 flex-shrink-0"
-                onClick={() => deleteCategoryMutation.mutate(category.id)}
-                disabled={deleteCategoryMutation.isPending}
+          <div className="max-h-64 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="flex items-center justify-between p-3 bg-muted rounded-lg"
               >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          ))
+                <div className="flex items-center min-w-0 flex-1">
+                  <div
+                    className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                    style={{ backgroundColor: category.color }}
+                  ></div>
+                  <span className="text-sm font-medium text-foreground truncate">{category.name}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-700 text-sm p-1 sm:p-2 flex-shrink-0"
+                  onClick={() => deleteCategoryMutation.mutate(category.id)}
+                  disabled={deleteCategoryMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
