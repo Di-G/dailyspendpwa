@@ -45,9 +45,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Persist auth state across reloads/PWA restarts
-setPersistence(auth, browserLocalPersistence).catch(() => {
-  // non-blocking if persistence fails (e.g., private mode)
-});
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log('[Firebase] Auth persistence set to browserLocalPersistence');
+  })
+  .catch((error) => {
+    console.warn('[Firebase] Failed to set auth persistence:', error);
+    // non-blocking if persistence fails (e.g., private mode)
+  });
 
 export { app, auth, db };
 

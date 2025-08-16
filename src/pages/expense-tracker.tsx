@@ -29,7 +29,7 @@ type CurrencyCode = "USD" | "INR";
 type ExpenseMode = "my" | "friend";
 
 export default function ExpenseTracker() {
-  const { user } = useAuth();
+  const { user, setRefreshingState } = useAuth();
   const [currentView, setCurrentView] = useState<ViewType>("entry");
   const [expenseMode, setExpenseMode] = useState<ExpenseMode>("my");
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
@@ -82,20 +82,51 @@ export default function ExpenseTracker() {
   const currentIndex = navigationItems.findIndex(item => item.id === currentView);
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
-  }, []);
+    // Prevent multiple simultaneous refresh operations
+    if (queryClient.isFetching()) {
+      return;
+    }
+    
+    // Protect against auth state changes during refresh
+    setRefreshingState(true);
+    
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
+    } catch (error) {
+      console.error('[Refresh] Error during refresh:', error);
+    } finally {
+      // Re-enable auth state changes after refresh
+      setRefreshingState(false);
+    }
+  }, [setRefreshingState]);
 
   // Visual pull-down feedback
   const [pullPx, setPullPx] = useState(0);
+  const [isPullToRefreshEnabled, setIsPullToRefreshEnabled] = useState(false);
+  
+  // Enable pull-to-refresh only after authentication state has stabilized
+  useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        setIsPullToRefreshEnabled(true);
+      }, 500); // 500ms delay to ensure auth state is stable
+      
+      return () => clearTimeout(timer);
+    } else {
+      setIsPullToRefreshEnabled(false);
+    }
+  }, [user]);
+  
   usePullToRefresh(handleRefresh, {
     thresholdPx: 12,
-    enabled: true,
+    enabled: isPullToRefreshEnabled,
     maxPullPx: 64,
+    isAuthenticated: !!user, // Only enable pull-to-refresh when user is authenticated
     onPullChange: (px, state) => setPullPx(state === "pulling" || state === "refreshing" ? px : 0),
   });
 

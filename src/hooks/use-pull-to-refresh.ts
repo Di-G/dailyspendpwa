@@ -5,13 +5,20 @@ type UsePullToRefreshOptions = {
   enabled?: boolean;
   maxPullPx?: number;
   onPullChange?: (pullPx: number, state: "idle" | "pulling" | "refreshing") => void;
+  isAuthenticated?: boolean; // Add authentication state awareness
 };
 
 export function usePullToRefresh(
   onRefresh: () => void | Promise<void>,
   options: UsePullToRefreshOptions = {}
 ) {
-  const { thresholdPx = 12, enabled = true, maxPullPx = 60, onPullChange } = options;
+  const { 
+    thresholdPx = 12, 
+    enabled = true, 
+    maxPullPx = 60, 
+    onPullChange,
+    isAuthenticated = true // Default to true to maintain backward compatibility
+  } = options;
   const startYRef = useRef<number | null>(null);
   const triggeredRef = useRef<boolean>(false);
   const touchingRef = useRef<boolean>(false);
@@ -19,6 +26,7 @@ export function usePullToRefresh(
   useEffect(() => {
     if (!enabled) return;
     if (!("ontouchstart" in window) && navigator.maxTouchPoints === 0) return;
+    if (!isAuthenticated) return; // Don't enable pull-to-refresh if user is not authenticated
 
     const handleTouchStart = (e: TouchEvent) => {
       if (window.scrollY > 0) return; // Only when at top of the page
@@ -69,7 +77,7 @@ export function usePullToRefresh(
       window.removeEventListener("touchend", handleTouchEnd as any);
       window.removeEventListener("touchcancel", handleTouchEnd as any);
     };
-  }, [onRefresh, thresholdPx, enabled]);
+  }, [onRefresh, thresholdPx, enabled, isAuthenticated]);
 }
 
 
