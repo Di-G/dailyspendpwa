@@ -131,7 +131,9 @@ export function applyConflictResolution(
       return localData;
     
     case 'overwrite-online':
-      return onlineData || localData;
+      // When using local data, completely replace online data with local data
+      // This means the local data becomes the authoritative source
+      return localData;
     
     default:
       return localData;

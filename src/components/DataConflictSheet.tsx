@@ -93,7 +93,7 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 py-4 pb-24 overflow-y-auto max-h-[calc(100vh-200px)]">
+        <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(100vh-200px)]">
           {/* Scroll Indicator */}
           <div className="flex justify-center pb-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -200,7 +200,7 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
                     <span className="font-medium text-sm">Use Local Data</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Upload your local data to the cloud, overwriting online data.
+                    Upload your local data to the cloud, completely replacing online data.
                   </p>
                 </div>
               </label>
@@ -227,7 +227,7 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
             </div>
           </div>
 
-          {/* Full Warning - Back to normal size */}
+          {/* Warning for data loss - Always below Use Online Data option */}
           {selectedResolution === 'overwrite-local' && (
             <Alert variant="destructive" className="text-sm">
               <AlertTriangle className="h-4 w-4" />
@@ -239,36 +239,48 @@ export default function DataConflictSheet({ open, onClose, conflict, onResolve }
             </Alert>
           )}
 
-          {/* Bottom Spacing for Buttons */}
-          <div className="h-8"></div>
-        </div>
+          {/* Warning for online data loss - Always below Use Local Data option */}
+          {selectedResolution === 'overwrite-online' && (
+            <Alert variant="destructive" className="text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Warning: Online Data Will Be Lost</AlertTitle>
+              <AlertDescription>
+                This action will completely replace all online data with your local data. 
+                Any online data not present in your local storage will be permanently lost.
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {/* Fixed Bottom Action Buttons - Always visible */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              onClick={onClose} 
-              disabled={isResolving}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleResolve} 
-              disabled={!selectedResolution || isResolving}
-              className="flex-1"
-            >
-              {isResolving ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2 animate-pulse" />
-                  Syncing...
-                </>
-              ) : (
-                "Sync Data"
-              )}
-            </Button>
+          {/* Action Buttons - Always below the warning and part of scrollable content */}
+          <div className="pt-4 border-t">
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={isResolving}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleResolve} 
+                disabled={!selectedResolution || isResolving}
+                className="flex-1"
+              >
+                {isResolving ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2 animate-pulse" />
+                    Syncing...
+                  </>
+                ) : (
+                  "Sync Data"
+                )}
+              </Button>
+            </div>
           </div>
+
+          {/* Bottom Spacing */}
+          <div className="h-4"></div>
         </div>
       </SheetContent>
     </Sheet>

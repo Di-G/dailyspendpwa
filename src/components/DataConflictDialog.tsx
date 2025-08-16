@@ -169,7 +169,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                     <span className="font-medium">Use Local Data</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Upload your local data to the cloud, overwriting online data.
+                    Upload your local data to the cloud, completely replacing online data.
                   </p>
                 </div>
               </label>
@@ -204,6 +204,18 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
               <AlertDescription>
                 This action will permanently replace your local data with online data. 
                 Any local changes not yet synced will be lost forever.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Warning for online data loss */}
+          {selectedResolution === 'overwrite-online' && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Warning: Online Data Will Be Lost</AlertTitle>
+              <AlertDescription>
+                This action will completely replace all online data with your local data. 
+                Any online data not present in your local storage will be permanently lost.
               </AlertDescription>
             </Alert>
           )}
