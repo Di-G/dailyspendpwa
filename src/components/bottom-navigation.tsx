@@ -12,11 +12,12 @@ interface BottomNavigationProps {
 
 export default function BottomNavigation({ currentView, onViewChange, onSlideProgress, onSlideStart, onSlideEnd }: BottomNavigationProps) {
   const isMobile = useIsMobile();
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [currentX, setCurrentX] = useState(0);
-  const [slideProgress, setSlideProgress] = useState(0);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  // Temporarily disabled sliding feature
+  // const [isDragging, setIsDragging] = useState(false);
+  // const [startX, setStartX] = useState(0);
+  // const [currentX, setCurrentX] = useState(0);
+  // const [slideProgress, setSlideProgress] = useState(0);
+  // const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const navigationItems = [
@@ -48,6 +49,8 @@ export default function BottomNavigation({ currentView, onViewChange, onSlidePro
 
   const currentIndex = navigationItems.findIndex(item => item.id === currentView);
 
+  // Temporarily disabled sliding logic
+  /*
   // Memoize the event handlers to avoid dependency issues
   const handleTouchStart = useCallback((e: TouchEvent) => {
     setIsDragging(true);
@@ -194,6 +197,7 @@ export default function BottomNavigation({ currentView, onViewChange, onSlidePro
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseDown, handleMouseMove, handleMouseUp]);
+  */
 
   if (!isMobile) {
     return null; // Only show on mobile devices
@@ -201,8 +205,8 @@ export default function BottomNavigation({ currentView, onViewChange, onSlidePro
 
   return (
     <>
-      {/* Global swipe indicator */}
-      {isDragging && slideProgress > 0.1 && (
+      {/* Temporarily disabled sliding indicator */}
+      {/* {isDragging && slideProgress > 0.1 && (
         <div className="fixed inset-0 bg-black bg-opacity-5 flex items-center justify-center pointer-events-none z-40">
           <div className="bg-white px-4 py-2 rounded-full shadow-lg border">
             <span className="text-sm font-medium text-gray-700">
@@ -210,7 +214,7 @@ export default function BottomNavigation({ currentView, onViewChange, onSlidePro
             </span>
           </div>
         </div>
-      )}
+      )} */}
       
       {/* Bottom Navigation */}
       <div 

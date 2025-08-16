@@ -296,11 +296,11 @@ function isArrayContinuation<T extends { id: string }>(local: T[], online: T[]):
 /**
  * Gets current local data for conflict analysis
  */
-export function getCurrentLocalData() {
+export function getCurrentLocalData(userId?: string) {
   return {
-    categories: getCategories(),
-    expenses: getExpenses(),
-    recurring: getRecurringExpenses(),
-    friends: getFriends()
+    categories: getCategories(userId),
+    expenses: getExpenses(userId),
+    recurring: getRecurringExpenses(userId),
+    friends: getFriends(userId)
   };
 }

@@ -2,12 +2,17 @@ import { Category, Expense, RecurringExpense, InsertCategory, InsertExpense, Ins
 import { formatDate } from "./date-utils";
 import { emitDataChanged } from "./syncBridge";
 
-// Storage keys
-const CATEGORIES_KEY = 'dailyspend_categories';
-const EXPENSES_KEY = 'dailyspend_expenses';
-const RECURRING_EXPENSES_KEY = 'dailyspend_recurring_expenses';
-const LAST_PROCESSED_DATE_KEY = 'dailyspend_last_processed_date';
-const FRIENDS_KEY = 'dailyspend_friends';
+// Storage keys - now user-specific
+const getStorageKey = (baseKey: string, userId?: string): string => {
+  if (!userId) return baseKey;
+  return `${baseKey}_${userId}`;
+};
+
+const CATEGORIES_BASE_KEY = 'dailyspend_categories';
+const EXPENSES_BASE_KEY = 'dailyspend_expenses';
+const RECURRING_EXPENSES_BASE_KEY = 'dailyspend_recurring_expenses';
+const LAST_PROCESSED_DATE_BASE_KEY = 'dailyspend_last_processed_date';
+const FRIENDS_BASE_KEY = 'dailyspend_friends';
 
 // Helper functions
 const generateId = (): string => {
@@ -33,8 +38,8 @@ const setToStorage = <T>(key: string, value: T): void => {
 };
 
 // Helper function to enrich expenses with category data
-const enrichExpensesWithCategories = (expenses: Expense[]): ExpenseWithCategory[] => {
-  const categories = getCategories();
+const enrichExpensesWithCategories = (expenses: Expense[], userId?: string): ExpenseWithCategory[] => {
+  const categories = getCategories(userId);
   return expenses.map(expense => ({
     ...expense,
     category: expense.categoryId ? categories.find(cat => cat.id === expense.categoryId) : undefined,
@@ -42,8 +47,8 @@ const enrichExpensesWithCategories = (expenses: Expense[]): ExpenseWithCategory[
 };
 
 // Helper function to enrich recurring expenses with category data
-const enrichRecurringExpensesWithCategories = (recurringExpenses: RecurringExpense[]): RecurringExpenseWithCategory[] => {
-  const categories = getCategories();
+const enrichRecurringExpensesWithCategories = (recurringExpenses: RecurringExpense[], userId?: string): RecurringExpenseWithCategory[] => {
+  const categories = getCategories(userId);
   return recurringExpenses.map(expense => ({
     ...expense,
     category: expense.categoryId ? categories.find(cat => cat.id === expense.categoryId) : undefined,
@@ -51,12 +56,13 @@ const enrichRecurringExpensesWithCategories = (recurringExpenses: RecurringExpen
 };
 
 // Categories
-export const getCategories = (): Category[] => {
-  return getFromStorage<Category[]>(CATEGORIES_KEY, []);
+export const getCategories = (userId?: string): Category[] => {
+  const key = getStorageKey(CATEGORIES_BASE_KEY, userId);
+  return getFromStorage<Category[]>(key, []);
 };
 
-export const createCategory = (data: InsertCategory): Category => {
-  const categories = getCategories();
+export const createCategory = (data: InsertCategory, userId?: string): Category => {
+  const categories = getCategories(userId);
   const newCategory: Category = {
     id: generateId(),
     name: data.name,
@@ -65,51 +71,55 @@ export const createCategory = (data: InsertCategory): Category => {
   };
   
   const updatedCategories = [...categories, newCategory];
-  setToStorage(CATEGORIES_KEY, updatedCategories);
+  const key = getStorageKey(CATEGORIES_BASE_KEY, userId);
+  setToStorage(key, updatedCategories);
   emitDataChanged();
   return newCategory;
 };
 
-export const deleteCategory = (id: string): void => {
-  const categories = getCategories();
+export const deleteCategory = (id: string, userId?: string): void => {
+  const categories = getCategories(userId);
   const updatedCategories = categories.filter(cat => cat.id !== id);
-  setToStorage(CATEGORIES_KEY, updatedCategories);
+  const key = getStorageKey(CATEGORIES_BASE_KEY, userId);
+  setToStorage(key, updatedCategories);
   emitDataChanged();
   
   // Also remove category from expenses
-  const expenses = getExpenses();
+  const expenses = getExpenses(userId);
   const updatedExpenses = expenses.map(expense => 
     expense.categoryId === id ? { ...expense, categoryId: null } : expense
   );
-  setToStorage(EXPENSES_KEY, updatedExpenses);
+  const expensesKey = getStorageKey(EXPENSES_BASE_KEY, userId);
+  setToStorage(expensesKey, updatedExpenses);
 };
 
 // Expenses
-export const getExpenses = (): Expense[] => {
-  return getFromStorage<Expense[]>(EXPENSES_KEY, []);
+export const getExpenses = (userId?: string): Expense[] => {
+  const key = getStorageKey(EXPENSES_BASE_KEY, userId);
+  return getFromStorage<Expense[]>(key, []);
 };
 
-export const getExpensesWithCategories = (): ExpenseWithCategory[] => {
-  const expenses = getExpenses();
-  return enrichExpensesWithCategories(expenses);
+export const getExpensesWithCategories = (userId?: string): ExpenseWithCategory[] => {
+  const expenses = getExpenses(userId);
+  return enrichExpensesWithCategories(expenses, userId);
 };
 
-export const getExpensesByDate = (date: string): ExpenseWithCategory[] => {
-  const expenses = getExpenses();
+export const getExpensesByDate = (date: string, userId?: string): ExpenseWithCategory[] => {
+  const expenses = getExpenses(userId);
   const filteredExpenses = expenses.filter(expense => expense.date === date);
-  return enrichExpensesWithCategories(filteredExpenses);
+  return enrichExpensesWithCategories(filteredExpenses, userId);
 };
 
-export const getExpensesByDateRange = (startDate: string, endDate: string): ExpenseWithCategory[] => {
-  const expenses = getExpenses();
+export const getExpensesByDateRange = (startDate: string, endDate: string, userId?: string): ExpenseWithCategory[] => {
+  const expenses = getExpenses(userId);
   const filteredExpenses = expenses.filter(expense => 
     expense.date >= startDate && expense.date <= endDate
   );
-  return enrichExpensesWithCategories(filteredExpenses);
+  return enrichExpensesWithCategories(filteredExpenses, userId);
 };
 
-export const createExpense = (data: InsertExpense): Expense => {
-  const expenses = getExpenses();
+export const createExpense = (data: InsertExpense, userId?: string): Expense => {
+  const expenses = getExpenses(userId);
   const newExpense: Expense = {
     id: generateId(),
     name: data.name,
@@ -121,22 +131,25 @@ export const createExpense = (data: InsertExpense): Expense => {
   };
   
   const updatedExpenses = [...expenses, newExpense];
-  setToStorage(EXPENSES_KEY, updatedExpenses);
+  const key = getStorageKey(EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedExpenses);
   emitDataChanged();
   return newExpense;
 };
 
-export const deleteExpense = (id: string): void => {
-  const expenses = getExpenses();
+export const deleteExpense = (id: string, userId?: string): void => {
+  const expenses = getExpenses(userId);
   const updatedExpenses = expenses.filter(expense => expense.id !== id);
-  setToStorage(EXPENSES_KEY, updatedExpenses);
+  const key = getStorageKey(EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedExpenses);
   emitDataChanged();
 };
 
-export const restoreExpense = (expense: Expense): void => {
-  const expenses = getExpenses();
+export const restoreExpense = (expense: Expense, userId?: string): void => {
+  const expenses = getExpenses(userId);
   const updatedExpenses = [...expenses, expense];
-  setToStorage(EXPENSES_KEY, updatedExpenses);
+  const key = getStorageKey(EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedExpenses);
   emitDataChanged();
 };
 
@@ -148,9 +161,10 @@ export const updateExpense = (
     details?: string | null;
     categoryId?: string | null;
     date?: string; // optional: allow moving between dates
-  }
+  },
+  userId?: string
 ): Expense | null => {
-  const expenses = getExpenses();
+  const expenses = getExpenses(userId);
   let updated: Expense | null = null;
   const updatedExpenses = expenses.map(expense => {
     if (expense.id !== id) return expense;
@@ -164,23 +178,25 @@ export const updateExpense = (
     };
     return updated;
   });
-  setToStorage(EXPENSES_KEY, updatedExpenses);
+  const key = getStorageKey(EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedExpenses);
   emitDataChanged();
   return updated;
 };
 
 // Recurring Expenses
-export const getRecurringExpenses = (): RecurringExpense[] => {
-  return getFromStorage<RecurringExpense[]>(RECURRING_EXPENSES_KEY, []);
+export const getRecurringExpenses = (userId?: string): RecurringExpense[] => {
+  const key = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+  return getFromStorage<RecurringExpense[]>(key, []);
 };
 
-export const getRecurringExpensesWithCategories = (): RecurringExpenseWithCategory[] => {
-  const recurringExpenses = getRecurringExpenses();
-  return enrichRecurringExpensesWithCategories(recurringExpenses);
+export const getRecurringExpensesWithCategories = (userId?: string): RecurringExpenseWithCategory[] => {
+  const recurringExpenses = getRecurringExpenses(userId);
+  return enrichRecurringExpensesWithCategories(recurringExpenses, userId);
 };
 
-export const createRecurringExpense = (data: InsertRecurringExpense): RecurringExpense => {
-  const recurringExpenses = getRecurringExpenses();
+export const createRecurringExpense = (data: InsertRecurringExpense, userId?: string): RecurringExpense => {
+  const recurringExpenses = getRecurringExpenses(userId);
   // Enforce no past start dates
   const todayStr = formatDate(new Date());
   if (data.startDate < todayStr) {
@@ -201,7 +217,8 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
   };
   
   const updatedRecurringExpenses = [...recurringExpenses, newRecurringExpense];
-  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  const key = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedRecurringExpenses);
   emitDataChanged();
 
   // If a recurring expense starts today, immediately add today's occurrence only
@@ -212,7 +229,7 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
       newRecurringExpense.startDate === todayStr &&
       (!newRecurringExpense.endDate || todayStr <= newRecurringExpense.endDate)
     ) {
-      const existingExpenses = getExpensesByDate(todayStr);
+      const existingExpenses = getExpensesByDate(todayStr, userId);
       const alreadyExists = existingExpenses.some(exp =>
         exp.name === newRecurringExpense.name &&
         exp.amount === newRecurringExpense.amount &&
@@ -225,7 +242,7 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
           details: newRecurringExpense.details || undefined,
           categoryId: newRecurringExpense.categoryId || undefined,
           date: todayStr,
-        });
+        }, userId);
       }
     }
   } catch (e) {
@@ -237,9 +254,10 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
 
 export const updateRecurringExpense = (
   id: string,
-  data: Partial<InsertRecurringExpense> & { isActive?: boolean }
+  data: Partial<InsertRecurringExpense> & { isActive?: boolean },
+  userId?: string
 ): RecurringExpense | null => {
-  const recurringExpenses = getRecurringExpenses();
+  const recurringExpenses = getRecurringExpenses(userId);
   let updated: RecurringExpense | null = null;
   const updatedRecurringExpenses = recurringExpenses.map(expense => {
     if (expense.id !== id) return expense;
@@ -266,30 +284,33 @@ export const updateRecurringExpense = (
     };
     return updated;
   });
-  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  const key = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedRecurringExpenses);
   emitDataChanged();
   return updated;
 };
 
-export const deleteRecurringExpense = (id: string): void => {
-  const recurringExpenses = getRecurringExpenses();
+export const deleteRecurringExpense = (id: string, userId?: string): void => {
+  const recurringExpenses = getRecurringExpenses(userId);
   const updatedRecurringExpenses = recurringExpenses.filter(expense => expense.id !== id);
-  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  const key = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedRecurringExpenses);
   emitDataChanged();
 };
 
-export const toggleRecurringExpense = (id: string): void => {
-  const recurringExpenses = getRecurringExpenses();
+export const toggleRecurringExpense = (id: string, userId?: string): void => {
+  const recurringExpenses = getRecurringExpenses(userId);
   const updatedRecurringExpenses = recurringExpenses.map(expense => 
     expense.id === id ? { ...expense, isActive: !expense.isActive } : expense
   );
-  setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+  const key = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updatedRecurringExpenses);
   emitDataChanged();
 };
 
 // Function to generate expenses from recurring expenses for a given date
-export const generateExpensesFromRecurring = (date: string): Expense[] => {
-  const recurringExpenses = getRecurringExpenses().filter(re => re.isActive);
+export const generateExpensesFromRecurring = (date: string, userId?: string): Expense[] => {
+  const recurringExpenses = getRecurringExpenses(userId).filter(re => re.isActive);
   const generatedExpenses: Expense[] = [];
   
   recurringExpenses.forEach(recurring => {
@@ -324,7 +345,7 @@ export const generateExpensesFromRecurring = (date: string): Expense[] => {
     
     if (shouldGenerate) {
       // Check if expense already exists for this date
-      const existingExpenses = getExpensesByDate(date);
+      const existingExpenses = getExpensesByDate(date, userId);
       const alreadyExists = existingExpenses.some(exp => 
         exp.name === recurring.name && 
         exp.amount === recurring.amount && 
@@ -350,33 +371,36 @@ export const generateExpensesFromRecurring = (date: string): Expense[] => {
 };
 
 // Persist generated expenses for a specific date and return how many were saved
-export const processRecurringForDate = (date: string): number => {
-  const expensesToAdd = generateExpensesFromRecurring(date);
+export const processRecurringForDate = (date: string, userId?: string): number => {
+  const expensesToAdd = generateExpensesFromRecurring(date, userId);
   if (expensesToAdd.length === 0) return 0;
-  const current = getExpenses();
+  const current = getExpenses(userId);
   const updated = [...current, ...expensesToAdd];
-  setToStorage(EXPENSES_KEY, updated);
+  const key = getStorageKey(EXPENSES_BASE_KEY, userId);
+  setToStorage(key, updated);
   emitDataChanged();
   return expensesToAdd.length;
 };
 
-export const getLastProcessedDate = (): string | null => {
-  return getFromStorage<string | null>(LAST_PROCESSED_DATE_KEY, null);
+export const getLastProcessedDate = (userId?: string): string | null => {
+  const key = getStorageKey(LAST_PROCESSED_DATE_BASE_KEY, userId);
+  return getFromStorage<string | null>(key, null);
 };
 
-export const setLastProcessedDate = (date: string): void => {
-  setToStorage(LAST_PROCESSED_DATE_KEY, date);
+export const setLastProcessedDate = (date: string, userId?: string): void => {
+  const key = getStorageKey(LAST_PROCESSED_DATE_BASE_KEY, userId);
+  setToStorage(key, date);
 };
 
 // Analytics
-export const getDailyTotal = (date: string): number => {
-  const expenses = getExpensesByDate(date);
+export const getDailyTotal = (date: string, userId?: string): number => {
+  const expenses = getExpensesByDate(date, userId);
   return expenses.reduce((total, expense) => total + parseFloat(expense.amount), 0);
 };
 
-export const getCategoryTotals = (date: string): Array<{ categoryId: string; total: number; category: Category }> => {
-  const expenses = getExpensesByDate(date);
-  const categories = getCategories();
+export const getCategoryTotals = (date: string, userId?: string): Array<{ categoryId: string; total: number; category: Category }> => {
+  const expenses = getExpensesByDate(date, userId);
+  const categories = getCategories(userId);
   
   const categoryTotals = new Map<string, number>();
   
@@ -397,11 +421,11 @@ export const getCategoryTotals = (date: string): Array<{ categoryId: string; tot
   });
 };
 
-export const getMonthlyTotals = (year: number, month: number): Array<{ date: string; total: number }> => {
+export const getMonthlyTotals = (year: number, month: number, userId?: string): Array<{ date: string; total: number }> => {
   const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
   const endDate = formatDate(new Date(year, month, 0)); // Last day of month (month is 1-based here)
   
-  const expenses = getExpensesByDateRange(startDate, endDate);
+  const expenses = getExpensesByDateRange(startDate, endDate, userId);
   
   const dailyTotals = new Map<string, number>();
   
@@ -416,7 +440,7 @@ export const getMonthlyTotals = (year: number, month: number): Array<{ date: str
   }));
 };
 
-export const getWeeklyTotals = (date: string): Array<{ date: string; total: number }> => {
+export const getWeeklyTotals = (date: string, userId?: string): Array<{ date: string; total: number }> => {
   const currentDate = new Date(date);
   const startDate = new Date(currentDate);
   startDate.setDate(currentDate.getDate() - 6); // 7 days ago
@@ -424,7 +448,7 @@ export const getWeeklyTotals = (date: string): Array<{ date: string; total: numb
   const startDateStr = formatDate(startDate);
   const endDateStr = date;
   
-  const expenses = getExpensesByDateRange(startDateStr, endDateStr);
+  const expenses = getExpensesByDateRange(startDateStr, endDateStr, userId);
   
   const dailyTotals = new Map<string, number>();
   
@@ -440,9 +464,9 @@ export const getWeeklyTotals = (date: string): Array<{ date: string; total: numb
 };
 
 // Initialize default categories if none exist
-export const initializeDefaultCategories = (): void => {
+export const initializeDefaultCategories = (userId?: string): void => {
   try {
-    const categories = getCategories();
+    const categories = getCategories(userId);
     if (categories.length === 0) {
       const defaultCategories: InsertCategory[] = [
         { name: "Food & Dining", color: "#EF4444" },
@@ -453,7 +477,7 @@ export const initializeDefaultCategories = (): void => {
         { name: "Healthcare", color: "#EC4899" },
       ];
       
-      defaultCategories.forEach(category => createCategory(category));
+      defaultCategories.forEach(category => createCategory(category, userId));
       console.log('Default categories initialized successfully');
     }
   } catch (error) {
@@ -468,14 +492,20 @@ export const updateAllData = (
   categories: Category[],
   expenses: Expense[],
   recurring: RecurringExpense[],
-  friends?: Friend[]
+  friends?: Friend[],
+  userId?: string
 ): void => {
   try {
-    setToStorage(CATEGORIES_KEY, categories);
-    setToStorage(EXPENSES_KEY, expenses);
-    setToStorage(RECURRING_EXPENSES_KEY, recurring);
+    const categoriesKey = getStorageKey(CATEGORIES_BASE_KEY, userId);
+    const expensesKey = getStorageKey(EXPENSES_BASE_KEY, userId);
+    const recurringKey = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+    const friendsKey = getStorageKey(FRIENDS_BASE_KEY, userId);
+
+    setToStorage(categoriesKey, categories);
+    setToStorage(expensesKey, expenses);
+    setToStorage(recurringKey, recurring);
     if (friends !== undefined) {
-      setToStorage(FRIENDS_KEY, friends);
+      setToStorage(friendsKey, friends);
     }
     emitDataChanged();
   } catch (error) {
@@ -489,17 +519,23 @@ export const updateAllData = (
  * This function removes all categories, expenses, recurring expenses, and friends,
  * then reinitializes the default categories
  */
-export const clearAllData = (): void => {
+export const clearAllData = (userId?: string): void => {
   try {
     // Clear all storage keys
-    localStorage.removeItem(CATEGORIES_KEY);
-    localStorage.removeItem(EXPENSES_KEY);
-    localStorage.removeItem(RECURRING_EXPENSES_KEY);
-    localStorage.removeItem(FRIENDS_KEY);
-    localStorage.removeItem(LAST_PROCESSED_DATE_KEY);
+    const categoriesKey = getStorageKey(CATEGORIES_BASE_KEY, userId);
+    const expensesKey = getStorageKey(EXPENSES_BASE_KEY, userId);
+    const recurringKey = getStorageKey(RECURRING_EXPENSES_BASE_KEY, userId);
+    const friendsKey = getStorageKey(FRIENDS_BASE_KEY, userId);
+    const lastProcessedKey = getStorageKey(LAST_PROCESSED_DATE_BASE_KEY, userId);
+
+    localStorage.removeItem(categoriesKey);
+    localStorage.removeItem(expensesKey);
+    localStorage.removeItem(recurringKey);
+    localStorage.removeItem(friendsKey);
+    localStorage.removeItem(lastProcessedKey);
     
     // Reinitialize default categories
-    initializeDefaultCategories();
+    initializeDefaultCategories(userId);
     
     // Emit data changed event to refresh UI
     emitDataChanged();
@@ -512,12 +548,13 @@ export const clearAllData = (): void => {
 };
 
 // Friends
-export const getFriends = (): Friend[] => {
-  return getFromStorage<Friend[]>(FRIENDS_KEY, []);
+export const getFriends = (userId?: string): Friend[] => {
+  const key = getStorageKey(FRIENDS_BASE_KEY, userId);
+  return getFromStorage<Friend[]>(key, []);
 };
 
-export const addFriend = (data: InsertFriend): Friend => {
-  const friends = getFriends();
+export const addFriend = (data: InsertFriend, userId?: string): Friend => {
+  const friends = getFriends(userId);
   const newFriend: Friend = {
     id: generateId(),
     userId: data.userId,
@@ -528,23 +565,26 @@ export const addFriend = (data: InsertFriend): Friend => {
   };
   
   const updatedFriends = [...friends, newFriend];
-  setToStorage(FRIENDS_KEY, updatedFriends);
+  const key = getStorageKey(FRIENDS_BASE_KEY, userId);
+  setToStorage(key, updatedFriends);
   emitDataChanged();
   return newFriend;
 };
 
-export const removeFriend = (id: string): void => {
-  const friends = getFriends();
+export const removeFriend = (id: string, userId?: string): void => {
+  const friends = getFriends(userId);
   const updatedFriends = friends.filter(friend => friend.id !== id);
-  setToStorage(FRIENDS_KEY, updatedFriends);
+  const key = getStorageKey(FRIENDS_BASE_KEY, userId);
+  setToStorage(key, updatedFriends);
   emitDataChanged();
 };
 
-export const updateFriend = (id: string, updates: Partial<Friend>): void => {
-  const friends = getFriends();
+export const updateFriend = (id: string, updates: Partial<Friend>, userId?: string): void => {
+  const friends = getFriends(userId);
   const updatedFriends = friends.map(friend => 
     friend.id === id ? { ...friend, ...updates } : friend
   );
-  setToStorage(FRIENDS_KEY, updatedFriends);
+  const key = getStorageKey(FRIENDS_BASE_KEY, userId);
+  setToStorage(key, updatedFriends);
   emitDataChanged();
 };

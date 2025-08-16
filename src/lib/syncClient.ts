@@ -38,10 +38,10 @@ export function useRealtimeSync() {
     const onChanged = async () => {
       try {
         await uploadAllForUser(user.uid, {
-          categories: getCategories(),
-          expenses: getExpenses(),
-          recurring: getRecurringExpenses(),
-          friends: getFriends(),
+          categories: getCategories(user.uid),
+          expenses: getExpenses(user.uid),
+          recurring: getRecurringExpenses(user.uid),
+          friends: getFriends(user.uid),
         });
       } catch (e) {
         console.error('Background upload failed', e);
@@ -58,7 +58,7 @@ export function useRealtimeSync() {
   const handleInitialSync = async () => {
     try {
       console.log('[Sync] Starting initial sync for user:', user!.uid);
-      const localData = getCurrentLocalData();
+      const localData = getCurrentLocalData(user!.uid);
       const remoteData = await downloadAllForUser(user!.uid);
       
       console.log('[Sync] Local data:', {
@@ -135,14 +135,10 @@ export function useRealtimeSync() {
                            conflict.conflicts.recurring;
         
         if (hasConflicts) {
-          console.log('[Sync] Conflicts detected, automatically using merge resolution (dialog disabled)');
-          // Temporarily disabled: show conflict resolution dialog
-          // setPendingConflict(conflict);
-          // setConflictDialogOpen(true);
-          // return;
-          
-          // Auto-resolve conflicts using merge strategy
-          await performSync(conflict, 'merge');
+          console.log('[Sync] Conflicts detected, showing conflict resolution dialog');
+          // Show conflict resolution dialog for user to choose
+          setPendingConflict(conflict);
+          setConflictDialogOpen(true);
           return;
         }
       }
@@ -166,7 +162,8 @@ export function useRealtimeSync() {
         resolvedData.categories,
         resolvedData.expenses,
         resolvedData.recurring,
-        resolvedData.friends
+        resolvedData.friends,
+        user!.uid
       );
       
       // Upload resolved data to cloud

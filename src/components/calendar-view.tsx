@@ -6,6 +6,7 @@ import { getMonthInfo, generateCalendarDays, getToday } from "@/lib/date-utils";
 import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getRecurringExpenses } from "@/lib/localStorage";
+import { useAuth } from "@/lib/auth";
 import type { RecurringExpense, ExpenseWithCategory } from "@shared/schema";
 
 interface CalendarViewProps {
@@ -15,6 +16,7 @@ interface CalendarViewProps {
 }
 
 export default function CalendarView({ currency, isFriendMode = false, friendData }: CalendarViewProps) {
+  const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const today = getToday();
   const isMobile = useIsMobile();
@@ -31,7 +33,7 @@ export default function CalendarView({ currency, isFriendMode = false, friendDat
   });
 
   // Get recurring expenses for the month - disabled in friend mode
-  const recurringExpenses = isFriendMode ? [] : getRecurringExpenses();
+  const recurringExpenses = isFriendMode ? [] : getRecurringExpenses(user?.uid);
 
   const CURRENCIES = {
     USD: { symbol: "$" },

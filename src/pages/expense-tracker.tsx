@@ -22,12 +22,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getFriends, addFriend, removeFriend } from "@/lib/localStorage";
 import { downloadFriendData } from "@/lib/sync";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
 type CurrencyCode = "USD" | "INR";
 type ExpenseMode = "my" | "friend";
 
 export default function ExpenseTracker() {
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<ViewType>("entry");
   const [expenseMode, setExpenseMode] = useState<ExpenseMode>("my");
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
@@ -38,9 +40,10 @@ export default function ExpenseTracker() {
   });
   const isMobile = useIsMobile();
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-  const [slideProgress, setSlideProgress] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  // Temporarily disabled sliding state variables
+  // const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  // const [slideProgress, setSlideProgress] = useState(0);
+  // const [isDragging, setIsDragging] = useState(false);
   
   // Friend dropdown state
   const [showFriendDropdown, setShowFriendDropdown] = useState(false);
@@ -128,27 +131,7 @@ export default function ExpenseTracker() {
   };
 
   const handleViewChange = (view: ViewType) => {
-    // Determine slide direction based on current and new view
-    const viewOrder = ["entry", "calendar", "charts", "recurring"];
-    const currentIndex = viewOrder.indexOf(currentView);
-    const newIndex = viewOrder.indexOf(view);
-    
-    if (newIndex > currentIndex) {
-      // Going forward - slide left
-      setSlideDirection('left');
-      setSlideProgress(1);
-    } else if (newIndex < currentIndex) {
-      // Going backward - slide right
-      setSlideDirection('right');
-      setSlideProgress(1);
-    }
-    
-    // Animate the slide
-    setTimeout(() => {
-      setCurrentView(view);
-      setSlideDirection(null);
-      setSlideProgress(0);
-    }, 300);
+    setCurrentView(view);
   };
 
   // Long press functionality for Friends tab
@@ -190,7 +173,7 @@ export default function ExpenseTracker() {
   }, []);
 
   // Friend management functions
-  const friends = getFriends();
+  const friends = getFriends(user?.uid);
   const safeFriends = Array.isArray(friends) ? friends : [];
 
   const handleAddFriend = async () => {
@@ -205,7 +188,7 @@ export default function ExpenseTracker() {
         userId: newFriendEmail,
         displayName: newFriendName,
         email: newFriendEmail,
-      });
+      }, user?.uid);
       
       setNewFriendEmail("");
       setNewFriendName("");
@@ -244,7 +227,7 @@ export default function ExpenseTracker() {
   };
 
   const handleRemoveFriend = (friendId: string) => {
-    removeFriend(friendId);
+    removeFriend(friendId, user?.uid);
     if (selectedFriend?.id === friendId) {
       handleFriendSelect(null);
       handleFriendDataLoad(null);
@@ -501,16 +484,6 @@ export default function ExpenseTracker() {
       {/* Main Content */}
       <div 
         className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}
-        style={{
-          transform: slideDirection === 'left' 
-            ? `translateX(-${slideProgress * 100}%)` 
-            : slideDirection === 'right' 
-            ? `translateX(${slideProgress * 100}%)` 
-            : 'translateX(0)',
-          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
-          opacity: 1 - (slideProgress * 0.3),
-          scale: 1 - (slideProgress * 0.05),
-        }}
       >
         {currentView === "entry" && (
           <ExpenseEntry
@@ -547,40 +520,7 @@ export default function ExpenseTracker() {
       </div>
       
       {/* Next/Previous Screen Preview (underneath) */}
-      {slideProgress > 0.1 && slideDirection && (
-        <div 
-          className="fixed inset-0 z-30 pointer-events-none"
-          style={{
-            transform: slideDirection === 'left' 
-              ? `translateX(${(1 - slideProgress) * 100}%)` 
-              : `translateX(-${(1 - slideProgress) * 100}%)`,
-            transition: 'none',
-          }}
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-            {slideDirection === 'left' && currentIndex < navigationItems.length - 1 && (
-              <div className="bg-background rounded-lg shadow-lg p-6 h-full">
-                <h2 className="text-2xl font-bold text-muted-foreground mb-4">
-                  {navigationItems[currentIndex + 1]?.label}
-                </h2>
-                <p className="text-muted-foreground">
-                  Swipe to reveal {navigationItems[currentIndex + 1]?.label.toLowerCase()} content
-                </p>
-              </div>
-            )}
-            {slideDirection === 'right' && currentIndex > 0 && (
-              <div className="bg-background rounded-lg shadow-lg p-6 h-full">
-                <h2 className="text-2xl font-bold text-muted-foreground mb-4">
-                  {navigationItems[currentIndex - 1]?.label}
-                </h2>
-                <p className="text-muted-foreground">
-                  Swipe to reveal {navigationItems[currentIndex - 1]?.label.toLowerCase()} content
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Removed sliding preview as sliding is disabled */}
 
       {/* Floating Action Button - Mobile only */}
       <FloatingActionButton 
@@ -595,12 +535,13 @@ export default function ExpenseTracker() {
       <BottomNavigation
         currentView={currentView}
         onViewChange={(v) => handleViewChange(v as ViewType)}
-        onSlideProgress={(progress, direction) => {
-          setSlideProgress(progress);
-          setSlideDirection(direction);
-        }}
-        onSlideStart={() => setIsDragging(true)}
-        onSlideEnd={() => setIsDragging(false)}
+        // Temporarily disabled sliding props
+        // onSlideProgress={(progress, direction) => {
+        //   setSlideProgress(progress);
+        //   setSlideDirection(direction);
+        // }}
+        // onSlideStart={() => setIsDragging(true)}
+        // onSlideEnd={() => setIsDragging(false)}
       />
 
       {/* Add to Home Screen Popup */}

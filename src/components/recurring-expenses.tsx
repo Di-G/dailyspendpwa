@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { getCategories, getRecurringExpensesWithCategories, createRecurringExpense, updateRecurringExpense, deleteRecurringExpense, toggleRecurringExpense } from "@/lib/localStorage";
 import { InsertRecurringExpense, RecurringExpenseWithCategory, Category } from "@shared/schema";
 import { formatDate } from "@/lib/date-utils";
@@ -29,6 +30,7 @@ interface RecurringExpensesProps {
 }
 
 export default function RecurringExpenses({ currency, isFriendMode = false, friendData }: RecurringExpensesProps) {
+  const { user } = useAuth();
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpenseWithCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -59,8 +61,8 @@ export default function RecurringExpenses({ currency, isFriendMode = false, frie
   }, [isFriendMode]);
 
   const loadData = () => {
-    setCategories(getCategories());
-    setRecurringExpenses(getRecurringExpensesWithCategories());
+    setCategories(getCategories(user?.uid));
+    setRecurringExpenses(getRecurringExpensesWithCategories(user?.uid));
   };
 
   // Friend mode data processing
@@ -114,13 +116,13 @@ export default function RecurringExpenses({ currency, isFriendMode = false, frie
 
     try {
       if (editingId) {
-        updateRecurringExpense(editingId, formData);
+        updateRecurringExpense(editingId, formData, user?.uid);
         toast({
           title: "Success",
           description: "Recurring expense updated successfully.",
         });
       } else {
-        createRecurringExpense(formData);
+        createRecurringExpense(formData, user?.uid);
         toast({
           title: "Success",
           description: "Recurring expense created successfully.",
@@ -159,7 +161,7 @@ export default function RecurringExpenses({ currency, isFriendMode = false, frie
   };
 
   const handleToggle = (id: string) => {
-    toggleRecurringExpense(id);
+    toggleRecurringExpense(id, user?.uid);
     loadData();
   };
 
@@ -428,7 +430,7 @@ export default function RecurringExpenses({ currency, isFriendMode = false, frie
             <AlertDialogAction
               onClick={() => {
                 if (pendingDeleteId) {
-                  deleteRecurringExpense(pendingDeleteId);
+                  deleteRecurringExpense(pendingDeleteId, user?.uid);
                   loadData();
                   resetForm();
                   toast({ title: "Success", description: "Recurring expense deleted successfully." });

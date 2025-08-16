@@ -10,6 +10,7 @@ import { insertCategorySchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { createCategory, deleteCategory } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { Plus, Trash2 } from "lucide-react";
 import type { Category } from "@shared/schema";
 
@@ -28,6 +29,7 @@ interface CategoryManagementProps {
 }
 
 export default function CategoryManagement({ hideHeader = false }: CategoryManagementProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
   const [customSwatchColor, setCustomSwatchColor] = useState<string>("#000000");
@@ -43,7 +45,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
   const addCategoryMutation = useMutation({
     mutationFn: async (data: any) => {
       try {
-        return createCategory(data);
+        return createCategory(data, user?.uid);
       } catch (error) {
         throw new Error('Failed to create category');
       }
@@ -62,7 +64,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: string) => {
       try {
-        deleteCategory(id);
+        deleteCategory(id, user?.uid);
         return { success: true };
       } catch (error) {
         throw new Error('Failed to delete category');

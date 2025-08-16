@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
 import { useRealtimeSync } from "@/lib/syncClient";
+import { useAuth } from "@/lib/auth";
 import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "@/lib/localStorage";
 import { formatDate } from "@/lib/date-utils";
 // import DataConflictSheet from "@/components/DataConflictSheet";
@@ -29,6 +30,7 @@ function Router() {
 }
 
 function App() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { 
     pendingConflict, 
@@ -53,28 +55,32 @@ function App() {
   // Initialize default categories on app start
   useEffect(() => {
     const initializeApp = async () => {
-      initializeDefaultCategories();
-      // Invalidate categories query to ensure fresh data is loaded
-      await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      if (user?.uid) {
+        initializeDefaultCategories(user.uid);
+        // Invalidate categories query to ensure fresh data is loaded
+        await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      }
     };
     
     initializeApp();
-  }, []);
+  }, [user?.uid]);
 
   // Process recurring expenses for today on app load (once per day) and schedule midnight processing
   useEffect(() => {
     const processTodayIfNeeded = async () => {
+      if (!user?.uid) return;
+      
       const todayStr = formatDate(new Date());
-      const lastProcessed = getLastProcessedDate();
+      const lastProcessed = getLastProcessedDate(user.uid);
       if (lastProcessed !== todayStr) {
-        const added = processRecurringForDate(todayStr);
+        const added = processRecurringForDate(todayStr, user.uid);
         if (added > 0) {
           await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
         }
-        setLastProcessedDate(todayStr);
+        setLastProcessedDate(todayStr, user.uid);
       }
     };
 
@@ -84,25 +90,29 @@ function App() {
       nextMidnight.setHours(24, 0, 0, 0);
       const msUntilMidnight = nextMidnight.getTime() - now.getTime();
       const timeoutId = window.setTimeout(async () => {
+        if (!user?.uid) return;
+        
         const runDate = formatDate(new Date());
-        const added = processRecurringForDate(runDate);
+        const added = processRecurringForDate(runDate, user.uid);
         if (added > 0) {
           await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
         }
-        setLastProcessedDate(runDate);
+        setLastProcessedDate(runDate, user.uid);
         // Schedule the next midnight run
         scheduleMidnightRun();
       }, msUntilMidnight);
       return timeoutId;
     };
 
-    processTodayIfNeeded();
-    const id = scheduleMidnightRun();
-    return () => window.clearTimeout(id);
-  }, []);
+    if (user?.uid) {
+      processTodayIfNeeded();
+      const id = scheduleMidnightRun();
+      return () => window.clearTimeout(id);
+    }
+  }, [user?.uid]);
 
   return (
     <QueryClientProvider client={queryClient}>

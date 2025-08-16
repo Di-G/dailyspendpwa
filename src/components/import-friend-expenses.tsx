@@ -9,6 +9,7 @@ import { CalendarIcon, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenses, createExpense } from "@/lib/localStorage";
 import { formatDate } from "@/lib/date-utils";
+import { useAuth } from "@/lib/auth";
 import { Expense, Friend } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ interface ImportFriendExpensesProps {
 }
 
 export default function ImportFriendExpenses({ friend, friendExpenses, currentDate, trigger }: ImportFriendExpensesProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [importDate, setImportDate] = useState<Date | undefined>(new Date());
@@ -61,7 +63,7 @@ export default function ImportFriendExpenses({ friend, friendExpenses, currentDa
           date: targetDateStr,
         };
         
-        await createExpense(newExpense);
+        await createExpense(newExpense, user?.uid);
         importedCount++;
       }
 

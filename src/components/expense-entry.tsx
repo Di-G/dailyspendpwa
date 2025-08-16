@@ -14,6 +14,7 @@ import { queryClient } from "@/lib/queryClient";
 import { createExpense, deleteExpense, updateExpense, restoreExpense } from "@/lib/localStorage";
 import { getToday, getYesterday, formatDisplayDate, formatDate } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import type { ExpenseWithCategory, Category } from "@shared/schema";
 import { z } from "zod";
@@ -48,6 +49,7 @@ export default function ExpenseEntry({
   friendData,
   selectedFriend
 }: ExpenseEntryProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(getToday());
@@ -121,7 +123,7 @@ export default function ExpenseEntry({
   const addExpenseMutation = useMutation({
     mutationFn: async (data: any) => {
       try {
-        return createExpense(data);
+        return createExpense(data, user?.uid);
       } catch (error) {
         throw new Error('Failed to create expense');
       }
@@ -155,7 +157,7 @@ export default function ExpenseEntry({
           setDeletedExpense(expenseToDelete);
         }
         
-        deleteExpense(id);
+        deleteExpense(id, user?.uid);
         return { success: true };
       } catch (error) {
         throw new Error('Failed to delete expense');
@@ -234,7 +236,7 @@ export default function ExpenseEntry({
   const handleUndo = () => {
     if (deletedExpense) {
       // Restore the expense
-      restoreExpense(deletedExpense);
+      restoreExpense(deletedExpense, user?.uid);
       
       // Clear the undo state
       setDeletedExpense(null);
@@ -256,7 +258,7 @@ export default function ExpenseEntry({
 
   const updateExpenseMutation = useMutation({
     mutationFn: async (payload: { id: string; updates: any }) => {
-      const result = updateExpense(payload.id, payload.updates);
+      const result = updateExpense(payload.id, payload.updates, user?.uid);
       if (!result) throw new Error("Failed to update expense");
       return result;
     },

@@ -25,7 +25,7 @@ export default function FriendSelector({ selectedFriend, onFriendSelect, onFrien
   const [newFriendName, setNewFriendName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const friends = getFriends();
+  const friends = getFriends(user?.uid);
 
   const handleAddFriend = async () => {
     if (!newFriendEmail || !newFriendName) {
@@ -40,7 +40,7 @@ export default function FriendSelector({ selectedFriend, onFriendSelect, onFrien
         userId: newFriendEmail, // This should be the actual user ID in production
         displayName: newFriendName,
         email: newFriendEmail,
-      });
+      }, user?.uid);
       
       setNewFriendEmail("");
       setNewFriendName("");
@@ -78,7 +78,7 @@ export default function FriendSelector({ selectedFriend, onFriendSelect, onFrien
   };
 
   const handleRemoveFriend = (friendId: string) => {
-    removeFriend(friendId);
+    removeFriend(friendId, user?.uid);
     if (selectedFriend?.id === friendId) {
       onFriendSelect(null);
       onFriendDataLoad(null);

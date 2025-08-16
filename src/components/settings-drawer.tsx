@@ -40,10 +40,10 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
   };
 
   const data = useMemo(() => {
-    const categories = getCategories();
-    const expenses = getExpenses();
+    const categories = getCategories(user?.uid);
+    const expenses = getExpenses(user?.uid);
     return { categories, expenses };
-  }, []);
+  }, [user?.uid]);
 
   const buildCsv = () => {
     const { categories, expenses } = data;
@@ -314,7 +314,7 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
                   if (confirm("Are you sure you want to erase all local data? This action cannot be undone.")) {
                     setErasing(true);
                     try {
-                      clearAllData();
+                      clearAllData(user?.uid);
                       toast({ title: "Data Erased", description: "All local data has been erased." });
                       setTimeout(() => window.location.reload(), 800);
                     } catch (error) {

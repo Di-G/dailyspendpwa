@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from "react";
 import { auth } from "@/lib/firebase";
 import {
   onAuthStateChanged,
@@ -11,6 +11,7 @@ import {
   reload,
   type User,
 } from "firebase/auth";
+import { clearAllData } from "./localStorage";
 
 type AuthContextValue = {
   user: User | null;
@@ -36,12 +37,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [emailForSignIn, setEmailForSignIn] = useState<string>(() => localStorage.getItem("dailyspend_emailForSignIn") || "");
+  const previousUserId = useRef<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
+      // Check if this is a different user (account switching)
+      if (u && previousUserId.current && u.uid !== previousUserId.current) {
+        console.log('[Auth] User account switched from', previousUserId.current, 'to', u.uid);
+        // Clear local data from previous user to force fresh start
+        clearAllData(previousUserId.current);
+      }
+      
       setUser(u);
       setDisplayName(u?.displayName || localStorage.getItem("dailyspend_displayName") || "");
       setIsLoading(false);
+      
+      // Update previous user ID
+      if (u) {
+        previousUserId.current = u.uid;
+      } else {
+        previousUserId.current = null;
+      }
     });
     return () => unsub();
   }, []);
@@ -88,6 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOutUser = async () => {
+    // Clear local data for current user before signing out
+    if (user) {
+      clearAllData(user.uid);
+    }
     await signOut(auth);
   };
 
