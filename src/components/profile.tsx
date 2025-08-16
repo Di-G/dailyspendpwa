@@ -72,7 +72,7 @@ export default function Profile() {
           )}
 
           <div className="space-y-2">
-            {user ? (
+            {user && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Signed in as {displayName || user.displayName || "user"} with email {user.email}</p>
                 <div>
