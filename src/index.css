@@ -87,13 +87,86 @@
   * {
     @apply border-border;
   }
-
   body {
-    @apply font-sans antialiased bg-background text-foreground;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-    overscroll-behavior: none;
+    @apply bg-background text-foreground;
   }
+}
+
+/* Screen sliding animations */
+@keyframes slideOutLeft {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-25%) scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(-100%) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes slideOutRight {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(25%) scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(100%) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  0% {
+    transform: translateX(-100%) scale(0.9);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(-25%) scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  0% {
+    transform: translateX(100%) scale(0.9);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(25%) scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slideOutLeft {
+  animation: slideOutLeft 0.3s ease-out forwards;
+}
+
+.animate-slideOutRight {
+  animation: slideOutRight 0.3s ease-out forwards;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.3s ease-out forwards;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out forwards;
 }
 
 /* Fix for bright placeholder text */

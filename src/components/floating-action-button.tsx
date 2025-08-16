@@ -1,13 +1,26 @@
-import { Plus } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffect, useRef, useState } from "react";
+import ImportFriendExpenses from "./import-friend-expenses";
+import { Friend } from "@shared/schema";
+import { formatDate } from "@/lib/date-utils";
 
 interface FloatingActionButtonProps {
   onClick: () => void;
+  isFriendMode?: boolean;
+  selectedFriend?: Friend | null;
+  friendData?: any;
+  currentView?: string;
 }
 
-export default function FloatingActionButton({ onClick }: FloatingActionButtonProps) {
+export default function FloatingActionButton({ 
+  onClick, 
+  isFriendMode = false, 
+  selectedFriend, 
+  friendData,
+  currentView 
+}: FloatingActionButtonProps) {
   const isMobile = useIsMobile();
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -91,6 +104,32 @@ export default function FloatingActionButton({ onClick }: FloatingActionButtonPr
   const style = position
     ? { left: `${position.left}px`, top: `${position.top}px`, touchAction: "none" as const }
     : { touchAction: "none" as const };
+
+  // In friend mode, show import dialog instead of regular add expense
+  if (isFriendMode && selectedFriend && friendData && friendData.expenses) {
+    return (
+      <div
+        ref={containerRef}
+        className={`${commonClass} ${position ? "" : centeredClass}`}
+        style={style}
+        onPointerDown={handlePointerDown}
+      >
+        <ImportFriendExpenses
+          friend={selectedFriend}
+          friendExpenses={friendData.expenses || []}
+          currentDate={currentView === "entry" ? formatDate(new Date()) : ""}
+          trigger={
+            <Button
+              size="lg"
+              className="w-20 h-20 rounded-full bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <Download className="w-10 h-10" />
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div

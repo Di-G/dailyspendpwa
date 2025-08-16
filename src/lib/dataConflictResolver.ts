@@ -1,5 +1,5 @@
-import { Category, Expense, RecurringExpense } from "@shared/schema";
-import { getCategories, getExpenses, getRecurringExpenses } from "./localStorage";
+import { Category, Expense, RecurringExpense, Friend } from "@shared/schema";
+import { getCategories, getExpenses, getRecurringExpenses, getFriends } from "./localStorage";
 
 export type DataConflict = {
   hasLocalData: boolean;
@@ -8,16 +8,19 @@ export type DataConflict = {
     categories: boolean;
     expenses: boolean;
     recurring: boolean;
+    friends: boolean;
   };
   localData: {
     categories: Category[];
     expenses: Expense[];
     recurring: RecurringExpense[];
+    friends: Friend[];
   };
   onlineData: {
     categories: Category[];
     expenses: Expense[];
     recurring: RecurringExpense[];
+    friends: Friend[];
   };
 };
 
@@ -27,23 +30,24 @@ export type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online
  * Analyzes data conflicts between local and online storage
  */
 export function analyzeDataConflicts(
-  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] },
-  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } | null
+  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] },
+  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] } | null
 ): DataConflict {
-  const hasLocalData = localData.categories.length > 0 || localData.expenses.length > 0 || localData.recurring.length > 0;
+  const hasLocalData = localData.categories.length > 0 || localData.expenses.length > 0 || localData.recurring.length > 0 || localData.friends.length > 0;
   const hasOnlineData = onlineData !== null && (
     (onlineData.categories && onlineData.categories.length > 0) ||
     (onlineData.expenses && onlineData.expenses.length > 0) ||
-    (onlineData.recurring && onlineData.recurring.length > 0)
+    (onlineData.recurring && onlineData.recurring.length > 0) ||
+    (onlineData.friends && onlineData.friends.length > 0)
   );
 
   if (!hasLocalData || !hasOnlineData) {
     return {
       hasLocalData,
       hasOnlineData: !!hasOnlineData,
-      conflicts: { categories: false, expenses: false, recurring: false },
+      conflicts: { categories: false, expenses: false, recurring: false, friends: false },
       localData,
-      onlineData: onlineData || { categories: [], expenses: [], recurring: [] }
+      onlineData: onlineData || { categories: [], expenses: [], recurring: [], friends: [] }
     };
   }
 
@@ -51,6 +55,7 @@ export function analyzeDataConflicts(
   const categoriesConflict = !areArraysEqual(localData.categories, onlineData.categories || []);
   const expensesConflict = !areArraysEqual(localData.expenses, onlineData.expenses || []);
   const recurringConflict = !areArraysEqual(localData.recurring, onlineData.recurring || []);
+  const friendsConflict = !areArraysEqual(localData.friends, onlineData.friends || []);
 
   return {
     hasLocalData,
@@ -58,10 +63,11 @@ export function analyzeDataConflicts(
     conflicts: {
       categories: categoriesConflict,
       expenses: expensesConflict,
-      recurring: recurringConflict
+      recurring: recurringConflict,
+      friends: friendsConflict
     },
     localData,
-    onlineData: onlineData || { categories: [], expenses: [], recurring: [] }
+    onlineData: onlineData || { categories: [], expenses: [], recurring: [], friends: [] }
   };
 }
 
@@ -69,9 +75,9 @@ export function analyzeDataConflicts(
  * Merges local and online data, preferring the most recent version of each item
  */
 export function mergeData(
-  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] },
-  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }
-): { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } {
+  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] },
+  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] }
+): { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] } {
   // Merge categories - prefer the one with the latest createdAt
   const mergedCategories = mergeArraysByTimestamp(
     localData.categories,
@@ -93,10 +99,18 @@ export function mergeData(
     'createdAt'
   );
 
+  // Merge friends - prefer the one with the latest addedAt
+  const mergedFriends = mergeArraysByTimestamp(
+    localData.friends.map(f => ({ ...f, createdAt: f.addedAt })),
+    (onlineData.friends || []).map(f => ({ ...f, createdAt: f.addedAt })),
+    'createdAt'
+  ).map(f => ({ ...f, addedAt: f.createdAt, createdAt: undefined })) as Friend[];
+
   return {
     categories: mergedCategories,
     expenses: mergedExpenses,
-    recurring: mergedRecurring
+    recurring: mergedRecurring,
+    friends: mergedFriends
   };
 }
 
@@ -105,9 +119,9 @@ export function mergeData(
  */
 export function applyConflictResolution(
   resolution: ConflictResolution,
-  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] },
-  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } | null
-): { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } {
+  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] },
+  onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] } | null
+): { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] } {
   switch (resolution) {
     case 'merge':
       if (!onlineData) return localData;
@@ -197,6 +211,7 @@ export function getCurrentLocalData() {
   return {
     categories: getCategories(),
     expenses: getExpenses(),
-    recurring: getRecurringExpenses()
+    recurring: getRecurringExpenses(),
+    friends: getFriends()
   };
 }

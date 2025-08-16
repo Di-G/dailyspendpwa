@@ -19,9 +19,11 @@ declare global {
 
 interface ChartsViewProps {
   currency: "USD" | "INR";
+  isFriendMode?: boolean;
+  friendData?: any;
 }
 
-export default function ChartsView({ currency }: ChartsViewProps) {
+export default function ChartsView({ currency, isFriendMode = false, friendData }: ChartsViewProps) {
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [chartsReady, setChartsReady] = useState(false);
   const pieChartRef = useRef<HTMLCanvasElement>(null);
@@ -38,22 +40,50 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   // Queries
   const { data: categoryTotals = [] } = useQuery<Array<{ categoryId: string; total: number; category: Category }>>({
     queryKey: ["/api/analytics/category-totals", { date: selectedDate }],
+    enabled: !isFriendMode, // Only query local data when not in friend mode
   });
 
   const { data: dailyTotal = { total: 0 } } = useQuery<{ total: number }>({
     queryKey: ["/api/analytics/daily-total", { date: selectedDate }],
+    enabled: !isFriendMode,
   });
 
   // Get real weekly data
   const { data: weeklyTotals = [] } = useQuery<Array<{ date: string; total: number }>>({
     queryKey: ["/api/analytics/weekly-totals", { date: selectedDate }],
+    enabled: !isFriendMode,
   });
 
   // Get monthly data for current month
   const selectedMonth = new Date(selectedDate);
   const { data: monthlyTotals = [] } = useQuery<Array<{ date: string; total: number }>>({
     queryKey: ["/api/analytics/monthly-totals", { year: selectedMonth.getFullYear(), month: selectedMonth.getMonth() + 1 }],
+    enabled: !isFriendMode,
   });
+
+  // Friend mode data processing
+  const friendCategoryTotals = isFriendMode && friendData?.expenses 
+    ? Object.values(friendData.expenses.reduce((acc: any, expense: any) => {
+        if (expense.date === selectedDate) {
+          const categoryId = expense.categoryId || 'uncategorized';
+          if (!acc[categoryId]) {
+            acc[categoryId] = { categoryId, total: 0, category: null };
+          }
+          acc[categoryId].total += parseFloat(expense.amount);
+        }
+        return acc;
+      }, {}))
+    : [];
+
+  const friendDailyTotal = isFriendMode && friendData?.expenses
+    ? friendData.expenses
+        .filter((expense: any) => expense.date === selectedDate)
+        .reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0)
+    : 0;
+
+  // Use friend data when in friend mode
+  const categoryTotalsData = isFriendMode ? friendCategoryTotals : categoryTotals;
+  const dailyTotalData = isFriendMode ? friendDailyTotal : dailyTotal.total;
 
   // Generate last 7 days from selected date
   const getLast7Days = (date: string) => {
@@ -129,15 +159,15 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     const colorMutedForeground = css.getPropertyValue('--muted-foreground').trim() || '#6b7280';
 
     // Pie Chart - only render if we have category data
-    if (pieChartRef.current && categoryTotals.length > 0) {
+    if (pieChartRef.current && categoryTotalsData.length > 0) {
       const ctx = pieChartRef.current.getContext('2d');
       pieChartInstance.current = new window.Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: categoryTotals.map(ct => ct.category.name),
+          labels: categoryTotalsData.map(ct => ct.category.name),
           datasets: [{
-            data: categoryTotals.map(ct => ct.total),
-            backgroundColor: categoryTotals.map(ct => ct.category.color),
+            data: categoryTotalsData.map(ct => ct.total),
+            backgroundColor: categoryTotalsData.map(ct => ct.category.color),
             borderWidth: 0,
             borderColor: 'transparent'
           }]
@@ -247,7 +277,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     }
 
     setChartsReady(chartsInitialized);
-  }, [categoryTotals, weeklyData, weeklyLabels, currency, weeklyDays]);
+  }, [categoryTotalsData, weeklyData, weeklyLabels, currency, weeklyDays]);
 
   // Reset weekly chart offset when date changes
   useEffect(() => {
@@ -260,7 +290,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       initializeCharts();
     }, 100);
     return () => clearTimeout(timer);
-  }, [categoryTotals, weeklyData, weeklyLabels, initializeCharts]);
+  }, [categoryTotalsData, weeklyData, weeklyLabels, initializeCharts]);
 
   // Check if Chart.js is available and initialize on mount
   useEffect(() => {
@@ -389,7 +419,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     initializeCharts();
   }, [initializeCharts]);
 
-  const totalExpense = categoryTotals.reduce((sum, ct) => sum + ct.total, 0);
+  const totalExpense = categoryTotalsData.reduce((sum, ct) => sum + ct.total, 0);
   
   // Calculate real monthly statistics
   const monthlyHighest = monthlyTotals.length > 0 ? Math.max(...monthlyTotals.map(mt => mt.total)) : 0;
@@ -435,7 +465,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Category Distribution</h3>
             <div className="relative h-48 sm:h-64">
-              {categoryTotals.length === 0 ? (
+              {categoryTotalsData.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <div className="text-center">
                     <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
@@ -447,9 +477,9 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 <canvas ref={pieChartRef} className="w-full h-full"></canvas>
               )}
             </div>
-            {categoryTotals.length > 0 && (
+            {categoryTotalsData.length > 0 && (
               <div className="mt-4 space-y-2">
-                {categoryTotals.map((ct) => {
+                {categoryTotalsData.map((ct) => {
                   const percentage = totalExpense > 0 ? Math.round((ct.total / totalExpense) * 100) : 0;
                   return (
                     <div key={ct.categoryId} className="flex items-center justify-between text-sm">

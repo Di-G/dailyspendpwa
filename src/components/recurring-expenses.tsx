@@ -24,9 +24,11 @@ import { formatDate } from "@/lib/date-utils";
 
 interface RecurringExpensesProps {
   currency: "USD" | "INR";
+  isFriendMode?: boolean;
+  friendData?: any;
 }
 
-export default function RecurringExpenses({ currency }: RecurringExpensesProps) {
+export default function RecurringExpenses({ currency, isFriendMode = false, friendData }: RecurringExpensesProps) {
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpenseWithCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -51,13 +53,32 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
   } as const;
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!isFriendMode) {
+      loadData();
+    }
+  }, [isFriendMode]);
 
   const loadData = () => {
     setCategories(getCategories());
     setRecurringExpenses(getRecurringExpensesWithCategories());
   };
+
+  // Friend mode data processing
+  useEffect(() => {
+    if (isFriendMode && friendData) {
+      if (friendData.recurring && Array.isArray(friendData.recurring)) {
+        setRecurringExpenses(friendData.recurring);
+      } else {
+        setRecurringExpenses([]);
+      }
+      // For friend mode, we'll use their categories if available
+      if (friendData.categories && Array.isArray(friendData.categories)) {
+        setCategories(friendData.categories);
+      } else {
+        setCategories([]);
+      }
+    }
+  }, [isFriendMode, friendData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,20 +230,41 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
-          <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
+          <h2 className="text-2xl font-bold text-foreground">
+            {isFriendMode ? `${friendData?.displayName || 'Friend'}'s Recurring Expenses` : 'Recurring Expenses'}
+          </h2>
+          <p className="text-muted-foreground">
+            {isFriendMode 
+              ? `View ${friendData?.displayName || 'your friend'}'s recurring expenses and subscriptions`
+              : 'Manage your recurring expenses and subscriptions'
+            }
+          </p>
         </div>
-        <Button
-          onClick={() => setIsAddingNew(true)}
-          aria-label="Add Recurring"
-          className="bg-primary hover:bg-blue-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
-        >
-          <Plus className="w-5 h-5" />
-        </Button>
+        {!isFriendMode && (
+          <Button
+            onClick={() => setIsAddingNew(true)}
+            aria-label="Add Recurring"
+            className="bg-primary hover:bg-blue-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
+          >
+            <Plus className="w-5 h-5" />
+          </Button>
+        )}
       </div>
 
-      {/* Add/Edit Form */}
-      {isAddingNew && (
+      {/* Friend mode info */}
+      {isFriendMode && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 text-muted-foreground">
+              <span>• Recurring expenses are read-only</span>
+              <span>• Use the + button to import expenses</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add/Edit Form - Hidden in friend mode */}
+      {!isFriendMode && isAddingNew && (
         <Card>
           <CardHeader>
             <CardTitle>
@@ -410,7 +452,12 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
             <CardContent className="p-8 text-center">
               <Repeat className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <h4 className="text-lg font-medium text-foreground mb-2">No Recurring Expenses</h4>
-              <p className="text-muted-foreground">Create your first recurring expense to get started.</p>
+              <p className="text-muted-foreground">
+                {isFriendMode 
+                  ? `${friendData?.displayName || 'Your friend'} has no recurring expenses yet.`
+                  : 'Create your first recurring expense to get started.'
+                }
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -467,20 +514,23 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2 ml-4 shrink-0">
-                      <Switch
-                        checked={expense.isActive}
-                        onCheckedChange={() => handleToggle(expense.id)}
-                      />
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(expense)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {/* Edit/Delete controls - Hidden in friend mode */}
+                    {!isFriendMode && (
+                      <div className="flex items-center space-x-2 ml-4 shrink-0">
+                        <Switch
+                          checked={expense.isActive}
+                          onCheckedChange={() => handleToggle(expense.id)}
+                        />
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(expense)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

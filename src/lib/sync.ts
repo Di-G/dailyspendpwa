@@ -5,6 +5,7 @@ type SyncPayload = {
   categories: unknown;
   expenses: unknown;
   recurring: unknown;
+  friends: unknown;
   updatedAt?: unknown;
 };
 
@@ -23,6 +24,18 @@ export async function uploadAllForUser(userId: string, payload: SyncPayload): Pr
 export async function markUpdated(userId: string): Promise<void> {
   const ref = doc(db, "users", userId);
   await updateDoc(ref, { updatedAt: serverTimestamp() });
+}
+
+export async function downloadFriendData(friendUserId: string): Promise<SyncPayload | null> {
+  const ref = doc(db, "users", friendUserId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  return snap.data() as SyncPayload;
+}
+
+export async function uploadFriendsForUser(userId: string, friends: unknown): Promise<void> {
+  const ref = doc(db, "users", userId);
+  await updateDoc(ref, { friends, updatedAt: serverTimestamp() });
 }
 
 

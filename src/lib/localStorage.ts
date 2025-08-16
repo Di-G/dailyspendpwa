@@ -1,4 +1,4 @@
-import { Category, Expense, RecurringExpense, InsertCategory, InsertExpense, InsertRecurringExpense, ExpenseWithCategory, RecurringExpenseWithCategory } from "@shared/schema";
+import { Category, Expense, RecurringExpense, InsertCategory, InsertExpense, InsertRecurringExpense, ExpenseWithCategory, RecurringExpenseWithCategory, Friend, InsertFriend } from "@shared/schema";
 import { formatDate } from "./date-utils";
 import { emitDataChanged } from "./syncBridge";
 
@@ -7,6 +7,7 @@ const CATEGORIES_KEY = 'dailyspend_categories';
 const EXPENSES_KEY = 'dailyspend_expenses';
 const RECURRING_EXPENSES_KEY = 'dailyspend_recurring_expenses';
 const LAST_PROCESSED_DATE_KEY = 'dailyspend_last_processed_date';
+const FRIENDS_KEY = 'dailyspend_friends';
 
 // Helper functions
 const generateId = (): string => {
@@ -466,15 +467,57 @@ export const initializeDefaultCategories = (): void => {
 export const updateAllData = (
   categories: Category[],
   expenses: Expense[],
-  recurring: RecurringExpense[]
+  recurring: RecurringExpense[],
+  friends?: Friend[]
 ): void => {
   try {
     setToStorage(CATEGORIES_KEY, categories);
     setToStorage(EXPENSES_KEY, expenses);
     setToStorage(RECURRING_EXPENSES_KEY, recurring);
+    if (friends !== undefined) {
+      setToStorage(FRIENDS_KEY, friends);
+    }
     emitDataChanged();
   } catch (error) {
     console.error('Error updating all data:', error);
     throw error;
   }
+};
+
+// Friends
+export const getFriends = (): Friend[] => {
+  return getFromStorage<Friend[]>(FRIENDS_KEY, []);
+};
+
+export const addFriend = (data: InsertFriend): Friend => {
+  const friends = getFriends();
+  const newFriend: Friend = {
+    id: generateId(),
+    userId: data.userId,
+    displayName: data.displayName,
+    email: data.email,
+    addedAt: new Date().toISOString(),
+    isActive: true,
+  };
+  
+  const updatedFriends = [...friends, newFriend];
+  setToStorage(FRIENDS_KEY, updatedFriends);
+  emitDataChanged();
+  return newFriend;
+};
+
+export const removeFriend = (id: string): void => {
+  const friends = getFriends();
+  const updatedFriends = friends.filter(friend => friend.id !== id);
+  setToStorage(FRIENDS_KEY, updatedFriends);
+  emitDataChanged();
+};
+
+export const updateFriend = (id: string, updates: Partial<Friend>): void => {
+  const friends = getFriends();
+  const updatedFriends = friends.map(friend => 
+    friend.id === id ? { ...friend, ...updates } : friend
+  );
+  setToStorage(FRIENDS_KEY, updatedFriends);
+  emitDataChanged();
 };

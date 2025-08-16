@@ -10,9 +10,11 @@ import type { RecurringExpense, ExpenseWithCategory } from "@shared/schema";
 
 interface CalendarViewProps {
   currency: "USD" | "INR";
+  isFriendMode?: boolean;
+  friendData?: any;
 }
 
-export default function CalendarView({ currency }: CalendarViewProps) {
+export default function CalendarView({ currency, isFriendMode = false, friendData }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const today = getToday();
   const isMobile = useIsMobile();
@@ -22,35 +24,59 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   const monthInfo = getMonthInfo(currentDate);
   const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
 
-  // Query for monthly totals
+  // Query for monthly totals - disabled in friend mode
   const { data: monthlyTotals = [] } = useQuery<Array<{ date: string; total: number }>>({
     queryKey: ["/api/analytics/monthly-totals", { year: monthInfo.year, month: monthInfo.month }],
+    enabled: !isFriendMode,
   });
 
-  // Get recurring expenses for the month
-  const recurringExpenses = getRecurringExpenses();
+  // Get recurring expenses for the month - disabled in friend mode
+  const recurringExpenses = isFriendMode ? [] : getRecurringExpenses();
 
   const CURRENCIES = {
     USD: { symbol: "$" },
     INR: { symbol: "₹" }
   } as const;
 
-  // Expenses for the clicked date
+  // Expenses for the clicked date - disabled in friend mode
   const { data: previewExpenses = [] } = useQuery<ExpenseWithCategory[]>({
     queryKey: ["/api/expenses", previewDate ? { date: previewDate } : {}],
-    enabled: !!previewDate,
+    enabled: !!previewDate && !isFriendMode,
   });
+
+  // Friend mode data processing
+  const friendMonthlyTotals = isFriendMode && friendData?.expenses
+    ? Object.values(friendData.expenses.reduce((acc: any, expense: any) => {
+        const expenseMonth = new Date(expense.date);
+        if (expenseMonth.getFullYear() === monthInfo.year && expenseMonth.getMonth() + 1 === monthInfo.month) {
+          const dateStr = expense.date;
+          if (!acc[dateStr]) {
+            acc[dateStr] = { date: dateStr, total: 0 };
+          }
+          acc[dateStr].total += parseFloat(expense.amount);
+        }
+        return acc;
+      }, {}))
+    : [];
+
+  const friendPreviewExpenses = isFriendMode && friendData?.expenses && previewDate
+    ? friendData.expenses.filter((expense: any) => expense.date === previewDate)
+    : [];
+
+  // Use friend data when in friend mode
+  const monthlyTotalsData = isFriendMode ? friendMonthlyTotals : monthlyTotals;
+  const previewExpensesData = isFriendMode ? friendPreviewExpenses : previewExpenses;
 
   // Determine which recurring items are not yet present in the expense list for the selected date
   const missingRecurringItems = previewItems.filter((item) =>
-    !previewExpenses.some((exp) => exp.name === item.name && exp.amount === item.amount)
+    !previewExpensesData.some((exp) => exp.name === item.name && exp.amount === item.amount)
   );
 
   // Build a combined preview list: existing expenses + missing recurring items
   const combinedPreviewItems = (
     previewDate
       ? [
-          ...previewExpenses.map(exp => ({
+          ...previewExpensesData.map(exp => ({
             key: exp.id,
             name: exp.name,
             amount: exp.amount,
@@ -67,7 +93,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   );
 
   const getTotalForDate = (dateString: string) => {
-    const total = monthlyTotals.find(mt => mt.date === dateString);
+    const total = monthlyTotalsData.find(mt => mt.date === dateString);
     return total ? total.total : 0;
   };
 

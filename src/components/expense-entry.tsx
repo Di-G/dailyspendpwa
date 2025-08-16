@@ -34,9 +34,20 @@ interface ExpenseEntryProps {
   setCurrency: (currency: CurrencyCode) => void;
   focusAmountTrigger?: number | null;
   onFocusAmountConsumed?: () => void;
+  isFriendMode?: boolean;
+  friendData?: any;
+  selectedFriend?: any;
 }
 
-export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger, onFocusAmountConsumed }: ExpenseEntryProps) {
+export default function ExpenseEntry({ 
+  currency, 
+  setCurrency, 
+  focusAmountTrigger, 
+  onFocusAmountConsumed,
+  isFriendMode = false,
+  friendData,
+  selectedFriend
+}: ExpenseEntryProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(getToday());
@@ -60,21 +71,51 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
     staleTime: 0, // Always fetch fresh data
   });
 
+  // In friend mode, use friend's data instead of local data
   const { data: selectedDateExpenses = [] } = useQuery<ExpenseWithCategory[]>({
     queryKey: ["/api/expenses", { date: selectedDate }],
+    enabled: !isFriendMode, // Only query local data when not in friend mode
   });
 
   const { data: selectedDateTotal = { total: 0 } } = useQuery<{ total: number }>({
     queryKey: ["/api/analytics/daily-total", { date: selectedDate }],
+    enabled: !isFriendMode,
   });
 
   const { data: yesterdayTotal = { total: 0 } } = useQuery<{ total: number }>({
     queryKey: ["/api/analytics/daily-total", { date: yesterday }],
+    enabled: !isFriendMode,
   });
 
   const { data: categoryTotals = [] } = useQuery<Array<{ categoryId: string; total: number; category: Category }>>({
     queryKey: ["/api/analytics/category-totals", { date: selectedDate }],
+    enabled: !isFriendMode,
   });
+
+  // Friend mode data
+  const friendExpenses = isFriendMode && friendData?.expenses 
+    ? friendData.expenses.filter((expense: any) => expense.date === selectedDate)
+    : [];
+  
+  const friendTotal = isFriendMode && friendExpenses.length > 0
+    ? friendExpenses.reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0)
+    : 0;
+
+  const friendCategoryTotals = isFriendMode && friendExpenses.length > 0
+    ? Object.values(friendExpenses.reduce((acc: any, expense: any) => {
+        const categoryId = expense.categoryId || 'uncategorized';
+        if (!acc[categoryId]) {
+          acc[categoryId] = { categoryId, total: 0, category: null };
+        }
+        acc[categoryId].total += parseFloat(expense.amount);
+        return acc;
+      }, {}))
+    : [];
+
+  // Use friend data when in friend mode
+  const expenses = isFriendMode ? friendExpenses : selectedDateExpenses;
+  const total = isFriendMode ? friendTotal : selectedDateTotal.total;
+  const categoryTotalsData = isFriendMode ? friendCategoryTotals : categoryTotals;
 
   // Mutations
   const addExpenseMutation = useMutation({
@@ -375,7 +416,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
               </div>
             ) : (
               categories.map((category) => {
-                const categoryTotal = categoryTotals.find(ct => ct.categoryId === category.id);
+                const categoryTotal = categoryTotalsData.find(ct => ct.categoryId === category.id);
                 return (
                   <div
                     key={category.id}
@@ -402,180 +443,221 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Add Expense Form */}
-        <div className="lg:col-span-2" ref={addExpenseSectionRef}>
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Add New Expense</h3>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Amount ({CURRENCIES[currency].symbol})</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              {...field}
-                              ref={(el) => {
-                                field.ref(el);
-                                amountInputRef.current = el;
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Expense Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Lunch at cafe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="categoryId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categoriesLoading ? (
-                              <SelectItem value="loading" disabled>
-                                Loading categories...
-                              </SelectItem>
-                            ) : categories.length === 0 ? (
-                              <SelectItem value="no-categories" disabled>
-                                No categories available
-                              </SelectItem>
-                            ) : (
-                              categories.map((category) => (
-                                <SelectItem key={category.id} value={category.id}>
-                                  <div className="flex items-center">
-                                    <div
-                                      className="w-3 h-3 rounded-full mr-2"
-                                      style={{ backgroundColor: category.color }}
-                                    ></div>
-                                    {category.name}
-                                  </div>
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="space-y-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setShowAddDetails(!showAddDetails)}
-                      className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal"
-                    >
-                      <span className="text-sm">Additional Details (Optional)</span>
-                    </Button>
-                    {showAddDetails && (
+        {/* Add Expense Form - Hidden in friend mode */}
+        {!isFriendMode && (
+          <div className="lg:col-span-2" ref={addExpenseSectionRef}>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-4">Add New Expense</h3>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="details"
+                        name="amount"
                         render={({ field }) => (
                           <FormItem>
+                            <FormLabel>Amount ({CURRENCIES[currency].symbol})</FormLabel>
                             <FormControl>
-                              <Textarea
-                                placeholder="Add any additional notes about this expense..."
-                                rows={3}
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
                                 {...field}
-                                className="transition-all duration-200 ease-in-out"
+                                ref={(el) => {
+                                  field.ref(el);
+                                  amountInputRef.current = el;
+                                }}
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    )}
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full bg-primary hover:bg-blue-700 transition duration-200"
-                    disabled={addExpenseMutation.isPending}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Expense Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Lunch at cafe" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {categoriesLoading ? (
+                                <SelectItem value="loading" disabled>
+                                  Loading categories...
+                                </SelectItem>
+                              ) : categories.length === 0 ? (
+                                <SelectItem value="no-categories" disabled>
+                                  No categories available
+                                </SelectItem>
+                              ) : (
+                                categories.map((category) => (
+                                  <SelectItem key={category.id} value={category.id}>
+                                    <div className="flex items-center">
+                                      <div
+                                        className="w-3 h-3 rounded-full mr-2"
+                                        style={{ backgroundColor: category.color }}
+                                      ></div>
+                                      {category.name}
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setShowAddDetails(!showAddDetails)}
+                        className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal"
+                      >
+                        <span className="text-sm">Additional Details (Optional)</span>
+                      </Button>
+                      {showAddDetails && (
+                        <FormField
+                          control={form.control}
+                          name="details"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Add any additional notes about this expense..."
+                                  rows={3}
+                                  {...field}
+                                  className="transition-all duration-200 ease-in-out"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full bg-primary hover:bg-blue-700 transition duration-200"
+                      disabled={addExpenseMutation.isPending}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Friend mode info card */}
+        {isFriendMode && (
+          <div className="lg:col-span-2">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                  Viewing {selectedFriend?.displayName || 'Friend'}'s Expenses
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  You can view {selectedFriend?.displayName || 'your friend'}'s expenses for different dates. Use the calendar to navigate between dates.
+                </p>
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <span>• Expenses are read-only</span>
+                  <span>• Use the + button to import expenses</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Settings removed from home. Manage categories moved to Settings drawer. */}
       </div>
 
       {/* Selected Date Expenses List */}
       <Card>
-            <div className="p-4 sm:p-6 border-b border">
-              <h3 className="text-lg font-semibold text-foreground">
-                {selectedDate === today ? "Today's Expense List" : "Expense list"}
-              </h3>
-              {selectedDate !== today && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
-                </p>
-              )}
-            </div>
+        <div className="p-4 sm:p-6 border-b border">
+          <h3 className="text-lg font-semibold text-foreground">
+            {isFriendMode 
+              ? `${selectedFriend?.displayName || 'Friend'}'s ${selectedDate === today ? "Today's" : ""} Expense List`
+              : selectedDate === today ? "Today's Expense List" : "Expense list"
+            }
+          </h3>
+          {selectedDate !== today && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+            </p>
+          )}
+        </div>
         <CardContent className="p-4 sm:p-6">
-          {selectedDateExpenses.length === 0 ? (
+          {expenses.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>No expenses added for this date. Start by adding your first expense above.</p>
+              <p>
+                {isFriendMode 
+                  ? `${selectedFriend?.displayName || 'Your friend'} has no expenses for this date.`
+                  : "No expenses added for this date. Start by adding your first expense above."
+                }
+              </p>
             </div>
           ) : (
             <div className="rounded-lg overflow-hidden">
-              {selectedDateExpenses.map((expense) => (
-                <button
+              {expenses.map((expense) => (
+                <div
                   key={expense.id}
-                  className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors hover:bg-muted/30"
-                  onClick={() => openEdit(expense)}
+                  className="w-full text-left p-4 border-b border last:border-b-0 hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex items-center justify-between p-3 sm:p-4">
-                    <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 border"
-                        style={{ backgroundColor: expense.category?.color || "#9ca3af", borderColor: (expense.category?.color || "#9ca3af") + "55" }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground truncate">{expense.name}</p>
-                        {expense.details && (
-                          <p className="text-xs sm:text-sm text-muted-foreground whitespace-normal break-words">{expense.details}</p>
+                  {/* Expense content - non-editable in friend mode */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h4 className="font-medium text-foreground truncate">{expense.name}</h4>
+                        {expense.category && (
+                          <span
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: `${expense.category.color}20`,
+                              color: expense.category.color,
+                            }}
+                          >
+                            {expense.category.name}
+                          </span>
                         )}
-                        <p className="text-[11px] sm:text-xs text-muted-foreground">{formatTime(expense.createdAt!.toString())}</p>
                       </div>
+                      {expense.details && (
+                        <p className="text-sm text-muted-foreground mb-1">{expense.details}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(expense.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
-                    <div className="flex-shrink-0 ml-3 sm:ml-4">
-                      <span className="font-semibold text-foreground text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
+                    <div className="text-right ml-4">
+                      <p className="text-lg font-semibold text-foreground">
+                        {CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}
+                      </p>
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}

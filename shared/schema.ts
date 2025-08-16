@@ -58,6 +58,22 @@ export const insertRecurringExpenseSchema = z.object({
   endDate: z.string().optional(),
 });
 
+// Friend management schemas
+export const friendSchema = z.object({
+  id: z.string(),
+  userId: z.string(), // The friend's user ID
+  displayName: z.string(),
+  email: z.string(),
+  addedAt: z.string(),
+  isActive: z.boolean(),
+});
+
+export const insertFriendSchema = z.object({
+  userId: z.string().min(1, "User ID is required"),
+  displayName: z.string().min(1, "Display name is required"),
+  email: z.string().email("Valid email is required"),
+});
+
 // TypeScript types
 export type Category = z.infer<typeof categorySchema>;
 export type Expense = z.infer<typeof expenseSchema>;
@@ -65,6 +81,8 @@ export type RecurringExpense = z.infer<typeof recurringExpenseSchema>;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
+export type Friend = z.infer<typeof friendSchema>;
+export type InsertFriend = z.infer<typeof insertFriendSchema>;
 
 // Extended types for frontend
 export type ExpenseWithCategory = Expense & {

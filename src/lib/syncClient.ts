@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { downloadAllForUser, uploadAllForUser } from "@/lib/sync";
-import { getCategories, getExpenses, getRecurringExpenses, updateAllData } from "@/lib/localStorage";
+import { getCategories, getExpenses, getRecurringExpenses, getFriends, updateAllData } from "@/lib/localStorage";
 import { 
   analyzeDataConflicts, 
   applyConflictResolution, 
@@ -31,6 +31,7 @@ export function useRealtimeSync() {
           categories: getCategories(),
           expenses: getExpenses(),
           recurring: getRecurringExpenses(),
+          friends: getFriends(),
         });
       } catch (e) {
         console.error('Background upload failed', e);
@@ -104,7 +105,8 @@ export function useRealtimeSync() {
       updateAllData(
         resolvedData.categories,
         resolvedData.expenses,
-        resolvedData.recurring
+        resolvedData.recurring,
+        resolvedData.friends
       );
       
       // Upload resolved data to cloud

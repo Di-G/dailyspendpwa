@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Plus, ChevronDown } from "lucide-react";
 import ExpenseEntry from "@/components/expense-entry";
 import ChartsView from "@/components/charts-view";
 import CalendarView from "@/components/calendar-view";
@@ -10,23 +10,73 @@ import BottomNavigation from "@/components/bottom-navigation";
 import FloatingActionButton from "@/components/floating-action-button";
 import ThemeToggle from "@/components/theme-toggle";
 import Profile from "@/components/profile";
+import FriendSelector from "@/components/friend-selector";
+import ImportFriendExpenses from "@/components/import-friend-expenses";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import SettingsDrawer from "@/components/settings-drawer";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { queryClient } from "@/lib/queryClient";
+import { Friend } from "@shared/schema";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { getFriends, addFriend, removeFriend } from "@/lib/localStorage";
+import { downloadFriendData } from "@/lib/sync";
+import { useToast } from "@/hooks/use-toast";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
 type CurrencyCode = "USD" | "INR";
+type ExpenseMode = "my" | "friend";
 
 export default function ExpenseTracker() {
   const [currentView, setCurrentView] = useState<ViewType>("entry");
+  const [expenseMode, setExpenseMode] = useState<ExpenseMode>("my");
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [friendData, setFriendData] = useState<any>(null);
   const [currency, setCurrency] = useState<CurrencyCode>(() => {
     const saved = localStorage.getItem("dailyspend_currency") as CurrencyCode | null;
     return saved || "USD";
   });
   const isMobile = useIsMobile();
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [slideProgress, setSlideProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Friend dropdown state
+  const [showFriendDropdown, setShowFriendDropdown] = useState(false);
+  const [isAddingFriend, setIsAddingFriend] = useState(false);
+  const [newFriendEmail, setNewFriendEmail] = useState("");
+  const [newFriendName, setNewFriendName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const friendDropdownRef = useRef<HTMLDivElement>(null);
+  const friendsTabRef = useRef<HTMLButtonElement>(null);
+  const { toast } = useToast();
+
+  const navigationItems = [
+    {
+      id: "entry",
+      label: "Home",
+      icon: "🏠",
+    },
+    {
+      id: "calendar",
+      label: "Calendar",
+      icon: "📅",
+    },
+    {
+      id: "charts",
+      label: "Insights",
+      icon: "📊",
+    },
+    {
+      id: "recurring",
+      label: "Recurring",
+      icon: "🔄",
+    },
+  ];
+
+  // Calculate current index for navigation
+  const currentIndex = navigationItems.findIndex(item => item.id === currentView);
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -47,8 +97,159 @@ export default function ExpenseTracker() {
   });
 
   const handleFabClick = () => {
-    setCurrentView("entry");
+    handleViewChange("entry");
     setFocusAmountTrigger((t) => (t ?? 0) + 1);
+  };
+
+  const handleFriendSelect = (friend: Friend | null) => {
+    setSelectedFriend(friend);
+    if (friend) {
+      setExpenseMode("friend");
+    } else {
+      setExpenseMode("my");
+    }
+  };
+
+  const handleFriendDataLoad = (data: any) => {
+    setFriendData(data);
+  };
+
+  const isFriendMode = expenseMode === "friend" && selectedFriend && friendData;
+
+  const handleTabChange = (value: string) => {
+    if (value === "my") {
+      setExpenseMode("my");
+      setSelectedFriend(null);
+      setFriendData(null);
+    } else if (value === "friend") {
+      setExpenseMode("friend");
+      // Keep existing friend selection if any
+    }
+  };
+
+  const handleViewChange = (view: ViewType) => {
+    // Determine slide direction based on current and new view
+    const viewOrder = ["entry", "calendar", "charts", "recurring"];
+    const currentIndex = viewOrder.indexOf(currentView);
+    const newIndex = viewOrder.indexOf(view);
+    
+    if (newIndex > currentIndex) {
+      // Going forward - slide left
+      setSlideDirection('left');
+      setSlideProgress(1);
+    } else if (newIndex < currentIndex) {
+      // Going backward - slide right
+      setSlideDirection('right');
+      setSlideProgress(1);
+    }
+    
+    // Animate the slide
+    setTimeout(() => {
+      setCurrentView(view);
+      setSlideDirection(null);
+      setSlideProgress(0);
+    }, 300);
+  };
+
+  // Long press functionality for Friends tab
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+
+  const handleFriendsTabMouseDown = () => {
+    const timer = setTimeout(() => {
+      setIsLongPressing(true);
+      setShowFriendDropdown(true);
+    }, 500); // 500ms for long press
+    setLongPressTimer(timer);
+  };
+
+  const handleFriendsTabMouseUp = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    setIsLongPressing(false);
+  };
+
+  const handleFriendsTabClick = () => {
+    if (!isLongPressing) {
+      handleTabChange("friend");
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (friendDropdownRef.current && !friendDropdownRef.current.contains(event.target as Node)) {
+        setShowFriendDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Friend management functions
+  const friends = getFriends();
+  const safeFriends = Array.isArray(friends) ? friends : [];
+
+  const handleAddFriend = async () => {
+    if (!newFriendEmail || !newFriendName) {
+      toast({ title: "Missing information", description: "Please fill in both email and name.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const friend = addFriend({
+        userId: newFriendEmail,
+        displayName: newFriendName,
+        email: newFriendEmail,
+      });
+      
+      setNewFriendEmail("");
+      setNewFriendName("");
+      setIsAddingFriend(false);
+      setShowFriendDropdown(false);
+      
+      toast({ title: "Friend added", description: `${friend.displayName || 'Friend'} has been added to your friends list.` });
+    } catch (error) {
+      toast({ title: "Failed to add friend", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectFriend = async (friend: Friend) => {
+    try {
+      setIsLoading(true);
+      const friendData = await downloadFriendData(friend.userId);
+      if (friendData) {
+        handleFriendSelect(friend);
+        handleFriendDataLoad(friendData);
+        setShowFriendDropdown(false);
+        toast({ title: "Friend data loaded", description: `Viewing ${friend.displayName || 'Friend'}'s expenses.` });
+      } else {
+        handleFriendSelect(friend);
+        handleFriendDataLoad({ expenses: [], categories: [], recurring: [] });
+        setShowFriendDropdown(false);
+        toast({ title: "No data found", description: `${friend.displayName || 'Friend'} doesn't have any data yet.`, variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('Error loading friend data:', error);
+      toast({ title: "Failed to load friend data", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveFriend = (friendId: string) => {
+    removeFriend(friendId);
+    if (selectedFriend?.id === friendId) {
+      handleFriendSelect(null);
+      handleFriendDataLoad(null);
+    }
+    toast({ title: "Friend removed", description: "Friend has been removed from your list." });
   };
 
   return (
@@ -57,7 +258,7 @@ export default function ExpenseTracker() {
       <header className="bg-card shadow-sm border-b border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
-            <div className="flex items-center cursor-pointer" onClick={() => setCurrentView("entry") }>
+            <div className="flex items-center cursor-pointer" onClick={() => handleViewChange("entry") }>
               <Wallet className="text-primary text-2xl mr-3" />
               <h1 className="text-xl font-semibold text-foreground">Daily Spends</h1>
             </div>
@@ -86,20 +287,190 @@ export default function ExpenseTracker() {
         </div>
       </header>
 
+      {/* Expense Mode Tabs */}
+      <div className="bg-card border-b border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-stretch h-16">
+            <div className="flex items-stretch h-16 w-auto">
+              <button
+                onClick={() => handleTabChange("my")}
+                className={`flex flex-col items-center justify-center transition-all duration-200 px-8 ${
+                  expenseMode === "my"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
+              >
+                <Wallet className={`w-5 h-5 mb-1 ${expenseMode === "my" ? "text-white" : "text-gray-600"}`} />
+                <span className={`text-xs font-medium ${expenseMode === "my" ? "text-white" : "text-gray-600"}`}>
+                  My Expenses
+                </span>
+              </button>
+              <div className="relative">
+                <button
+                  ref={friendsTabRef}
+                  onMouseDown={handleFriendsTabMouseDown}
+                  onMouseUp={handleFriendsTabMouseUp}
+                  onMouseLeave={handleFriendsTabMouseUp}
+                  onTouchStart={handleFriendsTabMouseDown}
+                  onTouchEnd={handleFriendsTabMouseUp}
+                  onClick={handleFriendsTabClick}
+                  className={`flex flex-col items-center justify-center transition-all duration-200 px-8 ${
+                    expenseMode === "friend"
+                      ? "bg-primary text-white"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  <Users className={`w-5 h-5 mb-1 ${expenseMode === "friend" ? "text-white" : "text-gray-600"}`} />
+                  <span className={`text-xs font-medium ${expenseMode === "friend" ? "text-white" : "text-gray-600"}`}>
+                    Friends
+                  </span>
+                  <ChevronDown className={`w-3 h-3 mt-1 ${expenseMode === "friend" ? "text-white" : "text-gray-600"}`} />
+                </button>
+                
+                {/* Friend Dropdown */}
+                {showFriendDropdown && (
+                  <div 
+                    ref={friendDropdownRef}
+                    className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                  >
+                    <div className="p-3 border-b border-gray-200">
+                      <h3 className="text-sm font-medium text-gray-900">Friends</h3>
+                    </div>
+                    
+                    {safeFriends.length > 0 ? (
+                      <div className="max-h-48 overflow-y-auto">
+                        {safeFriends.map((friend) => (
+                          <div key={friend.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                            <div className="flex items-center space-x-3">
+                              <Users className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm text-gray-900">{friend.displayName}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSelectFriend(friend)}
+                                disabled={isLoading}
+                              >
+                                Select
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleRemoveFriend(friend.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-3 text-sm text-gray-500 text-center">
+                        No friends added yet
+                      </div>
+                    )}
+                    
+                    <div className="p-3 border-t border-gray-200">
+                      {!isAddingFriend ? (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => setIsAddingFriend(true)}
+                          className="w-full"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add New Friend
+                        </Button>
+                      ) : (
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            placeholder="Friend's name"
+                            value={newFriendName}
+                            onChange={(e) => setNewFriendName(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                          />
+                          <input
+                            type="email"
+                            placeholder="Friend's email"
+                            value={newFriendEmail}
+                            onChange={(e) => setNewFriendEmail(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                          />
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setIsAddingFriend(false)}
+                              className="flex-1"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleAddFriend}
+                              disabled={isLoading}
+                              className="flex-1"
+                            >
+                              {isLoading ? "Adding..." : "Add"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {expenseMode === "my" && (
+            <div className="mt-4 pb-4">
+            </div>
+          )}
+          
+          {expenseMode === "friend" && selectedFriend && (
+            <div className="mt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Viewing {selectedFriend.displayName}'s expenses
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedFriend(null);
+                    setExpenseMode("my");
+                    setFriendData(null);
+                  }}
+                >
+                  Switch to My Data
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Secondary Nav Bar - Only show on desktop */}
       {!isMobile && (
         <div className="bg-card border-b border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center space-x-2 sm:space-x-4 h-12">
               <Button
-                onClick={() => setCurrentView("entry")}
+                onClick={() => handleViewChange("entry")}
                 size="default"
                 className={`${currentView === "entry" ? "bg-primary hover:bg-blue-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
               >
                 Home
               </Button>
               <Button
-                onClick={() => setCurrentView("calendar")}
+                onClick={() => handleViewChange("calendar")}
                 size="default"
                 className={`${currentView === "calendar" ? "bg-primary hover:bg-blue-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
               >
@@ -107,7 +478,7 @@ export default function ExpenseTracker() {
                 Calendar View
               </Button>
               <Button
-                onClick={() => setCurrentView("charts")}
+                onClick={() => handleViewChange("charts")}
                 size="default"
                 className={`${currentView === "charts" ? "bg-secondary hover:bg-green-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
               >
@@ -115,7 +486,7 @@ export default function ExpenseTracker() {
                 Insights
               </Button>
               <Button
-                onClick={() => setCurrentView("recurring")}
+                onClick={() => handleViewChange("recurring")}
                 size="default"
                 className={`${currentView === "recurring" ? "bg-primary hover:bg-blue-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
               >
@@ -128,27 +499,108 @@ export default function ExpenseTracker() {
       )}
 
       {/* Main Content */}
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
+      <div 
+        className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}
+        style={{
+          transform: slideDirection === 'left' 
+            ? `translateX(-${slideProgress * 100}%)` 
+            : slideDirection === 'right' 
+            ? `translateX(${slideProgress * 100}%)` 
+            : 'translateX(0)',
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+          opacity: 1 - (slideProgress * 0.3),
+          scale: 1 - (slideProgress * 0.05),
+        }}
+      >
         {currentView === "entry" && (
           <ExpenseEntry
             currency={currency}
             setCurrency={setCurrency}
             focusAmountTrigger={focusAmountTrigger}
             onFocusAmountConsumed={() => setFocusAmountTrigger(null)}
+            isFriendMode={isFriendMode}
+            friendData={friendData}
+            selectedFriend={selectedFriend}
           />
         )}
-        {currentView === "charts" && <ChartsView currency={currency} />}
-        {currentView === "calendar" && <CalendarView currency={currency} />}
-        {currentView === "recurring" && <RecurringExpenses currency={currency} />}
+        {currentView === "charts" && (
+          <ChartsView 
+            currency={currency} 
+            isFriendMode={isFriendMode}
+            friendData={friendData}
+          />
+        )}
+        {currentView === "calendar" && (
+          <CalendarView 
+            currency={currency} 
+            isFriendMode={isFriendMode}
+            friendData={friendData}
+          />
+        )}
+        {currentView === "recurring" && (
+          <RecurringExpenses 
+            currency={currency} 
+            isFriendMode={isFriendMode}
+            friendData={friendData}
+          />
+        )}
       </div>
+      
+      {/* Next/Previous Screen Preview (underneath) */}
+      {slideProgress > 0.1 && slideDirection && (
+        <div 
+          className="fixed inset-0 z-30 pointer-events-none"
+          style={{
+            transform: slideDirection === 'left' 
+              ? `translateX(${(1 - slideProgress) * 100}%)` 
+              : `translateX(-${(1 - slideProgress) * 100}%)`,
+            transition: 'none',
+          }}
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+            {slideDirection === 'left' && currentIndex < navigationItems.length - 1 && (
+              <div className="bg-background rounded-lg shadow-lg p-6 h-full">
+                <h2 className="text-2xl font-bold text-muted-foreground mb-4">
+                  {navigationItems[currentIndex + 1]?.label}
+                </h2>
+                <p className="text-muted-foreground">
+                  Swipe to reveal {navigationItems[currentIndex + 1]?.label.toLowerCase()} content
+                </p>
+              </div>
+            )}
+            {slideDirection === 'right' && currentIndex > 0 && (
+              <div className="bg-background rounded-lg shadow-lg p-6 h-full">
+                <h2 className="text-2xl font-bold text-muted-foreground mb-4">
+                  {navigationItems[currentIndex - 1]?.label}
+                </h2>
+                <p className="text-muted-foreground">
+                  Swipe to reveal {navigationItems[currentIndex - 1]?.label.toLowerCase()} content
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Button - Mobile only */}
-      <FloatingActionButton onClick={handleFabClick} />
+      <FloatingActionButton 
+        onClick={handleFabClick}
+        isFriendMode={isFriendMode}
+        selectedFriend={selectedFriend}
+        friendData={friendData}
+        currentView={currentView}
+      />
 
       {/* Bottom Navigation - Mobile only */}
       <BottomNavigation
         currentView={currentView}
-        onViewChange={(v) => setCurrentView(v as ViewType)}
+        onViewChange={(v) => handleViewChange(v as ViewType)}
+        onSlideProgress={(progress, direction) => {
+          setSlideProgress(progress);
+          setSlideDirection(direction);
+        }}
+        onSlideStart={() => setIsDragging(true)}
+        onSlideEnd={() => setIsDragging(false)}
       />
 
       {/* Add to Home Screen Popup */}
