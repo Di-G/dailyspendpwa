@@ -12,8 +12,8 @@ type ApiEndpoint = {
 const mockApi: Record<string, ApiEndpoint> = {
   // Categories
   "/api/categories": {
-    GET: () => localStorageService.getCategories(),
-    POST: (data: any) => localStorageService.createCategory(data),
+    GET: (params?: any) => localStorageService.getCategories(params?.userId),
+    POST: (data: any) => localStorageService.createCategory(data, (data as any)?.userId),
     DELETE: (id: string) => localStorageService.deleteCategory(id),
   },
   
@@ -21,38 +21,38 @@ const mockApi: Record<string, ApiEndpoint> = {
   "/api/expenses": {
     GET: (params?: any) => {
       if (params?.date) {
-        return localStorageService.getExpensesByDate(params.date);
+        return localStorageService.getExpensesByDate(params.date, params?.userId);
       } else if (params?.startDate && params?.endDate) {
-        return localStorageService.getExpensesByDateRange(params.startDate, params.endDate);
+        return localStorageService.getExpensesByDateRange(params.startDate, params.endDate, params?.userId);
       } else {
-        return localStorageService.getExpenses();
+        return localStorageService.getExpenses(params?.userId);
       }
     },
-    POST: (data: any) => localStorageService.createExpense(data),
+    POST: (data: any) => localStorageService.createExpense(data, (data as any)?.userId),
     DELETE: (id: string) => localStorageService.deleteExpense(id),
   },
 
   // Expense by id (for update via mock PUT)
   "/api/expenses/update": {
     GET: () => ({}),
-    POST: (data: any) => localStorageService.updateExpense(data.id, data.updates),
+    POST: (data: any) => localStorageService.updateExpense(data.id, data.updates, (data as any)?.userId),
   },
   
   // Analytics
   "/api/analytics/daily-total": {
-    GET: (params: any) => ({ total: localStorageService.getDailyTotal(params.date) }),
+    GET: (params: any) => ({ total: localStorageService.getDailyTotal(params.date, params?.userId) }),
   },
   
   "/api/analytics/category-totals": {
-    GET: (params: any) => localStorageService.getCategoryTotals(params.date),
+    GET: (params: any) => localStorageService.getCategoryTotals(params.date, params?.userId),
   },
   
   "/api/analytics/monthly-totals": {
-    GET: (params: any) => localStorageService.getMonthlyTotals(parseInt(params.year), parseInt(params.month)),
+    GET: (params: any) => localStorageService.getMonthlyTotals(parseInt(params.year), parseInt(params.month), params?.userId),
   },
   
   "/api/analytics/weekly-totals": {
-    GET: (params: any) => localStorageService.getWeeklyTotals(params.date),
+    GET: (params: any) => localStorageService.getWeeklyTotals(params.date, params?.userId),
   },
 };
 

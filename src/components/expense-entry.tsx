@@ -69,28 +69,28 @@ export default function ExpenseEntry({
 
   // Queries
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
+    queryKey: ["/api/categories", { userId: user?.uid }],
     staleTime: 0, // Always fetch fresh data
   });
 
   // In friend mode, use friend's data instead of local data
   const { data: selectedDateExpenses = [] } = useQuery<ExpenseWithCategory[]>({
-    queryKey: ["/api/expenses", { date: selectedDate }],
+    queryKey: ["/api/expenses", { date: selectedDate, userId: user?.uid }],
     enabled: !isFriendMode, // Only query local data when not in friend mode
   });
 
   const { data: selectedDateTotal = { total: 0 } } = useQuery<{ total: number }>({
-    queryKey: ["/api/analytics/daily-total", { date: selectedDate }],
+    queryKey: ["/api/analytics/daily-total", { date: selectedDate, userId: user?.uid }],
     enabled: !isFriendMode,
   });
 
   const { data: yesterdayTotal = { total: 0 } } = useQuery<{ total: number }>({
-    queryKey: ["/api/analytics/daily-total", { date: yesterday }],
+    queryKey: ["/api/analytics/daily-total", { date: yesterday, userId: user?.uid }],
     enabled: !isFriendMode,
   });
 
   const { data: categoryTotals = [] } = useQuery<Array<{ categoryId: string; total: number; category: Category }>>({
-    queryKey: ["/api/analytics/category-totals", { date: selectedDate }],
+    queryKey: ["/api/analytics/category-totals", { date: selectedDate, userId: user?.uid }],
     enabled: !isFriendMode,
   });
 

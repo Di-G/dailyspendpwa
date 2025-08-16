@@ -154,7 +154,7 @@ export default function ExpenseTracker() {
     setFriendData(data);
   };
 
-  const isFriendMode = expenseMode === "friend" && selectedFriend && friendData;
+  const isFriendMode = expenseMode === "friend" && !!selectedFriend && !!friendData;
 
   const handleTabChange = (value: string) => {
     if (value === "my") {
@@ -212,6 +212,7 @@ export default function ExpenseTracker() {
   // Friend management functions
   const friends = getFriends(user?.uid);
   const safeFriends = Array.isArray(friends) ? friends : [];
+  const showFriendOverlay = expenseMode === "friend" && safeFriends.length === 0;
 
   const handleAddFriend = async () => {
     if (!newFriendEmail || !newFriendName) {
@@ -519,40 +520,56 @@ export default function ExpenseTracker() {
       )}
 
       {/* Main Content */}
-      <div 
-        className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}
-      >
-        {currentView === "entry" && (
-          <ExpenseEntry
-            currency={currency}
-            setCurrency={setCurrency}
-            focusAmountTrigger={focusAmountTrigger}
-            onFocusAmountConsumed={() => setFocusAmountTrigger(null)}
-            isFriendMode={isFriendMode}
-            friendData={friendData}
-            selectedFriend={selectedFriend}
-          />
-        )}
-        {currentView === "charts" && (
-          <ChartsView 
-            currency={currency} 
-            isFriendMode={isFriendMode}
-            friendData={friendData}
-          />
-        )}
-        {currentView === "calendar" && (
-          <CalendarView 
-            currency={currency} 
-            isFriendMode={isFriendMode}
-            friendData={friendData}
-          />
-        )}
-        {currentView === "recurring" && (
-          <RecurringExpenses 
-            currency={currency} 
-            isFriendMode={isFriendMode}
-            friendData={friendData}
-          />
+      <div className="relative">
+        <div 
+          className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''} ${showFriendOverlay ? 'blur-sm pointer-events-none select-none' : ''}`}
+        >
+          {currentView === "entry" && (
+            <ExpenseEntry
+              currency={currency}
+              setCurrency={setCurrency}
+              focusAmountTrigger={focusAmountTrigger}
+              onFocusAmountConsumed={() => setFocusAmountTrigger(null)}
+              isFriendMode={isFriendMode}
+              friendData={friendData}
+              selectedFriend={selectedFriend}
+            />
+          )}
+          {currentView === "charts" && (
+            <ChartsView 
+              currency={currency} 
+              isFriendMode={isFriendMode}
+              friendData={friendData}
+            />
+          )}
+          {currentView === "calendar" && (
+            <CalendarView 
+              currency={currency} 
+              isFriendMode={isFriendMode}
+              friendData={friendData}
+            />
+          )}
+          {currentView === "recurring" && (
+            <RecurringExpenses 
+              currency={currency} 
+              isFriendMode={isFriendMode}
+              friendData={friendData}
+            />
+          )}
+        </div>
+
+        {showFriendOverlay && (
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <div className="max-w-md w-full bg-card/90 backdrop-blur rounded-xl border border-muted p-6 text-center shadow-md">
+              <h2 className="text-lg font-semibold text-foreground mb-2">Add a friend to view their expenses</h2>
+              <p className="text-sm text-muted-foreground mb-4">Use the Friends tab menu to add your first friend. Once added, you'll be able to view their expenses in read-only mode.</p>
+              <div className="flex items-center justify-center">
+                <Button onClick={() => setShowFriendDropdown(true)}>
+                  Add Friend
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       
