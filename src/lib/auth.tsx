@@ -347,11 +347,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOutUser = async () => {
-    // Clear local data for current user before signing out
-    if (user) {
-      clearAllData(user.uid);
+    // Proactively clear UI/auth state and local data, then sign out of Firebase
+    const currentUserId = user?.uid;
+    if (currentUserId) {
+      clearAllData(currentUserId);
     }
-    await signOut(auth);
+
+    // Clear protected and stable state to immediately reflect sign-out in UI
+    protectedUserRef.current = null;
+    lastStableUserRef.current = null;
+    lastAuthStateRef.current = null;
+    previousUserId.current = null;
+    setUser(null);
+    setDisplayName("");
+    setIsLoading(false);
+
+    try {
+      await signOut(auth);
+    } catch {
+      // Ignore; UI already reflects signed out state
+    }
   };
 
   const value = useMemo(

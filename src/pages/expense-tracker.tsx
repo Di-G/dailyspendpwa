@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Plus, ChevronDown } from "lucide-react";
 import ExpenseEntry from "@/components/expense-entry";
@@ -15,7 +15,6 @@ import ImportFriendExpenses from "@/components/import-friend-expenses";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import SettingsDrawer from "@/components/settings-drawer";
-import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { queryClient } from "@/lib/queryClient";
 import { Friend } from "@shared/schema";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -29,7 +28,7 @@ type CurrencyCode = "USD" | "INR";
 type ExpenseMode = "my" | "friend";
 
 export default function ExpenseTracker() {
-  const { user, setRefreshingState } = useAuth();
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<ViewType>("entry");
   const [expenseMode, setExpenseMode] = useState<ExpenseMode>("my");
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
@@ -81,60 +80,7 @@ export default function ExpenseTracker() {
   // Calculate current index for navigation
   const currentIndex = navigationItems.findIndex(item => item.id === currentView);
 
-  const handleRefresh = useCallback(async () => {
-    // Prevent multiple simultaneous refresh operations
-    if (queryClient.isFetching()) {
-      return;
-    }
-    
-    // Dispatch global refresh start event
-    window.dispatchEvent(new CustomEvent('dailyspend:refresh-start'));
-    
-    // Protect against auth state changes during refresh
-    setRefreshingState(true);
-    
-    try {
-      await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
-    } catch (error) {
-      console.error('[Refresh] Error during refresh:', error);
-    } finally {
-      // Re-enable auth state changes after refresh
-      setRefreshingState(false);
-      
-      // Dispatch global refresh end event
-      window.dispatchEvent(new CustomEvent('dailyspend:refresh-end'));
-    }
-  }, [setRefreshingState]);
-
-  // Visual pull-down feedback
-  const [pullPx, setPullPx] = useState(0);
-  const [isPullToRefreshEnabled, setIsPullToRefreshEnabled] = useState(false);
-  
-  // Enable pull-to-refresh only after authentication state has stabilized
-  useEffect(() => {
-    if (user) {
-      const timer = setTimeout(() => {
-        setIsPullToRefreshEnabled(true);
-      }, 500); // 500ms delay to ensure auth state is stable
-      
-      return () => clearTimeout(timer);
-    } else {
-      setIsPullToRefreshEnabled(false);
-    }
-  }, [user]);
-  
-  usePullToRefresh(handleRefresh, {
-    thresholdPx: 12,
-    enabled: isPullToRefreshEnabled,
-    maxPullPx: 64,
-    isAuthenticated: !!user, // Only enable pull-to-refresh when user is authenticated
-    onPullChange: (px, state) => setPullPx(state === "pulling" || state === "refreshing" ? px : 0),
-  });
+  // Pull-to-refresh disabled
 
   const handleFabClick = () => {
     handleViewChange("entry");
@@ -274,7 +220,7 @@ export default function ExpenseTracker() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground" style={{ transform: pullPx ? `translateY(${pullPx}px)` : undefined, transition: pullPx ? "none" : "transform 200ms ease" }}>
+    <div className="min-h-screen bg-background text-foreground">
       {/* Title Bar */}
       <header className="bg-card shadow-sm border-b border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
