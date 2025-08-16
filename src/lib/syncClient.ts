@@ -7,6 +7,7 @@ import {
   applyConflictResolution, 
   getCurrentLocalData,
   isLocalDataContinuation,
+  isLocalDataOnlyDefaultCategories,
   type DataConflict,
   type ConflictResolution 
 } from "./dataConflictResolver";
@@ -93,6 +94,17 @@ export function useRealtimeSync() {
       }
       
       if (conflict.hasLocalData && conflict.hasOnlineData) {
+        // Check if local data consists only of default categories and should be replaced
+        if (isLocalDataOnlyDefaultCategories(localData)) {
+          console.log('[Sync] Local data consists only of default categories, replacing with online data');
+          showToast(
+            "Data Restored", 
+            "Your online data has been automatically downloaded to your device."
+          );
+          await performSync(conflict, 'replace-local-with-online');
+          return;
+        }
+        
         // Check if local data is a continuation of online data (offline additions)
         if (isLocalDataContinuation(localData, remoteData as any)) {
           console.log('[Sync] Local data is continuation of online data, auto-syncing');
@@ -116,7 +128,7 @@ export function useRealtimeSync() {
           await performSync(conflict, 'overwrite-online');
           return;
         }
-        
+
         // Check if there are actual conflicts
         const hasConflicts = conflict.conflicts.categories || 
                            conflict.conflicts.expenses || 

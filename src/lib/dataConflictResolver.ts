@@ -24,7 +24,7 @@ export type DataConflict = {
   };
 };
 
-export type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online';
+export type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online' | 'replace-local-with-online';
 
 /**
  * Analyzes data conflicts between local and online storage
@@ -137,6 +137,10 @@ export function applyConflictResolution(
       // This means the local data becomes the authoritative source
       return localData;
     
+    case 'replace-local-with-online':
+      // When replacing local data with online data, return online data
+      return onlineData || { categories: [], expenses: [], recurring: [], friends: [] };
+    
     default:
       return localData;
   }
@@ -236,6 +240,39 @@ export function isLocalDataContinuation(
   );
   
   return categoriesContinuation && expensesLenient && recurringContinuation && friendsContinuation;
+}
+
+/**
+ * Checks if local data consists only of default categories
+ * This helps identify when a fresh device should completely replace local data with online data
+ */
+export function isLocalDataOnlyDefaultCategories(
+  localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[]; friends: Friend[] }
+): boolean {
+  // Check if there are no expenses, recurring expenses, or friends (only default categories)
+  if (localData.expenses.length > 0 || localData.recurring.length > 0 || localData.friends.length > 0) {
+    return false;
+  }
+  
+  // Check if categories are exactly the default categories
+  const defaultCategoryNames = [
+    "Food & Dining",
+    "Transportation", 
+    "Shopping",
+    "Entertainment",
+    "Bills & Utilities",
+    "Healthcare"
+  ];
+  
+  if (localData.categories.length !== defaultCategoryNames.length) {
+    return false;
+  }
+  
+  // Check if all local categories match default category names
+  const localCategoryNames = localData.categories.map(cat => cat.name).sort();
+  const sortedDefaultNames = [...defaultCategoryNames].sort();
+  
+  return localCategoryNames.every((name, index) => name === sortedDefaultNames[index]);
 }
 
 /**

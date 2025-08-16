@@ -62,23 +62,37 @@ export function testDataMerging() {
 
 // Test conflict resolution
 export function testConflictResolution() {
-  console.log('=== Testing Conflict Resolution ===');
+  const conflict: DataConflict = {
+    hasLocalData: true,
+    hasOnlineData: true,
+    conflicts: { categories: true, expenses: true, recurring: true, friends: false },
+    localData: {
+      categories: [{ id: '1', name: 'Local Cat', color: '#000', createdAt: '2023-01-01' }],
+      expenses: [{ id: '1', name: 'Local Expense', amount: '10', date: '2023-01-01', createdAt: '2023-01-01', categoryId: null, details: null }],
+      recurring: [],
+      friends: []
+    },
+    onlineData: {
+      categories: [{ id: '2', name: 'Online Cat', color: '#fff', createdAt: '2023-01-02' }],
+      expenses: [{ id: '2', name: 'Online Expense', amount: '20', date: '2023-01-01', createdAt: '2023-01-02', categoryId: null, details: null }],
+      recurring: [],
+      friends: []
+    }
+  };
+
+  console.log('Testing conflict resolution...');
   
-  const conflict = analyzeDataConflicts(mockLocalData, mockOnlineData);
-  
-  // Test merge resolution
   const mergedResult = applyConflictResolution('merge', conflict.localData, conflict.onlineData);
   console.log('Merge result:', mergedResult);
   
-  // Test overwrite local
   const localResult = applyConflictResolution('overwrite-local', conflict.localData, conflict.onlineData);
   console.log('Overwrite local result:', localResult);
   
-  // Test overwrite online
   const onlineResult = applyConflictResolution('overwrite-online', conflict.localData, conflict.onlineData);
   console.log('Overwrite online result:', onlineResult);
   
-  return { mergedResult, localResult, onlineResult };
+  const replaceLocalResult = applyConflictResolution('replace-local-with-online', conflict.localData, conflict.onlineData);
+  console.log('Replace local with online result:', replaceLocalResult);
 }
 
 // Run all tests

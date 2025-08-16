@@ -19,6 +19,11 @@ When a verified user signs in, the system automatically:
 - **Result**: User's data is restored from the cloud seamlessly
 - **Note**: No conflict resolution dialog is shown in this case
 
+#### Scenario 2.5: Fresh Device with Default Categories (Local Data = Default Categories Only, Some Online Data)
+- **Action**: Automatically replaces local default categories with online data
+- **Result**: User's online data is restored, replacing the default categories that were created on app initialization
+- **Note**: This prevents duplicate categories when a fresh device gets default categories then syncs with online data
+
 #### Scenario 3: New User (No Local Data, No Online Data)
 - **Action**: No conflicts to resolve
 - **Result**: User can start using the app normally
@@ -66,11 +71,12 @@ The dialog provides:
 2. Local and remote data are fetched
 3. `analyzeDataConflicts()` compares datasets
 4. **Special case**: If no local data exists but online data is available, automatically download all online data
-5. If conflicts exist between local and online data, show conflict resolution dialog
-6. User selects resolution method (if dialog is shown)
-7. `applyConflictResolution()` processes the choice
-8. Data is synchronized locally and remotely
-9. UI is updated to reflect changes
+5. **Special case**: If local data consists only of default categories and online data exists, automatically replace local data with online data
+6. If conflicts exist between local and online data, show conflict resolution dialog
+7. User selects resolution method (if dialog is shown)
+8. `applyConflictResolution()` processes the choice
+9. Data is synchronized locally and remotely
+10. UI is updated to reflect changes
 
 ### Conflict Detection Logic
 ```typescript
@@ -82,8 +88,14 @@ const hasConflicts = conflict.conflicts.categories ||
 
 ### Resolution Methods
 ```typescript
-type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online';
+type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online' | 'replace-local-with-online';
 ```
+
+**Resolution Types:**
+- **`merge`**: Combines local and online data, keeping the most recent version of each item
+- **`overwrite-local`**: Keeps local data unchanged (used when local data is authoritative)
+- **`overwrite-online`**: Uploads local data to cloud, replacing online data
+- **`replace-local-with-online`**: Downloads online data, completely replacing local data (used for fresh devices with default categories)
 
 ## Best Practices
 
