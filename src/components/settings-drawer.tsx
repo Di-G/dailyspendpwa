@@ -4,7 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories } from "@/lib/localStorage";
+import { getExpenses, getCategories, clearAllData } from "@/lib/localStorage";
+import { useAuth } from "@/lib/auth";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -20,8 +21,10 @@ interface SettingsDrawerProps {
 
 export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawerProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [erasing, setErasing] = useState(false);
   const [open, setOpen] = useState<{
     currency: boolean;
     categories: boolean;
@@ -304,12 +307,46 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
               >
                 Import
               </Button>
+              <Button
+                variant="destructive"
+                disabled={erasing || !!user}
+                onClick={() => {
+                  if (confirm("Are you sure you want to erase all local data? This action cannot be undone.")) {
+                    setErasing(true);
+                    try {
+                      clearAllData();
+                      toast({ title: "Data Erased", description: "All local data has been erased." });
+                      setTimeout(() => window.location.reload(), 800);
+                    } catch (error) {
+                      toast({ title: "Error", description: "Failed to erase data.", variant: "destructive" });
+                    } finally {
+                      setErasing(false);
+                    }
+                  }
+                }}
+                className="w-full sm:w-auto px-4"
+              >
+                {erasing ? "Erasing..." : "Erase All Local Data"}
+              </Button>
               <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleImportFile(file);
               }} />
             </div>
-            <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
+            <p className="text-xs text-muted-foreground">
+              • Export to CSV (open in Excel) or print as PDF<br />
+              • Import accepts the exported CSV
+              {user && (
+                <span className="block mt-1 text-orange-600">
+                  ⚠️ Erase All Local Data is disabled when signed in. Sign out to use this option.
+                </span>
+              )}
+              {!user && (
+                <span className="block mt-1 text-blue-600">
+                  ℹ️ Erase All Local Data will remove all local data. This action cannot be undone.
+                </span>
+              )}
+            </p>
           </div>
         </div>
       </div>

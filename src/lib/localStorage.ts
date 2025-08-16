@@ -484,6 +484,33 @@ export const updateAllData = (
   }
 };
 
+/**
+ * Clear all data from localStorage and reset to default categories
+ * This function removes all categories, expenses, recurring expenses, and friends,
+ * then reinitializes the default categories
+ */
+export const clearAllData = (): void => {
+  try {
+    // Clear all storage keys
+    localStorage.removeItem(CATEGORIES_KEY);
+    localStorage.removeItem(EXPENSES_KEY);
+    localStorage.removeItem(RECURRING_EXPENSES_KEY);
+    localStorage.removeItem(FRIENDS_KEY);
+    localStorage.removeItem(LAST_PROCESSED_DATE_KEY);
+    
+    // Reinitialize default categories
+    initializeDefaultCategories();
+    
+    // Emit data changed event to refresh UI
+    emitDataChanged();
+    
+    console.log('All data cleared from localStorage and default categories restored');
+  } catch (error) {
+    console.error('Error clearing all data:', error);
+    throw error;
+  }
+};
+
 // Friends
 export const getFriends = (): Friend[] => {
   return getFromStorage<Friend[]>(FRIENDS_KEY, []);
