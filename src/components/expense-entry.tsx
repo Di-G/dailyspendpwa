@@ -623,11 +623,11 @@ export default function ExpenseEntry({
               </p>
             </div>
           ) : (
-            <div className="rounded-lg overflow-hidden">
+            <div className="rounded-lg overflow-hidden space-y-2">
               {expenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="w-full text-left p-4 border-b border last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="w-full text-left p-4 rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
                   onClick={() => !isFriendMode && openEdit(expense)}
                 >
                   {/* Expense content - non-editable in friend mode */}
@@ -636,15 +636,10 @@ export default function ExpenseEntry({
                       <div className="flex items-center space-x-2 mb-1">
                         <h4 className="font-medium text-foreground truncate">{expense.name}</h4>
                         {expense.category && (
-                          <span
-                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                            style={{
-                              backgroundColor: `${expense.category.color}20`,
-                              color: expense.category.color,
-                            }}
-                          >
-                            {expense.category.name}
-                          </span>
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: expense.category.color }}
+                          />
                         )}
                       </div>
                       {expense.details && (
