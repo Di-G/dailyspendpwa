@@ -79,6 +79,27 @@ export const createCategory = (data: InsertCategory, userId?: string): Category 
 
 export const deleteCategory = (id: string, userId?: string): void => {
   const categories = getCategories(userId);
+  
+  // Find the category to delete
+  const categoryToDelete = categories.find(cat => cat.id === id);
+  if (!categoryToDelete) {
+    return;
+  }
+  
+  // Check if this is a default category
+  const defaultCategoryNames = [
+    "Food & Dining",
+    "Transportation", 
+    "Shopping",
+    "Entertainment",
+    "Bills & Utilities",
+    "Healthcare"
+  ];
+  
+  if (defaultCategoryNames.includes(categoryToDelete.name)) {
+    throw new Error(`Cannot delete default category: ${categoryToDelete.name}`);
+  }
+  
   const updatedCategories = categories.filter(cat => cat.id !== id);
   const key = getStorageKey(CATEGORIES_BASE_KEY, userId);
   setToStorage(key, updatedCategories);

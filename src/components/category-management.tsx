@@ -67,6 +67,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
         deleteCategory(id, user?.uid);
         return { success: true };
       } catch (error) {
+        console.error('Error deleting category:', error);
         throw new Error('Failed to delete category');
       }
     },
@@ -80,7 +81,8 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
       toast({ title: "Success", description: "Category deleted successfully" });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Delete mutation failed:', error);
       toast({ title: "Error", description: "Failed to delete category", variant: "destructive" });
     },
   });
@@ -178,35 +180,63 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
       {/* Existing Categories */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-foreground/80 mb-3">Existing Categories</h4>
+        <p className="text-xs text-muted-foreground mb-3">
+          Default categories (marked with "Default" badge) cannot be deleted. You can delete any custom categories you've created.
+        </p>
         {categoriesLoading ? (
           <p className="text-sm text-muted-foreground text-center py-4">Loading categories...</p>
         ) : categories.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No categories created yet</p>
         ) : (
           <div className="max-h-64 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center justify-between p-3 bg-muted rounded-lg"
-              >
-                <div className="flex items-center min-w-0 flex-1">
-                  <div
-                    className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
-                    style={{ backgroundColor: category.color }}
-                  ></div>
-                  <span className="text-sm font-medium text-foreground truncate">{category.name}</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-red-500 hover:text-red-700 text-sm p-1 sm:p-2 flex-shrink-0"
-                  onClick={() => deleteCategoryMutation.mutate(category.id)}
-                  disabled={deleteCategoryMutation.isPending}
+            {categories.map((category) => {
+              // Check if this is a default category
+              const defaultCategoryNames = [
+                "Food & Dining",
+                "Transportation", 
+                "Shopping",
+                "Entertainment",
+                "Bills & Utilities",
+                "Healthcare"
+              ];
+              const isDefaultCategory = defaultCategoryNames.includes(category.name);
+              
+              return (
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
+                  <div className="flex items-center min-w-0 flex-1">
+                    <div
+                      className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                      style={{ backgroundColor: category.color }}
+                    ></div>
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {category.name}
+                      {isDefaultCategory && (
+                        <span className="ml-2 text-xs text-muted-foreground bg-muted-foreground/10 px-2 py-1 rounded">
+                          Default
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className={`text-sm p-1 sm:p-2 flex-shrink-0 ${
+                      isDefaultCategory 
+                        ? "text-gray-400 cursor-not-allowed" 
+                        : "text-red-500 hover:text-red-700"
+                    }`}
+                    onClick={() => !isDefaultCategory && deleteCategoryMutation.mutate(category.id)}
+                    disabled={deleteCategoryMutation.isPending || isDefaultCategory}
+                    title={isDefaultCategory ? "Default categories cannot be deleted" : "Delete category"}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
