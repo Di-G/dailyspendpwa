@@ -81,6 +81,17 @@ export function useRealtimeSync() {
         conflicts: conflict.conflicts
       });
       
+      // Special case: No local data, but online data exists - automatically download all online data
+      if (!conflict.hasLocalData && conflict.hasOnlineData) {
+        console.log('[Sync] No local data found, automatically downloading online data');
+        showToast(
+          "Data Restored", 
+          "Your online data has been automatically downloaded to your device."
+        );
+        await performSync(conflict, 'overwrite-local');
+        return;
+      }
+      
       if (conflict.hasLocalData && conflict.hasOnlineData) {
         // Check if local data is a continuation of online data (offline additions)
         if (isLocalDataContinuation(localData, remoteData as any)) {

@@ -14,19 +14,20 @@ When a verified user signs in, the system automatically:
 
 ### 2. Conflict Resolution Scenarios
 
-#### Scenario 1: New User (No Local Data, No Online Data)
+#### Scenario 2: Returning User (No Local Data, Some Online Data)
+- **Action**: Automatically downloads all online data to local storage without user intervention
+- **Result**: User's data is restored from the cloud seamlessly
+- **Note**: No conflict resolution dialog is shown in this case
+
+#### Scenario 3: New User (No Local Data, No Online Data)
 - **Action**: No conflicts to resolve
 - **Result**: User can start using the app normally
 
-#### Scenario 2: Returning User (No Local Data, Some Online Data)
-- **Action**: Automatically imports online data to local storage
-- **Result**: User's data is restored from the cloud
-
-#### Scenario 3: Conflict Detected (Local Data + Online Data + Differences)
+#### Scenario 4: Conflict Detected (Local Data + Online Data + Differences)
 - **Action**: Shows conflict resolution dialog
 - **User Choices**:
   1. **Merge Data (Recommended)**: Combines both datasets, keeping the most recent version of each item
-  2. **Use Local Data**: Uploads local data to cloud, overwriting online data
+  2. **Use Local Data**: Uploads local data to cloud, completely replacing online data
   3. **Use Online Data**: Downloads online data, replacing local data (with warning about data loss)
 
 ### 3. Smart Merging Algorithm
@@ -64,11 +65,12 @@ The dialog provides:
 1. User signs in → `useRealtimeSync` hook triggers
 2. Local and remote data are fetched
 3. `analyzeDataConflicts()` compares datasets
-4. If conflicts exist, dialog is shown
-5. User selects resolution method
-6. `applyConflictResolution()` processes the choice
-7. Data is synchronized locally and remotely
-8. UI is updated to reflect changes
+4. **Special case**: If no local data exists but online data is available, automatically download all online data
+5. If conflicts exist between local and online data, show conflict resolution dialog
+6. User selects resolution method (if dialog is shown)
+7. `applyConflictResolution()` processes the choice
+8. Data is synchronized locally and remotely
+9. UI is updated to reflect changes
 
 ### Conflict Detection Logic
 ```typescript

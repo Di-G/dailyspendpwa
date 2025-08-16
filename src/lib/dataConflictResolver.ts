@@ -41,6 +41,8 @@ export function analyzeDataConflicts(
     (onlineData.friends && onlineData.friends.length > 0)
   );
 
+  // If no local data exists, online data should be automatically downloaded
+  // This case is handled specially in the sync client to avoid showing conflict resolution
   if (!hasLocalData || !hasOnlineData) {
     return {
       hasLocalData,
