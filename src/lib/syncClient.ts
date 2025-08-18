@@ -115,7 +115,7 @@ export function useRealtimeSync() {
     };
   }, [user, isVerified]);
 
-  // Start presence and subscriptions when verified
+  // Start presence and realtime user doc listener when verified
   useEffect(() => {
     if (!user || !isVerified) return;
     // Start presence heartbeat
@@ -124,45 +124,30 @@ export function useRealtimeSync() {
       platform: typeof navigator !== 'undefined' ? (navigator as any).platform : 'unknown',
     });
 
-    // Track active sessions
-    stopActiveSessionsRef.current = subscribeToActiveSessions(user.uid, (count) => {
-      activeSessionsRef.current = count;
-      // Attach/detach user doc listener strictly when same account is open on 2+ devices
-      const shouldListen = count >= 2;
-      const isListening = !!stopUserDocRef.current;
-      if (shouldListen && !isListening) {
-        stopUserDocRef.current = subscribeToUserDoc(user.uid, (data) => {
-          if (!data) return;
-          // Ignore self updates
-          if (data.lastUpdatedBy && data.lastUpdatedBy === sessionIdRef.current) return;
-          // Only act when multi-device is active
-          if (activeSessionsRef.current < 2) return;
-          try {
-            const local = getCurrentLocalData();
-            const online = {
-              categories: (data.categories as any[]) || [],
-              expenses: (data.expenses as any[]) || [],
-              recurring: (data.recurring as any[]) || [],
-            };
-            const merged = mergeData(local as any, online as any);
-            // Suppress upload loop from local change event
-            suppressUploadsUntil.current = Date.now() + 2000;
-            updateAllData(merged.categories as any, merged.expenses as any, merged.recurring as any);
-          } catch (err) {
-            console.error('[Sync] Realtime merge failed', err);
-          }
-        });
-      } else if (!shouldListen && isListening) {
-        try { stopUserDocRef.current?.(); } catch {}
-        stopUserDocRef.current = null;
+    // Attach realtime listener immediately; we process only when update is from another session
+    stopUserDocRef.current = subscribeToUserDoc(user.uid, (data) => {
+      if (!data) return;
+      // Only react to changes coming from another device/session
+      if (!data.lastUpdatedBy || data.lastUpdatedBy === sessionIdRef.current) return;
+      try {
+        const local = getCurrentLocalData();
+        const online = {
+          categories: (data.categories as any[]) || [],
+          expenses: (data.expenses as any[]) || [],
+          recurring: (data.recurring as any[]) || [],
+        };
+        const merged = mergeData(local as any, online as any);
+        // Suppress upload loop from local change event
+        suppressUploadsUntil.current = Date.now() + 2000;
+        updateAllData(merged.categories as any, merged.expenses as any, merged.recurring as any);
+      } catch (err) {
+        console.error('[Sync] Realtime merge failed', err);
       }
     });
 
     return () => {
       try { stopUserDocRef.current?.(); } catch {}
       stopUserDocRef.current = null;
-      try { stopActiveSessionsRef.current?.(); } catch {}
-      stopActiveSessionsRef.current = null;
       try { stopPresenceRef.current?.(); } catch {}
       stopPresenceRef.current = null;
     };
