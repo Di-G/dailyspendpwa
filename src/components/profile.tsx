@@ -82,6 +82,16 @@ export default function Profile() {
     }
   };
 
+  // Open profile sheet when app requests it (e.g., cancel conflict resolution)
+  if (typeof window !== 'undefined') {
+    // Minimal inline guard to avoid adding duplicate listeners on re-renders
+    (window as any).__dailyspend_profile_listener__ ||= (() => {
+      const handler = () => setOpen(true);
+      window.addEventListener('dailyspend:open-profile', handler);
+      return () => window.removeEventListener('dailyspend:open-profile', handler);
+    })();
+  }
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>

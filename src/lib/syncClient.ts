@@ -19,7 +19,7 @@ import {
 } from "./dataConflictResolver";
 
 export function useRealtimeSync() {
-  const { user, isVerified } = useAuth();
+  const { user, isVerified, signOutUser } = useAuth();
   const hasInitialized = useRef(false);
   const lastUserId = useRef<string | null>(null);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
@@ -264,7 +264,16 @@ export function useRealtimeSync() {
     conflictDialogOpen,
     pendingConflict,
     onConflictResolve: handleConflictResolution,
-    onConflictDialogClose: () => setConflictDialogOpen(false)
+    onConflictDialogClose: async () => {
+      try {
+        await signOutUser();
+      } catch {}
+      setConflictDialogOpen(false);
+      setPendingConflict(null);
+      try {
+        window.dispatchEvent(new CustomEvent('dailyspend:open-profile'));
+      } catch {}
+    }
   };
 }
 
