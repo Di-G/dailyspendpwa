@@ -73,7 +73,6 @@ export const deleteCategory = (id: string): void => {
   const categories = getCategories();
   const updatedCategories = categories.filter(cat => cat.id !== id);
   setToStorage(CATEGORIES_KEY, updatedCategories);
-  emitDataChanged();
   
   // Also remove category from expenses
   const expenses = getExpenses();
@@ -81,6 +80,27 @@ export const deleteCategory = (id: string): void => {
     expense.categoryId === id ? { ...expense, categoryId: null } : expense
   );
   setToStorage(EXPENSES_KEY, updatedExpenses);
+  emitDataChanged();
+};
+
+export const updateCategory = (
+  id: string,
+  data: { name?: string; color?: string }
+): Category | null => {
+  const categories = getCategories();
+  let updated: Category | null = null;
+  const updatedCategories = categories.map(cat => {
+    if (cat.id !== id) return cat;
+    updated = {
+      ...cat,
+      name: data.name !== undefined ? data.name : cat.name,
+      color: data.color !== undefined ? data.color : cat.color,
+    };
+    return updated;
+  });
+  setToStorage(CATEGORIES_KEY, updatedCategories);
+  emitDataChanged();
+  return updated;
 };
 
 // Expenses

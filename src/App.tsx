@@ -46,6 +46,20 @@ function App() {
     initializeApp();
   }, []);
 
+  // Global data-changed listener to refresh UI immediately after any local data updates or sync merges
+  useEffect(() => {
+    const onDataChanged = async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
+    };
+    window.addEventListener('dailyspend:data-changed', onDataChanged);
+    return () => window.removeEventListener('dailyspend:data-changed', onDataChanged);
+  }, []);
+
   // Process recurring expenses for today on app load (once per day) and schedule midnight processing
   useEffect(() => {
     const processTodayIfNeeded = async () => {

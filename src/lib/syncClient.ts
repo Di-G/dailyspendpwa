@@ -158,7 +158,7 @@ export function useRealtimeSync() {
       // Upload resolved data to cloud
       await uploadAllForUser(user!.uid, resolvedData);
       
-      // Emit change event to refresh UI
+      // Emit change event to refresh UI immediately
       window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));
 
       // Mark this session as in-sync so future local changes auto-upload without dialog
