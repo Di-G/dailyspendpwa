@@ -48,9 +48,47 @@ export function analyzeDataConflicts(
   }
 
   // Check for conflicts by comparing data
-  const categoriesConflict = !areArraysEqual(localData.categories, onlineData.categories || []);
-  const expensesConflict = !areArraysEqual(localData.expenses, onlineData.expenses || []);
-  const recurringConflict = !areArraysEqual(localData.recurring, onlineData.recurring || []);
+  // Categories: treat as equal when the sets of (name+color) match, ignoring id/createdAt
+  const categoriesEquivalent = areCategoriesSemanticallyEqual(localData.categories, onlineData.categories || []);
+  const categoriesConflict = !categoriesEquivalent;
+
+  // If categories are equivalent, compare expenses/recurring after remapping online categoryId -> local categoryId
+  let expensesConflict: boolean;
+  let recurringConflict: boolean;
+
+  if (categoriesEquivalent) {
+    const key = (c: Category) => `${c.name.toLowerCase()}|${c.color.toLowerCase()}`;
+    const localKeyToId = new Map<string, string>();
+    localData.categories.forEach(c => localKeyToId.set(key(c), c.id));
+    const onlineIdToLocalId = new Map<string, string>();
+    (onlineData.categories || []).forEach(c => {
+      const k = key(c);
+      const localId = localKeyToId.get(k);
+      if (localId && localId !== c.id) {
+        onlineIdToLocalId.set(c.id, localId);
+      }
+    });
+
+    const remapExpenseCategoryId = (e: Expense): Expense => {
+      if (!e.categoryId) return e;
+      const mapped = onlineIdToLocalId.get(e.categoryId);
+      return mapped ? { ...e, categoryId: mapped } : e;
+    };
+    const remapRecurringCategoryId = (r: RecurringExpense): RecurringExpense => {
+      if (!r.categoryId) return r;
+      const mapped = onlineIdToLocalId.get(r.categoryId);
+      return mapped ? { ...r, categoryId: mapped } : r;
+    };
+
+    const onlineExpensesRemapped = (onlineData.expenses || []).map(remapExpenseCategoryId);
+    const onlineRecurringRemapped = (onlineData.recurring || []).map(remapRecurringCategoryId);
+
+    expensesConflict = !areArraysEqual(localData.expenses, onlineExpensesRemapped);
+    recurringConflict = !areArraysEqual(localData.recurring, onlineRecurringRemapped);
+  } else {
+    expensesConflict = !areArraysEqual(localData.expenses, onlineData.expenses || []);
+    recurringConflict = !areArraysEqual(localData.recurring, onlineData.recurring || []);
+  }
 
   return {
     hasLocalData,
@@ -72,26 +110,77 @@ export function mergeData(
   localData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] },
   onlineData: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }
 ): { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } {
-  // Merge categories - prefer the one with the latest createdAt
-  const mergedCategories = mergeArraysByTimestamp(
-    localData.categories,
-    onlineData.categories || [],
-    'createdAt'
-  );
+  // If categories are semantically equal (same name+color pairs), keep local categories
+  // and remap online expenses/recurring categoryId to local ids to preserve references.
+  const categoriesEquivalent = areCategoriesSemanticallyEqual(localData.categories, onlineData.categories || []);
 
-  // Merge expenses - prefer the one with the latest createdAt
-  const mergedExpenses = mergeArraysByTimestamp(
-    localData.expenses,
-    onlineData.expenses || [],
-    'createdAt'
-  );
+  let mergedCategories: Category[];
+  let mergedExpenses: Expense[];
+  let mergedRecurring: RecurringExpense[];
 
-  // Merge recurring expenses - prefer the one with the latest createdAt
-  const mergedRecurring = mergeArraysByTimestamp(
-    localData.recurring,
-    onlineData.recurring || [],
-    'createdAt'
-  );
+  if (categoriesEquivalent) {
+    // Build a map from online category id -> local category id based on name+color matching
+    const key = (c: Category) => `${c.name.toLowerCase()}|${c.color.toLowerCase()}`;
+    const localKeyToId = new Map<string, string>();
+    localData.categories.forEach(c => localKeyToId.set(key(c), c.id));
+
+    const onlineIdToLocalId = new Map<string, string>();
+    (onlineData.categories || []).forEach(c => {
+      const k = key(c);
+      const localId = localKeyToId.get(k);
+      if (localId && localId !== c.id) {
+        onlineIdToLocalId.set(c.id, localId);
+      }
+    });
+
+    // Keep local categories as source of truth to avoid breaking local references
+    mergedCategories = localData.categories;
+
+    // Remap online expenses/recurring to local category ids when needed
+    const remapExpenseCategoryId = (e: Expense): Expense => {
+      if (!e.categoryId) return e;
+      const mapped = onlineIdToLocalId.get(e.categoryId);
+      return mapped ? { ...e, categoryId: mapped } : e;
+    };
+    const remapRecurringCategoryId = (r: RecurringExpense): RecurringExpense => {
+      if (!r.categoryId) return r;
+      const mapped = onlineIdToLocalId.get(r.categoryId);
+      return mapped ? { ...r, categoryId: mapped } : r;
+    };
+
+    const onlineExpensesRemapped = (onlineData.expenses || []).map(remapExpenseCategoryId);
+    const onlineRecurringRemapped = (onlineData.recurring || []).map(remapRecurringCategoryId);
+
+    // Merge expenses/recurring by timestamp as usual
+    mergedExpenses = mergeArraysByTimestamp(
+      localData.expenses,
+      onlineExpensesRemapped,
+      'createdAt'
+    );
+
+    mergedRecurring = mergeArraysByTimestamp(
+      localData.recurring,
+      onlineRecurringRemapped,
+      'createdAt'
+    );
+  } else {
+    // Default behavior: merge by id preferring the latest timestamp
+    mergedCategories = mergeArraysByTimestamp(
+      localData.categories,
+      onlineData.categories || [],
+      'createdAt'
+    );
+    mergedExpenses = mergeArraysByTimestamp(
+      localData.expenses,
+      onlineData.expenses || [],
+      'createdAt'
+    );
+    mergedRecurring = mergeArraysByTimestamp(
+      localData.recurring,
+      onlineData.recurring || [],
+      'createdAt'
+    );
+  }
 
   return {
     categories: mergedCategories,
@@ -188,6 +277,19 @@ function mergeArraysByTimestamp<T extends { id: string; createdAt: string }>(
   });
   
   return Array.from(merged.values());
+}
+
+/**
+ * Helper to compare categories semantically (by name+color only)
+ */
+function areCategoriesSemanticallyEqual(local: Category[], online: Category[]): boolean {
+  if (local.length !== online.length) return false;
+  const normalize = (c: Category) => `${c.name.trim().toLowerCase()}|${c.color.trim().toLowerCase()}`;
+  const localSet = new Set(local.map(normalize));
+  for (const c of online) {
+    if (!localSet.has(normalize(c))) return false;
+  }
+  return true;
 }
 
 /**
