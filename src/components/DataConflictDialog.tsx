@@ -55,8 +55,8 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent className="max-w-2xl" onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
@@ -210,9 +210,6 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isResolving}>
-            Cancel
-          </Button>
           <Button 
             onClick={handleResolve} 
             disabled={!selectedResolution || isResolving}

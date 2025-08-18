@@ -13,10 +13,31 @@ import {
 export function useRealtimeSync() {
   const { user, isVerified } = useAuth();
   const hasInitialized = useRef(false);
+  const lastUserId = useRef<string | null>(null);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<DataConflict | null>(null);
+  const conflictDialogOpenRef = useRef(false);
+  const pendingConflictRef = useRef<DataConflict | null>(null);
+  const suppressConflictsUntil = useRef<number>(0);
+  const sessionSynced = useRef<boolean>(false);
 
   useEffect(() => {
+    conflictDialogOpenRef.current = conflictDialogOpen;
+  }, [conflictDialogOpen]);
+
+  useEffect(() => {
+    pendingConflictRef.current = pendingConflict;
+  }, [pendingConflict]);
+
+  useEffect(() => {
+    // Reset initialization when user changes (including logout/login)
+    const currentUserId = user?.uid ?? null;
+    if (currentUserId !== lastUserId.current) {
+      hasInitialized.current = false;
+      lastUserId.current = currentUserId;
+      sessionSynced.current = false;
+    }
+
     if (!user || !isVerified) return;
     if (hasInitialized.current) return;
     hasInitialized.current = true;
@@ -27,27 +48,31 @@ export function useRealtimeSync() {
     // Listen for local changes and handle conflicts before uploading
     const onChanged = async () => {
       try {
-        // If a conflict dialog is already open, skip background handling
-        if (conflictDialogOpen || pendingConflict) return;
+        // If a conflict dialog is already open or recently resolved, skip background handling
+        if (conflictDialogOpenRef.current || pendingConflictRef.current) return;
+        if (Date.now() < suppressConflictsUntil.current) return;
 
-        const localSnapshot = getCurrentLocalData();
-        const remoteSnapshot = await downloadAllForUser(user.uid);
-        const conflict = analyzeDataConflicts(localSnapshot, remoteSnapshot as any);
+        if (!sessionSynced.current) {
+          // Before a session is confirmed in-sync, check for conflicts
+          const localSnapshot = getCurrentLocalData();
+          const remoteSnapshot = await downloadAllForUser(user.uid);
+          const conflict = analyzeDataConflicts(localSnapshot, remoteSnapshot as any);
 
-        const hasConflicts = conflict.hasOnlineData && (
-          conflict.conflicts.categories ||
-          conflict.conflicts.expenses ||
-          conflict.conflicts.recurring
-        );
+          const hasConflicts = conflict.hasOnlineData && (
+            conflict.conflicts.categories ||
+            conflict.conflicts.expenses ||
+            conflict.conflicts.recurring
+          );
 
-        if (hasConflicts) {
-          // Show conflict dialog immediately; do not auto-upload
-          setPendingConflict(conflict);
-          setConflictDialogOpen(true);
-          return;
+          if (hasConflicts) {
+            // Show conflict dialog; do not auto-upload
+            setPendingConflict(conflict);
+            setConflictDialogOpen(true);
+            return;
+          }
         }
 
-        // No conflicts with online; proceed with upload
+        // Either session is in-sync or no conflicts detected; proceed with upload
         await uploadAllForUser(user.uid, {
           categories: getCategories(),
           expenses: getExpenses(),
@@ -119,6 +144,8 @@ export function useRealtimeSync() {
 
   const performSync = async (conflict: DataConflict, resolution: ConflictResolution) => {
     try {
+      // Suppress conflict detection briefly to avoid flicker while remote catches up
+      suppressConflictsUntil.current = Date.now() + 2000;
       const resolvedData = applyConflictResolution(resolution, conflict.localData, conflict.onlineData);
       
       // Update local storage with resolved data using the new function
@@ -133,6 +160,9 @@ export function useRealtimeSync() {
       
       // Emit change event to refresh UI
       window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));
+
+      // Mark this session as in-sync so future local changes auto-upload without dialog
+      sessionSynced.current = true;
       
     } catch (error) {
       console.error('Sync failed:', error);
