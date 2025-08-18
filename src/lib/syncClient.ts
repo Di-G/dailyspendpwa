@@ -7,6 +7,7 @@ import {
   subscribeToActiveSessions,
   subscribeToUserDoc,
 } from "@/lib/sync";
+import { queryClient } from "@/lib/queryClient";
 import { getCategories, getExpenses, getRecurringExpenses, updateAllData } from "@/lib/localStorage";
 import { 
   analyzeDataConflicts, 
@@ -127,8 +128,8 @@ export function useRealtimeSync() {
     // Attach realtime listener immediately; we process only when update is from another session
     stopUserDocRef.current = subscribeToUserDoc(user.uid, (data) => {
       if (!data) return;
-      // Only react to changes coming from another device/session
-      if (!data.lastUpdatedBy || data.lastUpdatedBy === sessionIdRef.current) return;
+      // Only skip when the update is known to be from this same session
+      if (data.lastUpdatedBy && data.lastUpdatedBy === sessionIdRef.current) return;
       try {
         const local = getCurrentLocalData();
         const online = {
@@ -140,6 +141,19 @@ export function useRealtimeSync() {
         // Suppress upload loop from local change event
         suppressUploadsUntil.current = Date.now() + 2000;
         updateAllData(merged.categories as any, merged.expenses as any, merged.recurring as any);
+        // Proactively refresh UI queries immediately
+        void queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
+        void queryClient.refetchQueries({ queryKey: ["/api/categories"], type: 'active' });
+        void queryClient.refetchQueries({ queryKey: ["/api/expenses"], type: 'active' });
+        void queryClient.refetchQueries({ queryKey: ["/api/analytics/daily-total"], type: 'active' });
+        void queryClient.refetchQueries({ queryKey: ["/api/analytics/category-totals"], type: 'active' });
+        void queryClient.refetchQueries({ queryKey: ["/api/analytics/monthly-totals"], type: 'active' });
+        void queryClient.refetchQueries({ queryKey: ["/api/analytics/weekly-totals"], type: 'active' });
       } catch (err) {
         console.error('[Sync] Realtime merge failed', err);
       }
