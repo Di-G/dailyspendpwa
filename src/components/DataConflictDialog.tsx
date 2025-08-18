@@ -66,7 +66,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
         onClose();
       }
     }}>
-      <DialogContent className="max-w-2xl" onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
@@ -78,7 +78,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           {/* Conflict Summary */}
           <Alert>
             <Info className="h-4 w-4" />
@@ -93,48 +93,60 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
             <div className="space-y-3">
               <h4 className="font-semibold text-sm text-muted-foreground">Local Data</h4>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Categories:</span>
-                  <Badge variant="secondary">
-                    {getDataCounts(conflict.localData.categories, "categories")}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Expenses:</span>
-                  <Badge variant="secondary">
-                    {getDataCounts(conflict.localData.expenses, "expenses")}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Recurring:</span>
-                  <Badge variant="secondary">
-                    {getDataCounts(conflict.localData.recurring, "recurring expenses")}
-                  </Badge>
-                </div>
+                {conflict.conflicts.categories && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Categories:</span>
+                    <Badge variant="secondary">
+                      {getDataCounts(conflict.localData.categories, "categories")}
+                    </Badge>
+                  </div>
+                )}
+                {conflict.conflicts.expenses && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Expenses:</span>
+                    <Badge variant="secondary">
+                      {getDataCounts(conflict.localData.expenses, "expenses")}
+                    </Badge>
+                  </div>
+                )}
+                {conflict.conflicts.recurring && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Recurring:</span>
+                    <Badge variant="secondary">
+                      {getDataCounts(conflict.localData.recurring, "recurring expenses")}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="space-y-3">
               <h4 className="font-semibold text-sm text-muted-foreground">Online Data</h4>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Categories:</span>
-                  <Badge variant="secondary">
-                    {getDataCounts(conflict.onlineData.categories, "categories")}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Expenses:</span>
-                  <Badge variant="secondary">
-                    {getDataCounts(conflict.onlineData.expenses, "expenses")}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Recurring:</span>
-                  <Badge variant="secondary">
-                    {getDataCounts(conflict.onlineData.recurring, "recurring expenses")}
-                  </Badge>
-                </div>
+                {conflict.conflicts.categories && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Categories:</span>
+                    <Badge variant="secondary">
+                      {getDataCounts(conflict.onlineData.categories, "categories")}
+                    </Badge>
+                  </div>
+                )}
+                {conflict.conflicts.expenses && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Expenses:</span>
+                    <Badge variant="secondary">
+                      {getDataCounts(conflict.onlineData.expenses, "expenses")}
+                    </Badge>
+                  </div>
+                )}
+                {conflict.conflicts.recurring && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Recurring:</span>
+                    <Badge variant="secondary">
+                      {getDataCounts(conflict.onlineData.recurring, "recurring expenses")}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -159,7 +171,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                     <span className="font-medium">Merge Data (Recommended)</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Combine local and online data, keeping the most recent version of each item.
+                    Push your entries made when you were offline to cloud. This combines both your local and cloud entries together.
                   </p>
                 </div>
               </label>
@@ -179,7 +191,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                     <span className="font-medium">Use Local Data</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Upload your local data to the cloud, overwriting online data.
+                    Upload your local data to the cloud, entirely overwriting online data.
                   </p>
                 </div>
               </label>
@@ -199,7 +211,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                     <span className="font-medium">Use Online Data</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Download online data, replacing your local data.
+                    Download online data, entirely replacing your local data.
                   </p>
                 </div>
               </label>
@@ -207,13 +219,22 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
           </div>
 
           {/* Warning for data loss */}
+          {selectedResolution === 'overwrite-online' && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>
+                You will lose all your online data.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {selectedResolution === 'overwrite-local' && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Warning: Local Data Will Be Lost</AlertTitle>
+              <AlertTitle>Warning</AlertTitle>
               <AlertDescription>
-                This action will permanently replace your local data with online data. 
-                Any local changes not yet synced will be lost forever.
+                You will lose all your local data (entries made when you were offline).
               </AlertDescription>
             </Alert>
           )}
