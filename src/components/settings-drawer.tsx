@@ -4,7 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories } from "@/lib/localStorage";
+import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
+import { useAuth } from "@/lib/auth";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -22,6 +23,8 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { user } = useAuth();
   const [open, setOpen] = useState<{
     currency: boolean;
     categories: boolean;
@@ -223,6 +226,27 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
 
   const toggle = (key: keyof typeof open) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const handleDeleteLocalData = async () => {
+    if (user) return; // Safety: should be disabled anyway
+    const confirmed = window.confirm("This will delete ALL local expenses and recurring items, and restore categories to defaults. This cannot be undone. Proceed?");
+    if (!confirmed) return;
+    try {
+      setDeleting(true);
+      // Clear all local datasets
+      updateAllData([], [], []);
+      // Clear any last processed date for recurring safety
+      try { localStorage.removeItem("dailyspend_last_processed_date"); } catch {}
+      // Restore default categories
+      initializeDefaultCategories();
+      toast({ title: "Local data cleared", description: "All local expenses removed and categories reset." });
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || "Unable to clear local data", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Currency */}
@@ -270,17 +294,29 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
 
       <Separator />
 
-      {/* Export / Import */}
+      {/* Import / Export / Delete */}
       <div>
         <button
           className="w-full text-left text-sm font-medium text-foreground py-2"
           onClick={() => toggle("export")}
         >
-          Export / Import
+          Import / Export / Delete
         </button>
         <div className={`overflow-hidden transition-[max-height] duration-300 ${open.export ? 'max-h-96' : 'max-h-0'}`}>
           <div className="pt-2 space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Button
+                variant="outline"
+                disabled={importing}
+                onClick={() => document.getElementById("dailyspend-import-input")?.click()}
+                className="w-full sm:w-auto px-4"
+              >
+                Import
+              </Button>
+              <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImportFile(file);
+              }} />
               <Button
                 disabled={exporting}
                 onClick={() => handleExport("excel")}
@@ -297,19 +333,19 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
                 Export (PDF)
               </Button>
               <Button
-                variant="outline"
-                disabled={importing}
-                onClick={() => document.getElementById("dailyspend-import-input")?.click()}
+                variant="destructive"
+                disabled={!!user || deleting}
+                onClick={handleDeleteLocalData}
+                title={user ? "Sign out to enable deleting local data" : undefined}
                 className="w-full sm:w-auto px-4"
               >
-                Import
+                Delete All Local Data
               </Button>
-              <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImportFile(file);
-              }} />
             </div>
             <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
+            {!!user && (
+              <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
+            )}
           </div>
         </div>
       </div>
