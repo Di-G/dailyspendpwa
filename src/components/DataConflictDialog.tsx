@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,25 +11,26 @@ interface DataConflictDialogProps {
   open: boolean;
   onClose: () => void;
   conflict: DataConflict;
-  onResolve: (resolution: ConflictResolution) => void;
+  onResolve: (resolution: ConflictResolution) => Promise<void>;
 }
 
 export default function DataConflictDialog({ open, onClose, conflict, onResolve }: DataConflictDialogProps) {
   const { toast } = useToast();
   const [selectedResolution, setSelectedResolution] = useState<ConflictResolution | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const suppressOnCloseRef = useRef(false);
 
   const handleResolve = async () => {
     if (!selectedResolution) return;
     
     setIsResolving(true);
+    suppressOnCloseRef.current = true; // prevent logout when dialog closes due to successful resolution
     try {
       await onResolve(selectedResolution);
       toast({ 
         title: "Data synchronized", 
         description: "Your data has been successfully synchronized." 
       });
-      onClose();
     } catch (error) {
       toast({ 
         title: "Sync failed", 
@@ -56,7 +57,12 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (nextOpen) {
+        suppressOnCloseRef.current = false;
+        return;
+      }
       if (!nextOpen) {
+        if (suppressOnCloseRef.current) return;
         onClose();
       }
     }}>
