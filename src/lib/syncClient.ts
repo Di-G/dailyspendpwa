@@ -24,9 +24,30 @@ export function useRealtimeSync() {
     // Initial sync with conflict resolution
     handleInitialSync();
 
-    // Listen for local changes and push immediately
+    // Listen for local changes and handle conflicts before uploading
     const onChanged = async () => {
       try {
+        // If a conflict dialog is already open, skip background handling
+        if (conflictDialogOpen || pendingConflict) return;
+
+        const localSnapshot = getCurrentLocalData();
+        const remoteSnapshot = await downloadAllForUser(user.uid);
+        const conflict = analyzeDataConflicts(localSnapshot, remoteSnapshot as any);
+
+        const hasConflicts = conflict.hasOnlineData && (
+          conflict.conflicts.categories ||
+          conflict.conflicts.expenses ||
+          conflict.conflicts.recurring
+        );
+
+        if (hasConflicts) {
+          // Show conflict dialog immediately; do not auto-upload
+          setPendingConflict(conflict);
+          setConflictDialogOpen(true);
+          return;
+        }
+
+        // No conflicts with online; proceed with upload
         await uploadAllForUser(user.uid, {
           categories: getCategories(),
           expenses: getExpenses(),
