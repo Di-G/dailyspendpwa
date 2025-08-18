@@ -28,12 +28,17 @@ export async function downloadAllForUser(userId: string): Promise<SyncPayload | 
   return snap.data() as SyncPayload;
 }
 
-export async function uploadAllForUser(userId: string, payload: SyncPayload, bySessionId?: string): Promise<void> {
+export async function uploadAllForUser(
+  userId: string,
+  payload: SyncPayload,
+  bySessionId?: string,
+  options?: { overwrite?: boolean }
+): Promise<void> {
   const ref = doc(db, "users", userId);
   await setDoc(
     ref,
     { ...payload, updatedAt: serverTimestamp(), lastUpdatedBy: bySessionId || null },
-    { merge: true }
+    { merge: !(options?.overwrite ?? false) }
   );
 }
 

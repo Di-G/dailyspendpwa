@@ -224,6 +224,7 @@ export function useRealtimeSync() {
       // Suppress conflict detection briefly to avoid flicker while remote catches up
       suppressConflictsUntil.current = Date.now() + 2000;
       const resolvedData = applyConflictResolution(resolution, conflict.localData, conflict.onlineData);
+      const shouldOverwriteRemote = resolution === 'overwrite-online';
       
       // Update local storage with resolved data using the new function
       updateAllData(
@@ -233,7 +234,12 @@ export function useRealtimeSync() {
       );
       
       // Upload resolved data to cloud
-      await uploadAllForUser(user!.uid, resolvedData as any, sessionIdRef.current);
+      await uploadAllForUser(
+        user!.uid,
+        resolvedData as any,
+        sessionIdRef.current,
+        { overwrite: shouldOverwriteRemote }
+      );
       
       // Emit change event to refresh UI immediately
       window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));

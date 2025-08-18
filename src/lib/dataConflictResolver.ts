@@ -217,11 +217,13 @@ export function applyConflictResolution(
       if (!onlineData) return localData;
       return mergeData(localData, onlineData);
     
+    // Use Online Data: replace local with online snapshot
     case 'overwrite-local':
-      return localData;
+      return onlineData || { categories: [], expenses: [], recurring: [] };
     
+    // Use Local Data: upload local snapshot to cloud (and keep it locally)
     case 'overwrite-online':
-      return onlineData || localData;
+      return localData;
     
     default:
       return localData;
