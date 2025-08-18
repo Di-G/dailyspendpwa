@@ -233,39 +233,52 @@ export function applyConflictResolution(
  */
 function areArraysEqual<T>(arr1: T[], arr2: T[]): boolean {
   if (arr1.length !== arr2.length) return false;
-  
+
   // If both arrays are empty, they're equal
   if (arr1.length === 0 && arr2.length === 0) return true;
-  
-  // Create maps for efficient comparison
+
+  // Stable stringify that ignores nullish fields and sorts keys to avoid
+  // false mismatches from key ordering or presence of null vs missing
+  const stableStringify = (value: unknown): string => {
+    const normalize = (val: unknown): unknown => {
+      if (val === null || val === undefined) return undefined; // drop nullish
+      if (Array.isArray(val)) return val.map(normalize);
+      if (typeof val === 'object') {
+        const obj = val as Record<string, unknown>;
+        const keys = Object.keys(obj).sort();
+        const out: Record<string, unknown> = {};
+        for (const k of keys) {
+          const normalized = normalize(obj[k]);
+          if (normalized !== undefined) {
+            out[k] = normalized;
+          }
+        }
+        return out;
+      }
+      return val;
+    };
+    return JSON.stringify(normalize(value));
+  };
+
   const map1 = new Map<string, string>();
   const map2 = new Map<string, string>();
-  
-  // Normalize and store items from both arrays
+
   arr1.forEach(item => {
-    const key = (item as any).id || JSON.stringify(item);
-    const normalized = JSON.stringify(item);
-    map1.set(key, normalized);
+    const id = (item as any).id ?? stableStringify(item);
+    map1.set(id, stableStringify(item));
   });
-  
+
   arr2.forEach(item => {
-    const key = (item as any).id || JSON.stringify(item);
-    const normalized = JSON.stringify(item);
-    map2.set(key, normalized);
+    const id = (item as any).id ?? stableStringify(item);
+    map2.set(id, stableStringify(item));
   });
-  
-  // Compare maps
+
   if (map1.size !== map2.size) return false;
-  
-  // Use forEach instead of for...of to avoid iteration issues
-  let isEqual = true;
-  map1.forEach((value, key) => {
-    if (map2.get(key) !== value) {
-      isEqual = false;
-    }
-  });
-  
-  return isEqual;
+
+  for (const [key, value] of map1.entries()) {
+    if (map2.get(key) !== value) return false;
+  }
+  return true;
 }
 
 /**
