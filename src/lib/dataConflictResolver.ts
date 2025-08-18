@@ -164,20 +164,35 @@ export function mergeData(
       'createdAt'
     );
   } else {
-    // Default behavior: merge by id preferring the latest timestamp
-    mergedCategories = mergeArraysByTimestamp(
-      localData.categories,
-      onlineData.categories || [],
-      'createdAt'
-    );
+    // Categories are not fully equivalent. Deduplicate by name+color and build an ID remap
+    const { finalCategories, idRemap } = buildCategoryDeduplication(localData.categories, onlineData.categories || []);
+    mergedCategories = finalCategories;
+
+    const remapExpenseCategoryId = (e: Expense): Expense => {
+      if (!e.categoryId) return e;
+      const mapped = idRemap.get(e.categoryId);
+      return mapped ? { ...e, categoryId: mapped } : e;
+    };
+    const remapRecurringCategoryId = (r: RecurringExpense): RecurringExpense => {
+      if (!r.categoryId) return r;
+      const mapped = idRemap.get(r.categoryId);
+      return mapped ? { ...r, categoryId: mapped } : r;
+    };
+
+    const localExpensesRemapped = localData.expenses.map(remapExpenseCategoryId);
+    const onlineExpensesRemapped = (onlineData.expenses || []).map(remapExpenseCategoryId);
+    const localRecurringRemapped = localData.recurring.map(remapRecurringCategoryId);
+    const onlineRecurringRemapped = (onlineData.recurring || []).map(remapRecurringCategoryId);
+
+    // Merge expenses/recurring by timestamp as usual
     mergedExpenses = mergeArraysByTimestamp(
-      localData.expenses,
-      onlineData.expenses || [],
+      localExpensesRemapped,
+      onlineExpensesRemapped,
       'createdAt'
     );
     mergedRecurring = mergeArraysByTimestamp(
-      localData.recurring,
-      onlineData.recurring || [],
+      localRecurringRemapped,
+      onlineRecurringRemapped,
       'createdAt'
     );
   }
@@ -277,6 +292,50 @@ function mergeArraysByTimestamp<T extends { id: string; createdAt: string }>(
   });
   
   return Array.from(merged.values());
+}
+
+/**
+ * Build a deduplicated category set by semantic key (name+color), preferring local items.
+ * Also returns a mapping from any old category id (local or online) to the final kept id.
+ */
+function buildCategoryDeduplication(local: Category[], online: Category[]): { finalCategories: Category[]; idRemap: Map<string, string> } {
+  const normalizeKey = (c: Category) => `${c.name.trim().toLowerCase()}|${c.color.trim().toLowerCase()}`;
+  const keyToFinal = new Map<string, Category>();
+  const idRemap = new Map<string, string>();
+
+  // Prefer local categories when keys collide
+  for (const c of local) {
+    const key = normalizeKey(c);
+    if (!keyToFinal.has(key)) {
+      keyToFinal.set(key, c);
+    } else {
+      // If duplicate keys exist locally, keep the newest
+      const existing = keyToFinal.get(key)!;
+      const winner = new Date(c.createdAt) > new Date(existing.createdAt) ? c : existing;
+      keyToFinal.set(key, winner);
+    }
+  }
+
+  for (const c of online) {
+    const key = normalizeKey(c);
+    const existing = keyToFinal.get(key);
+    if (!existing) {
+      keyToFinal.set(key, c);
+    }
+  }
+
+  // Build id remap from all seen ids to the final id per key
+  const collectIds = (arr: Category[]) => {
+    for (const c of arr) {
+      const key = normalizeKey(c);
+      const final = keyToFinal.get(key)!;
+      idRemap.set(c.id, final.id);
+    }
+  };
+  collectIds(local);
+  collectIds(online);
+
+  return { finalCategories: Array.from(keyToFinal.values()), idRemap };
 }
 
 /**
