@@ -11,17 +11,21 @@ import { Users, Plus, X, Trash2 } from "lucide-react";
 interface PartnerManagementProps {
   hideHeader?: boolean;
   outgoingRequests: PartnerRequest[];
+  incomingRequests: PartnerRequest[];
   onPartnerAdded?: () => void;
   onPartnerRemoved?: (requestId: string) => void;
+  onPartnerRequestStatusUpdated?: (requestId: string, status: PartnerRequest["status"]) => void;
 }
 
-export default function PartnerManagement({ hideHeader, outgoingRequests, onPartnerAdded, onPartnerRemoved }: PartnerManagementProps) {
+export default function PartnerManagement({ hideHeader, outgoingRequests, incomingRequests, onPartnerAdded, onPartnerRemoved, onPartnerRequestStatusUpdated }: PartnerManagementProps) {
   const [addPartnerOpen, setAddPartnerOpen] = useState(false);
   const [partnerName, setPartnerName] = useState("");
   const [partnerEmail, setPartnerEmail] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
   const [removing, setRemoving] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [partnerToRemove, setPartnerToRemove] = useState<PartnerRequest | null>(null);
   const { user, isVerified } = useAuth();
   const { toast } = useToast();
 
@@ -79,6 +83,18 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, onPart
   const handleRemoveRequest = async (request: PartnerRequest) => {
     if (removing) return; // Prevent multiple clicks
     
+    // For active partners, show confirmation dialog
+    if (request.status === 'accepted') {
+      setPartnerToRemove(request);
+      setRemoveConfirmOpen(true);
+      return;
+    }
+    
+    // For other statuses, remove directly
+    await performRemove(request);
+  };
+
+  const performRemove = async (request: PartnerRequest) => {
     setRemoving(true);
     try {
       // Call the parent callback to remove the request
@@ -96,9 +112,20 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, onPart
     }
   };
 
+  const handleConfirmRemove = async () => {
+    if (partnerToRemove) {
+      await performRemove(partnerToRemove);
+      setRemoveConfirmOpen(false);
+      setPartnerToRemove(null);
+    }
+  };
+
   const pendingRequests = outgoingRequests.filter(r => r.status === 'pending');
   const acceptedRequests = outgoingRequests.filter(r => r.status === 'accepted');
   const rejectedRequests = outgoingRequests.filter(r => r.status === 'rejected' || r.status === 'cancelled');
+  
+  // Also show incoming accepted requests (users who added you as partner)
+  const incomingAcceptedRequests = incomingRequests.filter(r => r.status === 'accepted');
 
   return (
     <div className="space-y-4">
@@ -109,6 +136,46 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, onPart
             <Plus className="w-4 h-4 mr-2" />
             Add Partner
           </Button>
+        </div>
+      )}
+
+      {/* Incoming Requests */}
+      {incomingRequests.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300">Incoming Requests</h4>
+          <div className="space-y-2">
+            {incomingRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
+                    <div className="text-xs text-blue-600">Wants to add you as partner</div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onPartnerRequestStatusUpdated?.(request.id, 'rejected')}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                    title="Reject request"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onPartnerRequestStatusUpdated?.(request.id, 'accepted')}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-100 p-2 h-8 w-8"
+                    title="Accept request"
+                  >
+                    <Users className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -126,6 +193,16 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, onPart
                     <div className="text-xs text-amber-600">Waiting for approval</div>
                   </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveRequest(request)}
+                  disabled={removing}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                  title="Cancel request"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -146,6 +223,46 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, onPart
                     <div className="text-xs text-green-600">Partner</div>
                   </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveRequest(request)}
+                  disabled={removing}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                  title="Remove partner"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Incoming Accepted Partners (Users who added you as partner) */}
+      {incomingAcceptedRequests.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Being Viewed As Partner</h4>
+          <div className="space-y-2">
+            {incomingAcceptedRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 border border-indigo-200 rounded-lg bg-indigo-50 dark:bg-indigo-950/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  <div>
+                    <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
+                    <div className="text-xs text-indigo-600">Views you as partner</div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveRequest(request)}
+                  disabled={removing}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                  title="Stop being viewed as partner"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -250,6 +367,37 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, onPart
                 {submitLoading ? "Sending..." : "Send Request"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Partner Confirmation Dialog */}
+      <Dialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Partner?</DialogTitle>
+          </DialogHeader>
+          {partnerToRemove && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to remove <span className="font-medium">{partnerToRemove.toName || partnerToRemove.toEmail}</span> as your partner?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This will permanently remove the partnership and you won't be able to share expenses with them anymore.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleConfirmRemove}
+              disabled={removing}
+            >
+              {removing ? "Removing..." : "Remove Partner"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

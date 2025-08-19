@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest } from "@/lib/sync";
+import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
@@ -80,6 +81,25 @@ export default function ExpenseTracker() {
     await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
     await queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
   }, []);
+
+  // Handle partner removal from settings
+  const handlePartnerRemoved = useCallback((requestId: string) => {
+    // Find if this was an accepted partner request
+    const acceptedPartners = [...outgoingRequests, ...incomingRequests].filter(r => r.status === 'accepted');
+    const removedPartner = acceptedPartners.find(r => r.id === requestId);
+    
+    if (removedPartner) {
+      // This was an accepted partner, update the app state
+      setHasPartner(false);
+      setPartnerUid(null);
+      setPartnerData(null);
+      setPartnerNameResolved("");
+      
+      // Stop the partner document subscription
+      try { stopPartnerDocRef.current?.(); } catch {}
+      stopPartnerDocRef.current = null;
+    }
+  }, [outgoingRequests, incomingRequests]);
 
   // Visual pull-down feedback
   const [pullPx, setPullPx] = useState(0);
@@ -328,7 +348,12 @@ export default function ExpenseTracker() {
                     </SheetHeader>
                   </div>
                   <div className="flex-1 overflow-y-auto p-6">
-                    <SettingsDrawer currency={currency} setCurrency={setCurrency} topTab={topTab} />
+                    <SettingsDrawer 
+          currency={currency} 
+          setCurrency={setCurrency} 
+          topTab={topTab}
+          onPartnerRemoved={handlePartnerRemoved}
+        />
                     {/* If user closed the popup, show pending here */}
                     {isVerified && hasPendingIncoming && (
                       <div className="mt-4 p-3 border rounded-md bg-yellow-50 text-sm">
@@ -880,11 +905,24 @@ export default function ExpenseTracker() {
 
 function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; setCurrentPartnerDate: (date: string) => void }) {
   const [selectedDate, setSelectedDate] = useState(getToday());
+  const [copyExpenseDialogOpen, setCopyExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [customDate, setCustomDate] = useState(getToday());
+  const { toast } = useToast();
 
   // Update parent state when selectedDate changes
   useEffect(() => {
     setCurrentPartnerDate(selectedDate);
   }, [selectedDate, setCurrentPartnerDate]);
+
+  const handleExpenseClick = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setCopyExpenseDialogOpen(true);
+    setShowMoreOptions(false);
+    setCustomDate(getToday());
+  };
 
   const getYesterdayForDate = (date: string) => {
     const d = new Date(date);
@@ -893,6 +931,45 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${dd}`;
+  };
+
+  const handleCopyExpense = async (useCustomDate = false) => {
+    if (!selectedExpense) return;
+    
+    setCopyLoading(true);
+    try {
+      const targetDate = useCustomDate ? customDate : getToday();
+      
+      // Create a new expense with the specified date
+      await createExpense({
+        name: selectedExpense.name,
+        amount: selectedExpense.amount,
+        details: selectedExpense.details ?? undefined,
+        categoryId: selectedExpense.categoryId ?? undefined,
+        date: targetDate,
+      });
+      
+      const dateDescription = useCustomDate ? 
+        `your expenses for ${new Date(customDate).toLocaleDateString()}` : 
+        "your today's expenses";
+      
+      toast({ 
+        title: "Expense copied!", 
+        description: `${selectedExpense.name} has been added to ${dateDescription}.` 
+      });
+      
+      setCopyExpenseDialogOpen(false);
+      setSelectedExpense(null);
+      setShowMoreOptions(false);
+      setCustomDate(getToday()); // Reset custom date
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to copy expense. Please try again." 
+      });
+    } finally {
+      setCopyLoading(false);
+    }
   };
 
   const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
@@ -967,7 +1044,11 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
           ) : (
             <div className="divide-y">
               {expensesForDate.map((exp) => (
-                <div key={exp.id} className="flex items-center justify-between p-4">
+                <div 
+                  key={exp.id} 
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleExpenseClick(exp)}
+                >
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: (exp.categoryId && categoryById.get(exp.categoryId)?.color) || '#E5E7EB', borderColor: '#CBD5E1' }} />
                     <div className="min-w-0 flex-1">
@@ -982,6 +1063,82 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
           )}
         </CardContent>
       </Card>
+
+      {/* Copy Expense Confirmation Dialog */}
+      <Dialog open={copyExpenseDialogOpen} onOpenChange={setCopyExpenseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Copy Expense</DialogTitle>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div className="p-3 border rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: (selectedExpense.categoryId && categoryById.get(selectedExpense.categoryId)?.color) || '#E5E7EB', borderColor: '#CBD5E1' }} />
+                    <div>
+                      <div className="font-medium">{selectedExpense.name}</div>
+                      <div className="text-sm text-muted-foreground">{categoryById.get(selectedExpense.categoryId || '')?.name || 'Uncategorized'}</div>
+                    </div>
+                  </div>
+                  <div className="font-semibold">{symbol}{formatAmount(parseFloat(selectedExpense.amount || '0'))}</div>
+                </div>
+                {selectedExpense.details && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {selectedExpense.details}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={() => handleCopyExpense(false)} 
+                    disabled={copyLoading}
+                    className="bg-rose-600 hover:bg-rose-700 w-full"
+                  >
+                    {copyLoading ? "Adding..." : "Add to Today's Expenses"}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowMoreOptions(!showMoreOptions)}
+                    className="w-full"
+                  >
+                    {showMoreOptions ? "Hide Options" : "More Options"}
+                  </Button>
+                </div>
+
+                {/* More Options */}
+                {showMoreOptions && (
+                  <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Choose a custom date:</label>
+                      <DatePicker 
+                        value={customDate} 
+                        onChange={setCustomDate}
+                        className="w-full"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => handleCopyExpense(true)} 
+                      disabled={copyLoading}
+                      className="bg-blue-600 hover:bg-blue-700 w-full"
+                    >
+                      {copyLoading ? "Adding..." : `Add to ${new Date(customDate).toLocaleDateString()}`}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyExpenseDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -990,6 +1147,12 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previewItems, setPreviewItems] = useState<Array<{ name: string; amount: string }>>([]);
   const [previewDate, setPreviewDate] = useState<string | null>(null);
+  const [copyExpenseDialogOpen, setCopyExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [customDate, setCustomDate] = useState(getToday());
+  const { toast } = useToast();
   const monthInfo = getMonthInfo(currentDate);
   const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
 
@@ -1107,6 +1270,52 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
+  const handleExpenseClick = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setCopyExpenseDialogOpen(true);
+    setShowMoreOptions(false);
+    setCustomDate(getToday());
+  };
+
+  const handleCopyExpense = async (useCustomDate = false) => {
+    if (!selectedExpense) return;
+    
+    setCopyLoading(true);
+    try {
+      const targetDate = useCustomDate ? customDate : getToday();
+      
+      // Create a new expense with the specified date
+      await createExpense({
+        name: selectedExpense.name,
+        amount: selectedExpense.amount,
+        details: selectedExpense.details ?? undefined,
+        categoryId: selectedExpense.categoryId ?? undefined,
+        date: targetDate,
+      });
+      
+      const dateDescription = useCustomDate ? 
+        `your expenses for ${new Date(customDate).toLocaleDateString()}` : 
+        "your today's expenses";
+      
+      toast({ 
+        title: "Expense copied!", 
+        description: `${selectedExpense.name} has been added to ${dateDescription}.` 
+      });
+      
+      setCopyExpenseDialogOpen(false);
+      setSelectedExpense(null);
+      setShowMoreOptions(false);
+      setCustomDate(getToday()); // Reset custom date
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to copy expense. Please try again." 
+      });
+    } finally {
+      setCopyLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <Card>
@@ -1190,7 +1399,19 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
                 amount: exp.amount,
                 isRecurring: false,
               })), ...previewItems.map((item, idx) => ({ key: `rec-${idx}-${item.name}-${item.amount}`, ...item, isRecurring: true }))].map((item) => (
-                <div key={item.key} className="flex items-center justify-between">
+                <div 
+                  key={item.key} 
+                  className={`flex items-center justify-between ${!item.isRecurring ? 'cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors' : ''}`}
+                  onClick={() => {
+                    if (!item.isRecurring) {
+                      // Find the actual expense object to pass to the handler
+                      const expense = data.expenses.find(e => e.id === item.key);
+                      if (expense) {
+                        handleExpenseClick(expense);
+                      }
+                    }
+                  }}
+                >
                   <span className="text-sm text-foreground font-medium flex items-center gap-1">
                     {item.isRecurring && <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />}
                     {item.name}
@@ -1202,6 +1423,82 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
           </CardContent>
         </Card>
       )}
+
+      {/* Copy Expense Confirmation Dialog */}
+      <Dialog open={copyExpenseDialogOpen} onOpenChange={setCopyExpenseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Copy Expense</DialogTitle>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div className="p-3 border rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: (selectedExpense.categoryId && data.categories.find(c => c.id === selectedExpense.categoryId)?.color) || '#E5E7EB', borderColor: '#CBD5E1' }} />
+                    <div>
+                      <div className="font-medium">{selectedExpense.name}</div>
+                      <div className="text-sm text-muted-foreground">{data.categories.find(c => c.id === selectedExpense.categoryId)?.name || 'Uncategorized'}</div>
+                    </div>
+                  </div>
+                  <div className="font-semibold">{CURRENCIES[currency].symbol}{selectedExpense.amount}</div>
+                </div>
+                {selectedExpense.details && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {selectedExpense.details}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={() => handleCopyExpense(false)} 
+                    disabled={copyLoading}
+                    className="bg-rose-600 hover:bg-rose-700 w-full"
+                  >
+                    {copyLoading ? "Adding..." : "Add to Today's Expenses"}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowMoreOptions(!showMoreOptions)}
+                    className="w-full"
+                  >
+                    {showMoreOptions ? "Hide Options" : "More Options"}
+                  </Button>
+                </div>
+
+                {/* More Options */}
+                {showMoreOptions && (
+                  <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Choose a custom date:</label>
+                      <DatePicker 
+                        value={customDate} 
+                        onChange={setCustomDate}
+                        className="w-full"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => handleCopyExpense(true)} 
+                      disabled={copyLoading}
+                      className="bg-blue-600 hover:bg-blue-700 w-full"
+                    >
+                      {copyLoading ? "Adding..." : `Add to ${new Date(customDate).toLocaleDateString()}`}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyExpenseDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

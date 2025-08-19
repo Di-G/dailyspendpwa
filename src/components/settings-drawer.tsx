@@ -20,9 +20,10 @@ interface SettingsDrawerProps {
   currency: CurrencyCode;
   setCurrency: (c: CurrencyCode) => void;
   topTab?: "my" | "couple" | "trips" | "followups";
+  onPartnerRemoved?: (requestId: string) => void;
 }
 
-export default function SettingsDrawer({ currency, setCurrency, topTab = "my" }: SettingsDrawerProps) {
+export default function SettingsDrawer({ currency, setCurrency, topTab = "my", onPartnerRemoved }: SettingsDrawerProps) {
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -277,19 +278,65 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my" }:
       return;
     }
 
-    // Optimistically remove the request from local state first
-    setOutgoing(prev => prev.filter(req => req.id !== requestId));
-
     try {
+      // Find the request to determine if it's an accepted partner
+      const request = [...outgoing, ...incoming].find(req => req.id === requestId);
+      const isAcceptedPartner = request?.status === 'accepted';
+      
+      // Optimistically remove the request from both local states
+      setOutgoing(prev => prev.filter(req => req.id !== requestId));
+      setIncoming(prev => prev.filter(req => req.id !== requestId));
+      
       await deletePartnerRequest(requestId);
-      // The subscription will automatically update the outgoing requests list
-      toast({ title: "Partner request removed", description: "The request has been permanently deleted." });
+      
+      if (isAcceptedPartner) {
+        toast({ 
+          title: "Partner removed", 
+          description: "The partnership has been ended." 
+        });
+        // Notify the parent component about partner removal
+        onPartnerRemoved?.(requestId);
+      } else {
+        toast({ 
+          title: "Request removed", 
+          description: "The request has been permanently deleted." 
+        });
+      }
     } catch (error) {
-      // On error, the subscription should restore the correct state
+      // On error, restore the correct state by refreshing from subscriptions
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({ 
         title: "Error", 
         description: `Failed to remove the partner request: ${errorMessage}`, 
+        variant: "destructive" 
+      });
+      
+      // Force refresh by re-subscribing (this will restore the correct state)
+      // The existing subscriptions should handle this automatically
+    }
+  };
+
+  const handlePartnerRequestStatusUpdated = async (requestId: string, status: "accepted" | "rejected") => {
+    if (!user) {
+      toast({ 
+        title: "Error", 
+        description: "You must be signed in to update partner requests.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    try {
+      await updatePartnerRequestStatus(requestId, status);
+      toast({ 
+        title: status === 'accepted' ? "Partner request accepted" : "Partner request rejected", 
+        description: status === 'accepted' ? "You are now partners!" : "The request has been rejected." 
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast({ 
+        title: "Error", 
+        description: `Failed to ${status} the partner request: ${errorMessage}`, 
         variant: "destructive" 
       });
     }
@@ -336,7 +383,13 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my" }:
           </button>
           <div className={`overflow-hidden transition-[max-height] duration-300 ${open.partners ? 'max-h-[999px]' : 'max-h-0'}`}>
             <div className="pt-2">
-              <PartnerManagement hideHeader outgoingRequests={outgoing} onPartnerRemoved={handlePartnerRemoved} />
+              <PartnerManagement 
+                hideHeader 
+                outgoingRequests={outgoing} 
+                incomingRequests={incoming}
+                onPartnerRemoved={handlePartnerRemoved}
+                onPartnerRequestStatusUpdated={handlePartnerRequestStatusUpdated}
+              />
             </div>
           </div>
         </div>
