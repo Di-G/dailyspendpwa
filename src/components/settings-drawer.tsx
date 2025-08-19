@@ -3,10 +3,11 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
+import PartnerManagement from "@/components/partner-management";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
-import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, type PartnerRequest } from "@/lib/sync";
+import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, type PartnerRequest } from "@/lib/sync";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -18,9 +19,10 @@ const CURRENCIES = {
 interface SettingsDrawerProps {
   currency: CurrencyCode;
   setCurrency: (c: CurrencyCode) => void;
+  topTab?: "my" | "couple" | "trips" | "followups";
 }
 
-export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawerProps) {
+export default function SettingsDrawer({ currency, setCurrency, topTab = "my" }: SettingsDrawerProps) {
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -29,24 +31,23 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
   const [open, setOpen] = useState<{
     currency: boolean;
     categories: boolean;
+    partners: boolean;
     export: boolean;
     partner: boolean;
-  }>({ currency: false, categories: false, export: false, partner: false });
+  }>({ currency: false, categories: false, partners: false, export: false, partner: false });
   const [incoming, setIncoming] = useState<PartnerRequest[]>([]);
   const [outgoing, setOutgoing] = useState<PartnerRequest[]>([]);
 
   useEffect(() => {
     let stopIn: null | (() => void) = null;
+    let stopOut: null | (() => void) = null;
     if (user) {
       stopIn = subscribeToIncomingRequests(user.uid, setIncoming);
-      const stopOut = subscribeToOutgoingRequests(user.uid, setOutgoing);
-      return () => {
-        try { stopIn?.(); } catch {}
-        try { stopOut?.(); } catch {}
-      };
+      stopOut = subscribeToOutgoingRequests(user.uid, setOutgoing);
     }
     return () => {
       try { stopIn?.(); } catch {}
+      try { stopOut?.(); } catch {}
     };
   }, [user?.uid]);
 
@@ -266,6 +267,34 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
     }
   };
 
+  const handlePartnerRemoved = async (requestId: string) => {
+    if (!user) {
+      toast({ 
+        title: "Error", 
+        description: "You must be signed in to remove partner requests.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Optimistically remove the request from local state first
+    setOutgoing(prev => prev.filter(req => req.id !== requestId));
+
+    try {
+      await deletePartnerRequest(requestId);
+      // The subscription will automatically update the outgoing requests list
+      toast({ title: "Partner request removed", description: "The request has been permanently deleted." });
+    } catch (error) {
+      // On error, the subscription should restore the correct state
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast({ 
+        title: "Error", 
+        description: `Failed to remove the partner request: ${errorMessage}`, 
+        variant: "destructive" 
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Currency */}
@@ -296,24 +325,36 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
 
       <Separator />
 
-      {/* Partner Requests - always visible; now last item moved later */}
-
-      
-
-      {/* Manage Categories */}
-      <div>
-        <button
-          className="w-full text-left text-sm font-medium text-foreground py-2"
-          onClick={() => toggle("categories")}
-        >
-          Manage Categories
-        </button>
-        <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
-          <div className="pt-2">
-            <CategoryManagement hideHeader />
+      {/* Manage Categories or Partners based on top tab */}
+      {topTab === 'couple' ? (
+        <div>
+          <button
+            className="w-full text-left text-sm font-medium text-foreground py-2"
+            onClick={() => toggle("partners")}
+          >
+            Manage Partners
+          </button>
+          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.partners ? 'max-h-[999px]' : 'max-h-0'}`}>
+            <div className="pt-2">
+              <PartnerManagement hideHeader outgoingRequests={outgoing} onPartnerRemoved={handlePartnerRemoved} />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <button
+            className="w-full text-left text-sm font-medium text-foreground py-2"
+            onClick={() => toggle("categories")}
+          >
+            Manage Categories
+          </button>
+          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
+            <div className="pt-2">
+              <CategoryManagement hideHeader />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Separator />
 

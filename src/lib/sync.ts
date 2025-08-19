@@ -212,8 +212,20 @@ export function subscribeToOutgoingRequests(userId: string, onChange: (requests:
   );
   return onSnapshot(qOutgoing, (snap) => {
     const list: PartnerRequest[] = [];
-    snap.forEach((d) => list.push(d.data() as PartnerRequest));
+    snap.forEach((d) => {
+      // Only include documents that exist and have valid data
+      if (d.exists()) {
+        const data = d.data() as PartnerRequest;
+        // Ensure we have all required fields
+        if (data.id && data.fromUid && data.toUid && data.status) {
+          list.push(data);
+        }
+      }
+    });
     onChange(list);
+  }, (error) => {
+    console.error('Error in outgoing requests subscription:', error);
+    // Don't update the list on error, keep previous state
   });
 }
 
@@ -225,6 +237,58 @@ export async function updatePartnerRequestStatus(id: string, status: PartnerRequ
   const data = snap.data() as PartnerRequest;
   const next = { ...data, status, updatedAt: serverTimestamp() } as any;
   await setDoc(ref, next, { merge: true });
+}
+
+/** Delete a partner request permanently */
+export async function deletePartnerRequest(id: string): Promise<void> {
+  const ref = doc(db, "partnerRequests", id);
+  await deleteDoc(ref);
+}
+
+
+/** Subscribe to accepted partner relationships for a user (both directions) */
+export function subscribeToAcceptedPartners(
+  userId: string,
+  onChange: (requests: PartnerRequest[]) => void
+): Unsubscribe {
+  const qFrom = query(
+    collection(db, "partnerRequests"),
+    where("fromUid", "==", userId),
+    where("status", "==", "accepted")
+  );
+  const qTo = query(
+    collection(db, "partnerRequests"),
+    where("toUid", "==", userId),
+    where("status", "==", "accepted")
+  );
+
+  let latestFrom: PartnerRequest[] = [];
+  let latestTo: PartnerRequest[] = [];
+
+  const emit = () => {
+    const map = new Map<string, PartnerRequest>();
+    [...latestFrom, ...latestTo].forEach((r) => map.set(r.id, r));
+    onChange(Array.from(map.values()));
+  };
+
+  const stopFrom = onSnapshot(qFrom, (snap) => {
+    const list: PartnerRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as PartnerRequest));
+    latestFrom = list;
+    emit();
+  });
+
+  const stopTo = onSnapshot(qTo, (snap) => {
+    const list: PartnerRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as PartnerRequest));
+    latestTo = list;
+    emit();
+  });
+
+  return () => {
+    try { stopFrom(); } catch {}
+    try { stopTo(); } catch {}
+  };
 }
 
 

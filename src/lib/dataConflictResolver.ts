@@ -277,10 +277,13 @@ function areArraysEqual<T>(arr1: T[], arr2: T[]): boolean {
 
   if (map1.size !== map2.size) return false;
 
-  for (const [key, value] of map1.entries()) {
-    if (map2.get(key) !== value) return false;
-  }
-  return true;
+  let equal = true;
+  map1.forEach((value, key) => {
+    if (map2.get(key) !== value) {
+      equal = false;
+    }
+  });
+  return equal;
 }
 
 /**
