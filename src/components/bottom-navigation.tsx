@@ -4,9 +4,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface BottomNavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  colorVariant?: 'primary' | 'rose';
 }
 
-export default function BottomNavigation({ currentView, onViewChange }: BottomNavigationProps) {
+export default function BottomNavigation({ currentView, onViewChange, colorVariant = 'primary' }: BottomNavigationProps) {
   const isMobile = useIsMobile();
 
   if (!isMobile) {
@@ -51,7 +52,7 @@ export default function BottomNavigation({ currentView, onViewChange }: BottomNa
               onClick={() => onViewChange(item.id)}
               className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
                 item.active
-                  ? "bg-primary text-white"
+                  ? `${colorVariant === 'rose' ? 'bg-rose-600' : 'bg-primary'} text-white`
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >

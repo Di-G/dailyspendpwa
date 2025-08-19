@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
@@ -19,6 +19,10 @@ import SettingsDrawer from "@/components/settings-drawer";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { queryClient } from "@/lib/queryClient";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
+import { getToday } from "@/lib/date-utils";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
 type CurrencyCode = "USD" | "INR";
@@ -32,6 +36,12 @@ export default function ExpenseTracker() {
   });
   const isMobile = useIsMobile();
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
+  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
+  const [overlayTopPx, setOverlayTopPx] = useState<number>(0);
+  const [hasPartner, setHasPartner] = useState<boolean>(() => {
+    try { return localStorage.getItem("dailyspend_has_partner") === "1"; } catch { return false; }
+  });
+  const [addPartnerOpen, setAddPartnerOpen] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -55,6 +65,38 @@ export default function ExpenseTracker() {
     setCurrentView("entry");
     setFocusAmountTrigger((t) => (t ?? 0) + 1);
   };
+
+  useEffect(() => {
+    const updateOverlayTop = () => {
+      if (!tabsContainerRef.current) return;
+      const rect = tabsContainerRef.current.getBoundingClientRect();
+      setOverlayTopPx(rect.bottom);
+    };
+    updateOverlayTop();
+    window.addEventListener('resize', updateOverlayTop);
+    window.addEventListener('scroll', updateOverlayTop, { passive: true });
+    return () => {
+      window.removeEventListener('resize', updateOverlayTop);
+      window.removeEventListener('scroll', updateOverlayTop);
+    };
+  }, [topTab]);
+
+  // Lock page scroll whenever couple tab is active and no partner is set
+  useEffect(() => {
+    const shouldLock = topTab === 'couple' && !hasPartner;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    if (shouldLock) {
+      html.style.overflow = 'hidden';
+      body.style.overflow = 'hidden';
+    }
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, [topTab, hasPartner]);
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ transform: pullPx ? `translateY(${pullPx}px)` : undefined, transition: pullPx ? "none" : "transform 200ms ease" }}>
@@ -135,7 +177,7 @@ export default function ExpenseTracker() {
       {/* Main Content */}
       <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
         {/* Top Tabs: below header, above content (edge-to-edge like bottom bar) */}
-        <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-8 mb-4">
+        <div ref={tabsContainerRef} className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-8 mb-4">
           <Tabs value={topTab} onValueChange={(v) => setTopTab(v as typeof topTab)}>
             <TabsList className="w-full h-16 p-0 rounded-none bg-card border-b border text-gray-600">
               <TabsTrigger
@@ -149,7 +191,7 @@ export default function ExpenseTracker() {
               <TabsTrigger
                 value="couple"
                 aria-label="Couple expenses"
-                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-rose-600 data-[state=active]:text-white data-[state=active]:shadow-none"
               >
                 <Users className="w-6 h-6" />
                 <span className="sr-only">Couple Expenses</span>
@@ -193,18 +235,147 @@ export default function ExpenseTracker() {
             {currentView === "calendar" && <CalendarView currency={currency} />}
             {currentView === "recurring" && <RecurringExpenses currency={currency} />}
           </>
+        ) : topTab === 'couple' ? (
+          <div className="relative">
+            {/* Visual scaffold to mimic full home layout without data (background content) */}
+            <div className="space-y-4 sm:space-y-6">
+              {/* Summary card with date and quick stats */}
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">My Today's Expenses</h2>
+                      <div className="flex items-center gap-2">
+                        <DatePicker value={getToday()} onChange={() => {}} className="h-8 text-sm" />
+                        <span className="text-sm font-medium text-primary">{new Date().toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-6 gap-4 sm:gap-0">
+                      <div className="text-center">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground">Yesterday</p>
+                        <p className="text-lg sm:text-xl font-semibold text-foreground">—</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground">Today</p>
+                        <p className="text-xl sm:text-2xl font-bold text-primary">—</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Categories Quick Stats (dummy) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-0">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                      <div key={idx} className="border rounded-lg p-2 sm:p-3 text-center bg-muted/20">
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2 bg-muted" />
+                        <div className="h-3 w-16 mx-auto bg-muted rounded-sm mb-1" />
+                        <div className="h-4 w-20 mx-auto bg-muted rounded-sm" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Add Expense Form (dummy) */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardContent className="p-4 sm:p-6">
+                      <h3 className="text-lg font-semibold text-foreground/80 mb-4">Add New Expense</h3>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="h-10 bg-muted/30 rounded" />
+                          <div className="h-10 bg-muted/30 rounded" />
+                        </div>
+                        <div className="h-10 bg-muted/30 rounded" />
+                        <div className="h-24 bg-muted/30 rounded" />
+                        <div className="h-10 bg-muted/40 rounded" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Selected Date Expenses List (dummy) */}
+              <Card>
+                <div className="p-4 sm:p-6 border-b border">
+                  <h3 className="text-lg font-semibold text-foreground/80">My Today's Expenses</h3>
+                </div>
+                <CardContent className="p-0">
+                  <div className="divide-y">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4">
+                        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                          <div className="w-2.5 h-2.5 rounded-full bg-muted flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="h-4 w-40 bg-muted/40 rounded mb-2" />
+                            <div className="h-3 w-24 bg-muted/30 rounded" />
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 ml-3 sm:ml-4">
+                          <div className="h-4 w-16 bg-muted/40 rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Fixed blur overlay covering everything below top tabs including bottom nav */}
+            {!hasPartner && (
+              <>
+                <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
+                {/* Center CTA above blur */}
+                <div className="fixed left-0 right-0 bottom-0 flex items-center justify-center z-[70]" style={{ top: overlayTopPx }}>
+                  <Button onClick={() => setAddPartnerOpen(true)} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
+                    Add a Partner/Friend
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         ) : (
           <div />
         )}
+
+        {/* Add Partner Dialog */}
+        <Dialog open={addPartnerOpen} onOpenChange={setAddPartnerOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add a Partner/Friend</DialogTitle>
+            </DialogHeader>
+            <div className="text-sm text-muted-foreground">
+              This is a placeholder setup. Confirm to mark a partner as added.
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddPartnerOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-rose-600 hover:bg-rose-700 text-white"
+                onClick={() => {
+                  setHasPartner(true);
+                  try { localStorage.setItem('dailyspend_has_partner', '1'); } catch {}
+                  setAddPartnerOpen(false);
+                }}
+              >
+                Add Partner
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Floating Action Button - Mobile only */}
-      <FloatingActionButton onClick={handleFabClick} />
+      <FloatingActionButton
+        onClick={handleFabClick}
+        colorVariant={topTab === 'couple' && !hasPartner ? 'rose' : 'primary'}
+        disabled={topTab === 'couple' && !hasPartner}
+      />
 
       {/* Bottom Navigation - Mobile only */}
       <BottomNavigation
         currentView={currentView}
         onViewChange={(v) => setCurrentView(v as ViewType)}
+        colorVariant={topTab === 'couple' && !hasPartner ? 'rose' : 'primary'}
       />
 
       {/* Add to Home Screen Popup */}

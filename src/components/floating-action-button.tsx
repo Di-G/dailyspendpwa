@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from "react";
 
 interface FloatingActionButtonProps {
   onClick: () => void;
+  colorVariant?: 'primary' | 'rose';
+  disabled?: boolean;
 }
 
-export default function FloatingActionButton({ onClick }: FloatingActionButtonProps) {
+export default function FloatingActionButton({ onClick, colorVariant = 'primary', disabled = false }: FloatingActionButtonProps) {
   const isMobile = useIsMobile();
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -106,7 +108,8 @@ export default function FloatingActionButton({ onClick }: FloatingActionButtonPr
           onClick();
         }}
         size="lg"
-        className="w-20 h-20 rounded-full bg-primary hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+        disabled={disabled}
+        className={`w-20 h-20 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 ${colorVariant === 'rose' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary hover:bg-blue-700'}`}
       >
         <Plus className="w-10 h-10" />
       </Button>
