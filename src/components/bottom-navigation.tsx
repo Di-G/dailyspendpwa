@@ -27,16 +27,16 @@ export default function BottomNavigation({ currentView, onViewChange }: BottomNa
       active: currentView === "calendar",
     },
     {
-      id: "charts",
-      label: "Insights",
-      icon: BarChart3,
-      active: currentView === "charts",
-    },
-    {
       id: "recurring",
       label: "Recurring",
       icon: Repeat,
       active: currentView === "recurring",
+    },
+    {
+      id: "charts",
+      label: "Insights",
+      icon: BarChart3,
+      active: currentView === "charts",
     },
   ];
 

@@ -1,6 +1,9 @@
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check } from "lucide-react";
+import { HiOutlineUserGroup } from "react-icons/hi2";
+ 
+import FollowupsTwoPeopleIcon from "@/components/icons/followups-two-people";
 import ExpenseEntry from "@/components/expense-entry";
 import ChartsView from "@/components/charts-view";
 import CalendarView from "@/components/calendar-view";
@@ -15,12 +18,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import SettingsDrawer from "@/components/settings-drawer";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { queryClient } from "@/lib/queryClient";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
 type CurrencyCode = "USD" | "INR";
 
 export default function ExpenseTracker() {
   const [currentView, setCurrentView] = useState<ViewType>("entry");
+  const [topTab, setTopTab] = useState<"my" | "couple" | "trips" | "followups">("my");
   const [currency, setCurrency] = useState<CurrencyCode>(() => {
     const saved = localStorage.getItem("dailyspend_currency") as CurrencyCode | null;
     return saved || "USD";
@@ -129,17 +134,68 @@ export default function ExpenseTracker() {
 
       {/* Main Content */}
       <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
-        {currentView === "entry" && (
-          <ExpenseEntry
-            currency={currency}
-            setCurrency={setCurrency}
-            focusAmountTrigger={focusAmountTrigger}
-            onFocusAmountConsumed={() => setFocusAmountTrigger(null)}
-          />
+        {/* Top Tabs: below header, above content (edge-to-edge like bottom bar) */}
+        <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-8 mb-4">
+          <Tabs value={topTab} onValueChange={(v) => setTopTab(v as typeof topTab)}>
+            <TabsList className="w-full h-16 p-0 rounded-none bg-card border-b border text-gray-600">
+              <TabsTrigger
+                value="my"
+                aria-label="My expenses"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+              >
+                <Wallet className="w-6 h-6" />
+                <span className="sr-only">My expenses</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="couple"
+                aria-label="Couple expenses"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+              >
+                <Users className="w-6 h-6" />
+                <span className="sr-only">Couple Expenses</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="trips"
+                aria-label="My trips"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+              >
+                <HiOutlineUserGroup className="w-6 h-6" />
+                <span className="sr-only">My Trips</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="followups"
+                aria-label="Follow ups"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+              >
+                <div className="relative">
+                  <Users className="w-6 h-6" />
+                  <span className="absolute -bottom-0 -right-0 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-background ring-2 ring-background">
+                    <Check className="w-2 h-2" />
+                  </span>
+                </div>
+                <span className="sr-only">FollowUps</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {topTab === 'my' ? (
+          <>
+            {currentView === "entry" && (
+              <ExpenseEntry
+                currency={currency}
+                setCurrency={setCurrency}
+                focusAmountTrigger={focusAmountTrigger}
+                onFocusAmountConsumed={() => setFocusAmountTrigger(null)}
+              />
+            )}
+            {currentView === "charts" && <ChartsView currency={currency} />}
+            {currentView === "calendar" && <CalendarView currency={currency} />}
+            {currentView === "recurring" && <RecurringExpenses currency={currency} />}
+          </>
+        ) : (
+          <div />
         )}
-        {currentView === "charts" && <ChartsView currency={currency} />}
-        {currentView === "calendar" && <CalendarView currency={currency} />}
-        {currentView === "recurring" && <RecurringExpenses currency={currency} />}
       </div>
 
       {/* Floating Action Button - Mobile only */}
