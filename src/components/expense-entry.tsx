@@ -333,18 +333,18 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-1">
-                {selectedDate === today ? "Today's Expenses" : "Expense list"}
+                {selectedDate === today ? "My Today's Expenses" : "My Expenses"}
               </h2>
-              {selectedDate !== today && (
-                <p className="text-xs text-muted-foreground mb-1">
-                  {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
-                </p>
-              )}
-              <DatePicker
-                value={selectedDate}
-                onChange={setSelectedDate}
-                className="h-8 text-sm"
-              />
+              <div className="flex items-center gap-2">
+                <DatePicker
+                  value={selectedDate}
+                  onChange={setSelectedDate}
+                  className="h-8 text-sm"
+                />
+                <span className="text-sm font-medium text-primary">
+                  {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}
+                </span>
+              </div>
             </div>
             <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-6 gap-4 sm:gap-0">
               <div className="text-center">
@@ -536,13 +536,8 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       <Card>
             <div className="p-4 sm:p-6 border-b border">
               <h3 className="text-lg font-semibold text-foreground">
-                {selectedDate === today ? "Today's Expense List" : "Expense list"}
+                {selectedDate === today ? "My Today's Expenses" : "My Expenses"}
               </h3>
-              {selectedDate !== today && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
-                </p>
-              )}
             </div>
         <CardContent className="p-4 sm:p-6">
           {selectedDateExpenses.length === 0 ? (
