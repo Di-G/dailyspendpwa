@@ -7,7 +7,7 @@ import PartnerManagement from "@/components/partner-management";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
-import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, type PartnerRequest } from "@/lib/sync";
+import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest } from "@/lib/sync";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -32,23 +32,25 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
   const [open, setOpen] = useState<{
     currency: boolean;
     categories: boolean;
-    partners: boolean;
     export: boolean;
-    partner: boolean;
-  }>({ currency: false, categories: false, partners: false, export: false, partner: false });
-  const [incoming, setIncoming] = useState<PartnerRequest[]>([]);
+  }>({ currency: false, categories: false, export: false });
   const [outgoing, setOutgoing] = useState<PartnerRequest[]>([]);
+  const [incoming, setIncoming] = useState<PartnerRequest[]>([]);
+  const [acceptedIncomingPartners, setAcceptedIncomingPartners] = useState<PartnerRequest[]>([]);
 
   useEffect(() => {
-    let stopIn: null | (() => void) = null;
     let stopOut: null | (() => void) = null;
+    let stopIn: null | (() => void) = null;
+    let stopAcceptedIncoming: null | (() => void) = null;
     if (user) {
-      stopIn = subscribeToIncomingRequests(user.uid, setIncoming);
       stopOut = subscribeToOutgoingRequests(user.uid, setOutgoing);
+      stopIn = subscribeToIncomingRequests(user.uid, setIncoming);
+      stopAcceptedIncoming = subscribeToAcceptedIncomingPartners(user.uid, setAcceptedIncomingPartners);
     }
     return () => {
-      try { stopIn?.(); } catch {}
       try { stopOut?.(); } catch {}
+      try { stopIn?.(); } catch {}
+      try { stopAcceptedIncoming?.(); } catch {}
     };
   }, [user?.uid]);
 
@@ -280,12 +282,13 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
 
     try {
       // Find the request to determine if it's an accepted partner
-      const request = [...outgoing, ...incoming].find(req => req.id === requestId);
+      const request = [...outgoing, ...incoming, ...acceptedIncomingPartners].find(req => req.id === requestId);
       const isAcceptedPartner = request?.status === 'accepted';
       
       // Optimistically remove the request from both local states
       setOutgoing(prev => prev.filter(req => req.id !== requestId));
       setIncoming(prev => prev.filter(req => req.id !== requestId));
+      setAcceptedIncomingPartners(prev => prev.filter(req => req.id !== requestId));
       
       await deletePartnerRequest(requestId);
       
@@ -310,13 +313,10 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
         description: `Failed to remove the partner request: ${errorMessage}`, 
         variant: "destructive" 
       });
-      
-      // Force refresh by re-subscribing (this will restore the correct state)
-      // The existing subscriptions should handle this automatically
     }
   };
 
-  const handlePartnerRequestStatusUpdated = async (requestId: string, status: "accepted" | "rejected") => {
+  const handlePartnerRequestStatusUpdated = async (requestId: string, status: PartnerRequest["status"]) => {
     if (!user) {
       toast({ 
         title: "Error", 
@@ -327,70 +327,86 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
     }
 
     try {
+      // Optimistically update the local state
+      setIncoming(prev => prev.map(req => req.id === requestId ? { ...req, status } : req));
+      setAcceptedIncomingPartners(prev => prev.map(req => req.id === requestId ? { ...req, status } : req));
+
       await updatePartnerRequestStatus(requestId, status);
-      toast({ 
-        title: status === 'accepted' ? "Partner request accepted" : "Partner request rejected", 
-        description: status === 'accepted' ? "You are now partners!" : "The request has been rejected." 
-      });
+
+      if (status === 'accepted') {
+        toast({ 
+          title: "Request accepted", 
+          description: "The partner request has been accepted." 
+        });
+      } else if (status === 'rejected') {
+        toast({ 
+          title: "Request rejected", 
+          description: "The partner request has been rejected." 
+        });
+      }
     } catch (error) {
+      // On error, restore the correct state by refreshing from subscriptions
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({ 
         title: "Error", 
-        description: `Failed to ${status} the partner request: ${errorMessage}`, 
+        description: `Failed to update the partner request status: ${errorMessage}`, 
         variant: "destructive" 
       });
     }
   };
 
+
   return (
     <div className="space-y-4">
       {/* Currency */}
-      <div>
-        <button
-          className="w-full text-left text-sm font-medium text-foreground py-2"
-          onClick={() => toggle("currency")}
-        >
-          Currency
-        </button>
-        <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-96' : 'max-h-0'}`}>
-          <div className="pt-2">
-            <Select value={currency} onValueChange={onCurrencyChange}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(CURRENCIES).map(([code, curr]) => (
-                  <SelectItem key={code} value={code}>
-                    {curr.symbol} {code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {topTab !== 'couple' && (
+        <div>
+          <button
+            className="w-full text-left text-sm font-medium text-foreground py-2"
+            onClick={() => toggle("currency")}
+          >
+            Currency
+          </button>
+          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-96' : 'max-h-0'}`}>
+            <div className="pt-2">
+              <Select value={currency} onValueChange={onCurrencyChange}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CURRENCIES).map(([code, curr]) => (
+                    <SelectItem key={code} value={code}>
+                      {curr.symbol} {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Manage Partners Heading for Couple Tab */}
+      {topTab === 'couple' && (
+        <div className="pt-2">
+          <h3 className="text-lg font-semibold">Manage Partners</h3>
+        </div>
+      )}
 
       <Separator />
 
       {/* Manage Categories or Partners based on top tab */}
       {topTab === 'couple' ? (
         <div>
-          <button
-            className="w-full text-left text-sm font-medium text-foreground py-2"
-            onClick={() => toggle("partners")}
-          >
-            Manage Partners
-          </button>
-          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.partners ? 'max-h-[999px]' : 'max-h-0'}`}>
-            <div className="pt-2">
-              <PartnerManagement 
-                hideHeader 
-                outgoingRequests={outgoing} 
-                incomingRequests={incoming}
-                onPartnerRemoved={handlePartnerRemoved}
-                onPartnerRequestStatusUpdated={handlePartnerRequestStatusUpdated}
-              />
-            </div>
+          <div className="pt-2">
+            <PartnerManagement 
+              hideHeader 
+              outgoingRequests={outgoing} 
+              incomingRequests={incoming}
+              acceptedIncomingPartners={acceptedIncomingPartners}
+              onPartnerRemoved={handlePartnerRemoved}
+              onPartnerRequestStatusUpdated={handlePartnerRequestStatusUpdated}
+            />
           </div>
         </div>
       ) : (
@@ -412,98 +428,64 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
       <Separator />
 
       {/* Import / Export / Delete */}
-      <div>
-        <button
-          className="w-full text-left text-sm font-medium text-foreground py-2"
-          onClick={() => toggle("export")}
-        >
-          Import / Export / Delete
-        </button>
-        <div className={`overflow-hidden transition-[max-height] duration-300 ${open.export ? 'max-h-96' : 'max-h-0'}`}>
-          <div className="pt-2 space-y-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <Button
-                variant="outline"
-                disabled={importing}
-                onClick={() => document.getElementById("dailyspend-import-input")?.click()}
-                className="w-full sm:w-auto px-4"
-              >
-                Import
-              </Button>
-              <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImportFile(file);
-              }} />
-              <Button
-                disabled={exporting}
-                onClick={() => handleExport("excel")}
-                className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
-              >
-                Export (Excel)
-              </Button>
-              <Button
-                disabled={exporting}
-                variant="secondary"
-                onClick={() => handleExport("pdf")}
-                className="w-full sm:w-auto px-4"
-              >
-                Export (PDF)
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={!!user || deleting}
-                onClick={handleDeleteLocalData}
-                title={user ? "Sign out to enable deleting local data" : undefined}
-                className="w-full sm:w-auto px-4"
-              >
-                Delete All Local Data
-              </Button>
+      {topTab !== 'couple' && (
+        <div>
+          <button
+            className="w-full text-left text-sm font-medium text-foreground py-2"
+            onClick={() => toggle("export")}
+          >
+            Import / Export / Delete
+          </button>
+          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.export ? 'max-h-96' : 'max-h-0'}`}>
+            <div className="pt-2 space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <Button
+                  variant="outline"
+                  disabled={importing}
+                  onClick={() => document.getElementById("dailyspend-import-input")?.click()}
+                  className="w-full sm:w-auto px-4"
+                >
+                  Import
+                </Button>
+                <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImportFile(file);
+                }} />
+                <Button
+                  disabled={exporting}
+                  onClick={() => handleExport("excel")}
+                  className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
+                >
+                  Export (Excel)
+                </Button>
+                <Button
+                  disabled={exporting}
+                  variant="secondary"
+                  onClick={() => handleExport("pdf")}
+                  className="w-full sm:w-auto px-4"
+                >
+                  Export (PDF)
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={!!user || deleting}
+                  onClick={handleDeleteLocalData}
+                  title={user ? "Sign out to enable deleting local data" : undefined}
+                  className="w-full sm:w-auto px-4"
+                >
+                  Delete All Local Data
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
+              {!!user && (
+                <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
-            {!!user && (
-              <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
-            )}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Partner Requests - placed last */}
-      <Separator />
-      <div>
-        <button
-          className="w-full text-left text-sm font-medium text-foreground py-2"
-          onClick={() => toggle("partner")}
-        >
-          Partner Requests {incoming.length > 0 ? '•' : ''}
-        </button>
-        <div className={`overflow-hidden transition-[max-height] duration-300 ${open.partner ? 'max-h-[999px]' : 'max-h-0'}`}>
-          <div className="pt-2 space-y-4">
-            <div>
-              <div className="text-sm font-medium mb-1">Incoming</div>
-              {incoming.length === 0 ? (
-                <div className="text-xs text-muted-foreground">You don't have any partner requests for now</div>
-              ) : (
-                <div className="space-y-2">
-                  {incoming.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between gap-2 border rounded p-2">
-                      <div className="text-sm">{r.fromName || r.fromEmail}</div>
-                      <div className="flex gap-2">
-                        <button className="text-xs px-2 py-1 rounded border" onClick={() => updatePartnerRequestStatus(r.id, 'rejected')}>Reject</button>
-                        <button className="text-xs px-2 py-1 rounded bg-primary text-white" onClick={() => updatePartnerRequestStatus(r.id, 'accepted')}>Accept</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {outgoing.some(o => o.status === 'pending') && (
-                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-xs p-2">
-                  Partner request sent to {(outgoing.filter(o => o.status === 'pending').map(o => o.toName || o.toEmail)).join(', ')} — waiting for approval
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 }

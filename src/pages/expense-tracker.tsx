@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
+import { formatAmountDisplay } from "@/lib/utils";
  
 import FollowupsTwoPeopleIcon from "@/components/icons/followups-two-people";
 import ExpenseEntry from "@/components/expense-entry";
@@ -194,11 +195,15 @@ export default function ExpenseTracker() {
       }
       
       // If user is a leader (sent request), show their partner's data
-      if (userSentRequest) {
-        const otherUid = userSentRequest.toUid;
+      // Find all accepted requests where user is the sender
+      const userSentRequests = accepted.filter(r => r.fromUid === user.uid);
+      if (userSentRequests.length > 0) {
+        // Show the first available partner (or next one if current was removed)
+        const currentPartner = userSentRequests[0];
+        const otherUid = currentPartner.toUid;
         setHasPartner(true);
         setPartnerUid(otherUid);
-        setPartnerNameResolved(userSentRequest.toName || userSentRequest.toEmail);
+        setPartnerNameResolved(currentPartner.toName || currentPartner.toEmail);
 
         try { stopPartnerDocRef.current?.(); } catch {}
         stopPartnerDocRef.current = subscribeToUserDoc(otherUid, (data) => {
@@ -354,12 +359,6 @@ export default function ExpenseTracker() {
           topTab={topTab}
           onPartnerRemoved={handlePartnerRemoved}
         />
-                    {/* If user closed the popup, show pending here */}
-                    {isVerified && hasPendingIncoming && (
-                      <div className="mt-4 p-3 border rounded-md bg-yellow-50 text-sm">
-                        You have pending partner requests.
-                      </div>
-                    )}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -426,14 +425,17 @@ export default function ExpenseTracker() {
               <TabsTrigger
                 value="couple"
                 aria-label="Couple expenses"
-                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-rose-600 data-[state=active]:text-white data-[state=active]:shadow-none"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-rose-600 data-[state=active]:text-white data-[state=active]:shadow-none relative"
               >
                 <div className="relative">
                   <Users className="w-6 h-6" />
-                  {rejectedUnseen.length > 0 && (
-                    <span className="absolute -top-0 -right-0 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Recent partner request was rejected" />
-                  )}
                 </div>
+                {rejectedUnseen.length > 0 && (
+                  <span className="absolute top-3 right-3 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Recent partner request was rejected" />
+                )}
+                {incomingRequests.some(r => r.status === 'pending') && (
+                  <span className="absolute top-3 right-6 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Incoming partner request" />
+                )}
                 <span className="sr-only">Couple Expenses</span>
               </TabsTrigger>
               <TabsTrigger
@@ -656,11 +658,6 @@ export default function ExpenseTracker() {
                   <Input value={partnerEmail} onChange={(e) => setPartnerEmail(e.target.value)} placeholder="Enter partner's email" type="email" />
                 </div>
                 <p className="text-xs text-muted-foreground">The user must be verified for you to add them as a partner.</p>
-                {!!outgoingRequests.length && (
-                  <div className="text-xs">
-                    Pending/Recent requests: {outgoingRequests.map(r => r.toName).join(", ")}
-                  </div>
-                )}
               </div>
             )}
             <DialogFooter>
@@ -999,9 +996,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
     return Array.from(totals.values());
   }, [expensesForDate, categoryById]);
 
-  const formatAmount = (amount: number) => {
-    return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -1017,7 +1012,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
             </div>
             <div className="text-center">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">Today</p>
-              <p className="text-xl sm:text-2xl font-bold text-primary">{symbol}{formatAmount(totalForDate)}</p>
+              <p className="text-xl sm:text-2xl font-bold text-primary">{symbol}{formatAmountDisplay(totalForDate)}</p>
             </div>
           </div>
           {categoryTotals.length > 0 && (
@@ -1026,7 +1021,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
                 <div key={category.id} className="border rounded-lg p-2 sm:p-3 text-center" style={{ backgroundColor: `${category.color}10`, borderColor: `${category.color}40` }}>
                   <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2" style={{ backgroundColor: category.color }} />
                   <div className="text-xs font-medium text-muted-foreground mb-1 truncate">{category.name}</div>
-                  <div className="text-sm font-semibold">{symbol}{formatAmount(total)}</div>
+                  <div className="text-sm font-semibold">{symbol}{formatAmountDisplay(total)}</div>
                 </div>
               ))}
             </div>
@@ -1056,7 +1051,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
                       <div className="text-xs text-muted-foreground truncate">{categoryById.get(exp.categoryId || '')?.name || 'Uncategorized'}</div>
                     </div>
                   </div>
-                  <div className="flex-shrink-0 ml-3 sm:ml-4 text-sm font-semibold">{symbol}{formatAmount(parseFloat(exp.amount || '0'))}</div>
+                  <div className="flex-shrink-0 ml-3 sm:ml-4 text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(exp.amount || '0'))}</div>
                 </div>
               ))}
             </div>
@@ -1081,7 +1076,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
                       <div className="text-sm text-muted-foreground">{categoryById.get(selectedExpense.categoryId || '')?.name || 'Uncategorized'}</div>
                     </div>
                   </div>
-                  <div className="font-semibold">{symbol}{formatAmount(parseFloat(selectedExpense.amount || '0'))}</div>
+                  <div className="font-semibold">{symbol}{formatAmountDisplay(parseFloat(selectedExpense.amount || '0'))}</div>
                 </div>
                 {selectedExpense.details && (
                   <div className="mt-2 text-sm text-muted-foreground">
@@ -1416,7 +1411,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
                     {item.isRecurring && <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />}
                     {item.name}
                   </span>
-                  <span className="text-sm text-foreground font-semibold">{CURRENCIES[currency].symbol}{item.amount}</span>
+                  <span className="text-sm text-foreground font-semibold">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(item.amount || '0'))}</span>
                 </div>
               ))}
             </div>
@@ -1441,7 +1436,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
                       <div className="text-sm text-muted-foreground">{data.categories.find(c => c.id === selectedExpense.categoryId)?.name || 'Uncategorized'}</div>
                     </div>
                   </div>
-                  <div className="font-semibold">{CURRENCIES[currency].symbol}{selectedExpense.amount}</div>
+                  <div className="font-semibold">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(selectedExpense.amount || '0'))}</div>
                 </div>
                 {selectedExpense.details && (
                   <div className="mt-2 text-sm text-muted-foreground">
@@ -1527,7 +1522,7 @@ function PartnerRecurringReadOnly({ currency, data }: { currency: CurrencyCode; 
                   <div className="text-sm font-medium truncate">{r.name}</div>
                   <div className="text-xs text-muted-foreground truncate">{categoryById.get(r.categoryId || '')?.name || 'Uncategorized'} • {r.frequency}</div>
                 </div>
-                <div className="text-sm font-semibold">{symbol}{parseFloat(r.amount || '0').toFixed(2)}</div>
+                <div className="text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(r.amount || '0'))}</div>
               </div>
             ))}
           </div>

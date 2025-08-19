@@ -291,4 +291,21 @@ export function subscribeToAcceptedPartners(
   };
 }
 
+/** Subscribe to accepted partner requests where the current user is the toUid (people who added them as partners) */
+export function subscribeToAcceptedIncomingPartners(
+  userId: string,
+  onChange: (requests: PartnerRequest[]) => void
+): Unsubscribe {
+  const qAcceptedIncoming = query(
+    collection(db, "partnerRequests"),
+    where("toUid", "==", userId),
+    where("status", "==", "accepted")
+  );
+  return onSnapshot(qAcceptedIncoming, (snap) => {
+    const list: PartnerRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as PartnerRequest));
+    onChange(list);
+  });
+}
+
 
