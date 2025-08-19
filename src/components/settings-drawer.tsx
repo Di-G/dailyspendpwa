@@ -6,7 +6,7 @@ import CategoryManagement from "@/components/category-management";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
-import { subscribeToIncomingRequests, updatePartnerRequestStatus, type PartnerRequest } from "@/lib/sync";
+import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, type PartnerRequest } from "@/lib/sync";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -33,11 +33,17 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
     partner: boolean;
   }>({ currency: false, categories: false, export: false, partner: false });
   const [incoming, setIncoming] = useState<PartnerRequest[]>([]);
+  const [outgoing, setOutgoing] = useState<PartnerRequest[]>([]);
 
   useEffect(() => {
     let stopIn: null | (() => void) = null;
     if (user) {
       stopIn = subscribeToIncomingRequests(user.uid, setIncoming);
+      const stopOut = subscribeToOutgoingRequests(user.uid, setOutgoing);
+      return () => {
+        try { stopIn?.(); } catch {}
+        try { stopOut?.(); } catch {}
+      };
     }
     return () => {
       try { stopIn?.(); } catch {}
@@ -393,6 +399,11 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {outgoing.some(o => o.status === 'pending') && (
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-xs p-2">
+                  Partner request sent to {(outgoing.filter(o => o.status === 'pending').map(o => o.toName || o.toEmail)).join(', ')} — waiting for approval
                 </div>
               )}
             </div>

@@ -315,7 +315,12 @@ export default function ExpenseTracker() {
                 aria-label="Couple expenses"
                 className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-rose-600 data-[state=active]:text-white data-[state=active]:shadow-none"
               >
-                <Users className="w-6 h-6" />
+                <div className="relative">
+                  <Users className="w-6 h-6" />
+                  {rejectedUnseen.length > 0 && (
+                    <span className="absolute -top-0 -right-0 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Recent partner request was rejected" />
+                  )}
+                </div>
                 <span className="sr-only">Couple Expenses</span>
               </TabsTrigger>
               <TabsTrigger
@@ -473,6 +478,11 @@ export default function ExpenseTracker() {
                   <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
                     Add a Partner/Friend
                   </Button>
+                  {pendingOutgoing.length > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs sm:text-sm px-3 py-2">
+                      Partner request sent to {(pendingOutgoing.map(r => r.toName || r.toEmail)).join(', ')} — waiting for approval
+                    </div>
+                  )}
                   {rejectedUnseen.length > 0 && (
                     <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs sm:text-sm px-3 py-2">
                       {(rejectedUnseen.map(r => r.toName || r.toEmail)).join(', ')} didn't approve your partner request.
