@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -47,6 +48,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isVerified = user?.emailVerified === true;
+
+  // Keep a lightweight public profile document for lookup by email and verification state
+  useEffect(() => {
+    const writeProfile = async () => {
+      if (!user) return;
+      try {
+        const email = user.email || "";
+        const profileRef = doc(db, "profiles", user.uid);
+        await setDoc(
+          profileRef,
+          {
+            uid: user.uid,
+            email,
+            emailLower: email.toLowerCase(),
+            displayName: user.displayName || localStorage.getItem("dailyspend_displayName") || "",
+            isVerified: user.emailVerified === true,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (_) {
+        // non-blocking
+      }
+    };
+    void writeProfile();
+  }, [user?.uid, user?.email, user?.emailVerified, displayName]);
 
   const saveDisplayName = async () => {
     if (user && displayName) {

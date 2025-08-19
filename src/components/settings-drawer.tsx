@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import CategoryManagement from "@/components/category-management";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
+import { subscribeToIncomingRequests, updatePartnerRequestStatus, type PartnerRequest } from "@/lib/sync";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -29,7 +30,19 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
     currency: boolean;
     categories: boolean;
     export: boolean;
-  }>({ currency: false, categories: false, export: false });
+    partner: boolean;
+  }>({ currency: false, categories: false, export: false, partner: false });
+  const [incoming, setIncoming] = useState<PartnerRequest[]>([]);
+
+  useEffect(() => {
+    let stopIn: null | (() => void) = null;
+    if (user) {
+      stopIn = subscribeToIncomingRequests(user.uid, setIncoming);
+    }
+    return () => {
+      try { stopIn?.(); } catch {}
+    };
+  }, [user?.uid]);
 
   // Persist currency preference
   const onCurrencyChange = (value: string) => {
@@ -277,6 +290,10 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
 
       <Separator />
 
+      {/* Partner Requests - always visible; now last item moved later */}
+
+      
+
       {/* Manage Categories */}
       <div>
         <button
@@ -346,6 +363,39 @@ export default function SettingsDrawer({ currency, setCurrency }: SettingsDrawer
             {!!user && (
               <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Partner Requests - placed last */}
+      <Separator />
+      <div>
+        <button
+          className="w-full text-left text-sm font-medium text-foreground py-2"
+          onClick={() => toggle("partner")}
+        >
+          Partner Requests {incoming.length > 0 ? '•' : ''}
+        </button>
+        <div className={`overflow-hidden transition-[max-height] duration-300 ${open.partner ? 'max-h-[999px]' : 'max-h-0'}`}>
+          <div className="pt-2 space-y-4">
+            <div>
+              <div className="text-sm font-medium mb-1">Incoming</div>
+              {incoming.length === 0 ? (
+                <div className="text-xs text-muted-foreground">You don't have any partner requests for now</div>
+              ) : (
+                <div className="space-y-2">
+                  {incoming.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between gap-2 border rounded p-2">
+                      <div className="text-sm">{r.fromName || r.fromEmail}</div>
+                      <div className="flex gap-2">
+                        <button className="text-xs px-2 py-1 rounded border" onClick={() => updatePartnerRequestStatus(r.id, 'rejected')}>Reject</button>
+                        <button className="text-xs px-2 py-1 rounded bg-primary text-white" onClick={() => updatePartnerRequestStatus(r.id, 'accepted')}>Accept</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -10,8 +10,10 @@ import {
   deleteDoc,
   query,
   where,
+  getDocs,
   type Unsubscribe,
   type DocumentData,
+  orderBy,
 } from "firebase/firestore";
 
 type SyncPayload = {
@@ -131,6 +133,98 @@ export function subscribeToUserDoc(
     }
     onChange(snap.data() as SyncPayload & { lastUpdatedBy?: string | null });
   });
+}
+
+
+// ----- Partner/Friend request helpers -----
+
+export type PartnerRequest = {
+  id: string; // generated request id
+  fromUid: string;
+  fromEmail: string;
+  fromName: string;
+  toUid: string;
+  toEmail: string;
+  toName: string;
+  status: "pending" | "accepted" | "rejected" | "cancelled";
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+/** Lookup a verified user profile by emailLower; returns uid and displayName if found */
+export async function findVerifiedUserByEmail(email: string): Promise<{ uid: string; displayName: string; email: string } | null> {
+  const emailLower = email.trim().toLowerCase();
+  if (!emailLower) return null;
+  const q = query(collection(db, "profiles"), where("emailLower", "==", emailLower), where("isVerified", "==", true));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const docSnap = snap.docs[0];
+  const data = docSnap.data() as any;
+  return { uid: data.uid, displayName: data.displayName || data.email || "User", email: data.email };
+}
+
+/** Create a partner request document under both users for easy querying. */
+export async function createPartnerRequest(params: {
+  fromUid: string;
+  fromEmail: string;
+  fromName: string;
+  toUid: string;
+  toEmail: string;
+  toName: string;
+}): Promise<PartnerRequest> {
+  const id = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload: PartnerRequest = {
+    id,
+    fromUid: params.fromUid,
+    fromEmail: params.fromEmail,
+    fromName: params.fromName,
+    toUid: params.toUid,
+    toEmail: params.toEmail,
+    toName: params.toName,
+    status: "pending",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  // Store under a shared collection keyed by request id (single write to avoid cross-user subcollection writes)
+  await setDoc(doc(db, "partnerRequests", id), payload as any, { merge: true });
+  return payload;
+}
+
+/** Subscribe to incoming partner requests for a user */
+export function subscribeToIncomingRequests(userId: string, onChange: (requests: PartnerRequest[]) => void): Unsubscribe {
+  const qIncoming = query(
+    collection(db, "partnerRequests"),
+    where("toUid", "==", userId),
+    where("status", "==", "pending")
+  );
+  return onSnapshot(qIncoming, (snap) => {
+    const list: PartnerRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as PartnerRequest));
+    onChange(list);
+  });
+}
+
+/** Subscribe to outgoing partner requests for a user */
+export function subscribeToOutgoingRequests(userId: string, onChange: (requests: PartnerRequest[]) => void): Unsubscribe {
+  const qOutgoing = query(
+    collection(db, "partnerRequests"),
+    where("fromUid", "==", userId)
+  );
+  return onSnapshot(qOutgoing, (snap) => {
+    const list: PartnerRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as PartnerRequest));
+    onChange(list);
+  });
+}
+
+/** Update a partner request's status and mirror to indexes */
+export async function updatePartnerRequestStatus(id: string, status: PartnerRequest["status"]): Promise<void> {
+  const ref = doc(db, "partnerRequests", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data() as PartnerRequest;
+  const next = { ...data, status, updatedAt: serverTimestamp() } as any;
+  await setDoc(ref, next, { merge: true });
 }
 
 

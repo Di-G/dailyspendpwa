@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
@@ -23,6 +23,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { getToday } from "@/lib/date-utils";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/lib/auth";
+import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, type PartnerRequest } from "@/lib/sync";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring";
 type CurrencyCode = "USD" | "INR";
@@ -40,6 +44,17 @@ export default function ExpenseTracker() {
   const [overlayTopPx, setOverlayTopPx] = useState<number>(0);
   const [hasPartner, setHasPartner] = useState<boolean>(false);
   const [addPartnerOpen, setAddPartnerOpen] = useState<boolean>(false);
+  const [partnerName, setPartnerName] = useState<string>("");
+  const [partnerEmail, setPartnerEmail] = useState<string>("");
+  const [submitLoading, setSubmitLoading] = useState<boolean>(false);
+  const [submitMessage, setSubmitMessage] = useState<string>("");
+  const [incomingRequests, setIncomingRequests] = useState<PartnerRequest[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<PartnerRequest[]>([]);
+  const { user, isVerified } = useAuth();
+  const [dismissedIncomingPopup, setDismissedIncomingPopup] = useState<boolean>(false);
+  const [ackRejectedIds, setAckRejectedIds] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_ack_rejected_outgoing') || '[]'); } catch { return []; }
+  });
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -84,6 +99,100 @@ export default function ExpenseTracker() {
     setHasPartner(false);
     try { localStorage.removeItem('dailyspend_has_partner'); } catch {}
   }, []);
+  // Subscribe to partner request inbox/outbox when verified
+  useEffect(() => {
+    let stopIn: null | (() => void) = null;
+    let stopOut: null | (() => void) = null;
+    if (user && isVerified) {
+      stopIn = subscribeToIncomingRequests(user.uid, setIncomingRequests);
+      stopOut = subscribeToOutgoingRequests(user.uid, setOutgoingRequests);
+    }
+    return () => {
+      try { stopIn?.(); } catch {}
+      try { stopOut?.(); } catch {}
+    };
+  }, [user?.uid, isVerified]);
+
+  const hasPendingIncoming = useMemo(() => incomingRequests.some(r => r.status === 'pending'), [incomingRequests]);
+  const pendingOutgoing = useMemo(() => outgoingRequests.filter(r => r.status === 'pending'), [outgoingRequests]);
+  const rejectedOutgoing = useMemo(() => outgoingRequests.filter(r => r.status === 'rejected' || r.status === 'cancelled'), [outgoingRequests]);
+  const rejectedUnseen = useMemo(() => rejectedOutgoing.filter(r => !ackRejectedIds.includes(r.id)), [rejectedOutgoing, ackRejectedIds]);
+
+  // Mark rejected notifications as seen when leaving the couple tab
+  const prevTopTabRef = useRef(topTab);
+  useEffect(() => {
+    const prev = prevTopTabRef.current;
+    if (prev === 'couple' && topTab !== 'couple' && rejectedUnseen.length > 0) {
+      const next = Array.from(new Set([...ackRejectedIds, ...rejectedUnseen.map(r => r.id)]));
+      setAckRejectedIds(next);
+      try { localStorage.setItem('dailyspend_ack_rejected_outgoing', JSON.stringify(next)); } catch {}
+    }
+    prevTopTabRef.current = topTab;
+  }, [topTab, rejectedUnseen.length]);
+
+  const handleOpenAddPartner = () => {
+    if (!isVerified) {
+      setSubmitMessage("This functionality is only available to verified users. Please verify your email in Profile.");
+      setAddPartnerOpen(true);
+      return;
+    }
+    setSubmitMessage("Enter your partner's name and email. The user must be verified for you to add them.");
+    setAddPartnerOpen(true);
+  };
+
+  const handleTopTabChange = (v: string) => {
+    if (v === 'couple' && !isVerified) {
+      setSubmitMessage("This functionality is only available to verified users. Please verify your email in Profile.");
+      setAddPartnerOpen(true);
+      setTopTab('my');
+      return;
+    }
+    setTopTab(v as typeof topTab);
+  };
+
+  const handleSubmitPartner = async () => {
+    if (!user) return;
+    setSubmitMessage("");
+    const name = partnerName.trim();
+    const email = partnerEmail.trim();
+    if (!name || !email) {
+      setSubmitMessage("Please enter both name and email address.");
+      return;
+    }
+    if (email.toLowerCase() === (user.email || "").toLowerCase()) {
+      setSubmitMessage("You cannot add yourself as a friend.");
+      return;
+    }
+    setSubmitLoading(true);
+    try {
+      const found = await findVerifiedUserByEmail(email);
+      if (!found) {
+        setSubmitMessage("No verified user found with that email.");
+        return;
+      }
+      const req = await createPartnerRequest({
+        fromUid: user.uid,
+        fromEmail: user.email || "",
+        fromName: user.displayName || "",
+        toUid: found.uid,
+        toEmail: found.email,
+        toName: name,
+      });
+      // Close dialog on success and clear fields; the overlay will show pending requests on page
+      setPartnerName("");
+      setPartnerEmail("");
+      setAddPartnerOpen(false);
+    } catch (e) {
+      setSubmitMessage("Failed to send request. Please try again.");
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleIncomingAction = async (req: PartnerRequest, action: 'accept' | 'reject') => {
+    await updatePartnerRequestStatus(req.id, action === 'accept' ? 'accepted' : 'rejected');
+  };
+
 
   // Lock page scroll whenever couple tab is active and no partner is set
   useEffect(() => {
@@ -117,8 +226,11 @@ export default function ExpenseTracker() {
               <Profile />
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Open Settings">
+                  <Button variant="ghost" size="icon" aria-label="Open Settings" className="relative">
                     <SettingsIcon className="w-5 h-5" />
+                    {hasPendingIncoming && (
+                      <span className="absolute -top-0 -right-0 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Pending partner requests" />
+                    )}
                   </Button>
                 </SheetTrigger>
                  <SheetContent side="right" className="bg-card p-0 flex flex-col">
@@ -129,6 +241,12 @@ export default function ExpenseTracker() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-6">
                     <SettingsDrawer currency={currency} setCurrency={setCurrency} />
+                    {/* If user closed the popup, show pending here */}
+                    {isVerified && hasPendingIncoming && (
+                      <div className="mt-4 p-3 border rounded-md bg-yellow-50 text-sm">
+                        You have pending partner requests.
+                      </div>
+                    )}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -182,7 +300,7 @@ export default function ExpenseTracker() {
       <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
         {/* Top Tabs: below header, above content (edge-to-edge like bottom bar) */}
         <div ref={tabsContainerRef} className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-8 mb-4">
-          <Tabs value={topTab} onValueChange={(v) => setTopTab(v as typeof topTab)}>
+          <Tabs value={topTab} onValueChange={handleTopTabChange}>
             <TabsList className="w-full h-16 p-0 rounded-none bg-card border-b border text-gray-600">
               <TabsTrigger
                 value="my"
@@ -215,9 +333,6 @@ export default function ExpenseTracker() {
               >
                 <div className="relative">
                   <Users className="w-6 h-6" />
-                  <span className="absolute -bottom-0 -right-0 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-background ring-2 ring-background">
-                    <Check className="w-2 h-2" />
-                  </span>
                 </div>
                 <span className="sr-only">FollowUps</span>
               </TabsTrigger>
@@ -354,11 +469,18 @@ export default function ExpenseTracker() {
               <>
                 <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
                 {/* Center CTA above blur */}
-                <div className="fixed left-0 right-0 bottom-0 flex items-center justify-center z-[70]" style={{ top: overlayTopPx }}>
-                  <Button onClick={() => {}} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
+                <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
+                  <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
                     Add a Partner/Friend
                   </Button>
+                  {rejectedUnseen.length > 0 && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs sm:text-sm px-3 py-2">
+                      {(rejectedUnseen.map(r => r.toName || r.toEmail)).join(', ')} didn't approve your partner request.
+                    </div>
+                  )}
                 </div>
+                {/* Pending outgoing requests list on page */}
+                {/* Pending panel removed as requested */}
               </>
             )}
           </div>
@@ -372,17 +494,37 @@ export default function ExpenseTracker() {
             <DialogHeader>
               <DialogTitle>Add a Partner/Friend</DialogTitle>
             </DialogHeader>
-            <div className="text-sm text-muted-foreground">
-              This is a placeholder setup. Confirm to mark a partner as added.
-            </div>
+            {!!submitMessage && (
+              <Alert className="mb-2">
+                <AlertTitle>Status</AlertTitle>
+                <AlertDescription>{submitMessage}</AlertDescription>
+              </Alert>
+            )}
+            {isVerified && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Name</label>
+                  <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Enter partner's name" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input value={partnerEmail} onChange={(e) => setPartnerEmail(e.target.value)} placeholder="Enter partner's email" type="email" />
+                </div>
+                <p className="text-xs text-muted-foreground">The user must be verified for you to add them as a partner.</p>
+                {!!outgoingRequests.length && (
+                  <div className="text-xs">
+                    Pending/Recent requests: {outgoingRequests.map(r => r.toName).join(", ")}
+                  </div>
+                )}
+              </div>
+            )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddPartnerOpen(false)}>Cancel</Button>
-              <Button
-                className="bg-rose-600 hover:bg-rose-700 text-white"
-                onClick={() => {}}
-              >
-                Add Partner
-              </Button>
+              <Button variant="outline" onClick={() => setAddPartnerOpen(false)}>Close</Button>
+              {isVerified && (
+                <Button className="bg-rose-600 hover:bg-rose-700 text-white" onClick={handleSubmitPartner} disabled={submitLoading}>
+                  {submitLoading ? "Sending..." : "Send Request"}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -401,6 +543,25 @@ export default function ExpenseTracker() {
         onViewChange={(v) => setCurrentView(v as ViewType)}
         colorVariant={topTab === 'couple' && !hasPartner ? 'rose' : 'primary'}
       />
+
+      {/* Incoming partner request popup when user opens app */}
+      {isVerified && !dismissedIncomingPopup && incomingRequests.some(r => r.status === 'pending') && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40">
+          <div className="bg-card border rounded-lg p-4 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-2">Partner Request</h3>
+            {incomingRequests.filter(r => r.status === 'pending').slice(0,1).map(r => (
+              <div key={r.id} className="space-y-2">
+                <p className="text-sm">{r.fromName || r.fromEmail} wants to add you as a partner in their expenses.</p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setDismissedIncomingPopup(true)}>Close</Button>
+                  <Button variant="destructive" onClick={() => handleIncomingAction(r, 'reject')}>Reject</Button>
+                  <Button onClick={() => handleIncomingAction(r, 'accept')}>Accept</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Add to Home Screen Popup */}
       <AddToHomeScreen />
