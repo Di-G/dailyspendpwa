@@ -38,9 +38,7 @@ export default function ExpenseTracker() {
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
   const [overlayTopPx, setOverlayTopPx] = useState<number>(0);
-  const [hasPartner, setHasPartner] = useState<boolean>(() => {
-    try { return localStorage.getItem("dailyspend_has_partner") === "1"; } catch { return false; }
-  });
+  const [hasPartner, setHasPartner] = useState<boolean>(false);
   const [addPartnerOpen, setAddPartnerOpen] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
@@ -80,6 +78,12 @@ export default function ExpenseTracker() {
       window.removeEventListener('scroll', updateOverlayTop);
     };
   }, [topTab]);
+
+  // Ensure old persisted state does not disable the blur
+  useEffect(() => {
+    setHasPartner(false);
+    try { localStorage.removeItem('dailyspend_has_partner'); } catch {}
+  }, []);
 
   // Lock page scroll whenever couple tab is active and no partner is set
   useEffect(() => {
@@ -237,7 +241,7 @@ export default function ExpenseTracker() {
           </>
         ) : topTab === 'couple' ? (
           <div className="relative">
-            {/* Visual scaffold to mimic full home layout without data (background content) */}
+            {/* Visual scaffold to mimic a fresh home layout without data (dummy copy) */}
             <div className="space-y-4 sm:space-y-6">
               {/* Summary card with date and quick stats */}
               <Card>
@@ -262,16 +266,40 @@ export default function ExpenseTracker() {
                     </div>
                   </div>
 
-                  {/* Categories Quick Stats (dummy) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-0">
-                    {Array.from({ length: 4 }).map((_, idx) => (
-                      <div key={idx} className="border rounded-lg p-2 sm:p-3 text-center bg-muted/20">
-                        <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2 bg-muted" />
-                        <div className="h-3 w-16 mx-auto bg-muted rounded-sm mb-1" />
-                        <div className="h-4 w-20 mx-auto bg-muted rounded-sm" />
+                  {/* Categories Quick Stats (dummy, but colored) */}
+                  {(() => {
+                    const mockCategories = [
+                      { id: 'food', name: 'Food', color: '#EF4444' },
+                      { id: 'travel', name: 'Travel', color: '#3B82F6' },
+                      { id: 'groceries', name: 'Groceries', color: '#10B981' },
+                      { id: 'shopping', name: 'Shopping', color: '#F59E0B' },
+                      { id: 'entertain', name: 'Entertainment', color: '#8B5CF6' },
+                      { id: 'health', name: 'Health', color: '#EC4899' },
+                      { id: 'bills', name: 'Bills', color: '#06B6D4' },
+                      { id: 'other', name: 'Other', color: '#94A3B8' },
+                    ];
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-0">
+                        {mockCategories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="border rounded-lg p-2 sm:p-3 text-center"
+                            style={{
+                              backgroundColor: `${category.color}10`,
+                              borderColor: `${category.color}40`,
+                            }}
+                          >
+                            <div
+                              className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
+                              style={{ backgroundColor: category.color }}
+                            ></div>
+                            <div className="h-3 w-16 mx-auto rounded-sm mb-1" style={{ backgroundColor: `${category.color}30` }} />
+                            <div className="h-4 w-20 mx-auto rounded-sm" style={{ backgroundColor: `${category.color}20` }} />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -283,12 +311,12 @@ export default function ExpenseTracker() {
                       <h3 className="text-lg font-semibold text-foreground/80 mb-4">Add New Expense</h3>
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="h-10 bg-muted/30 rounded" />
-                          <div className="h-10 bg-muted/30 rounded" />
+                          <div className="h-10 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                          <div className="h-10 rounded" style={{ backgroundColor: '#E5E7EB' }} />
                         </div>
-                        <div className="h-10 bg-muted/30 rounded" />
-                        <div className="h-24 bg-muted/30 rounded" />
-                        <div className="h-10 bg-muted/40 rounded" />
+                        <div className="h-10 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                        <div className="h-24 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                        <div className="h-10 rounded" style={{ backgroundColor: '#D1D5DB' }} />
                       </div>
                     </CardContent>
                   </Card>
@@ -305,14 +333,14 @@ export default function ExpenseTracker() {
                     {Array.from({ length: 3 }).map((_, idx) => (
                       <div key={idx} className="flex items-center justify-between p-4">
                         <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                          <div className="w-2.5 h-2.5 rounded-full bg-muted flex-shrink-0" />
+                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: '#E5E7EB', borderColor: '#CBD5E1' }} />
                           <div className="min-w-0 flex-1">
-                            <div className="h-4 w-40 bg-muted/40 rounded mb-2" />
-                            <div className="h-3 w-24 bg-muted/30 rounded" />
+                            <div className="h-4 w-40 rounded mb-2" style={{ backgroundColor: '#E5E7EB' }} />
+                            <div className="h-3 w-24 rounded" style={{ backgroundColor: '#E5E7EB' }} />
                           </div>
                         </div>
                         <div className="flex-shrink-0 ml-3 sm:ml-4">
-                          <div className="h-4 w-16 bg-muted/40 rounded" />
+                          <div className="h-4 w-16 rounded" style={{ backgroundColor: '#E5E7EB' }} />
                         </div>
                       </div>
                     ))}
@@ -327,7 +355,7 @@ export default function ExpenseTracker() {
                 <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
                 {/* Center CTA above blur */}
                 <div className="fixed left-0 right-0 bottom-0 flex items-center justify-center z-[70]" style={{ top: overlayTopPx }}>
-                  <Button onClick={() => setAddPartnerOpen(true)} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
+                  <Button onClick={() => {}} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
                     Add a Partner/Friend
                   </Button>
                 </div>
@@ -351,11 +379,7 @@ export default function ExpenseTracker() {
               <Button variant="outline" onClick={() => setAddPartnerOpen(false)}>Cancel</Button>
               <Button
                 className="bg-rose-600 hover:bg-rose-700 text-white"
-                onClick={() => {
-                  setHasPartner(true);
-                  try { localStorage.setItem('dailyspend_has_partner', '1'); } catch {}
-                  setAddPartnerOpen(false);
-                }}
+                onClick={() => {}}
               >
                 Add Partner
               </Button>
