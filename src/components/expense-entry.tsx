@@ -72,7 +72,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
     queryKey: ["/api/analytics/daily-total", { date: yesterday }],
   });
 
-  const { data: categoryTotals = [] } = useQuery<Array<{ categoryId: string; total: number; category: Category }>>({
+  const { data: categoryTotals = [], isLoading: categoryTotalsLoading } = useQuery<Array<{ categoryId: string; total: number; category: Category }>>({
     queryKey: ["/api/analytics/category-totals", { date: selectedDate }],
   });
 
@@ -365,38 +365,39 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
 
           {/* Categories Quick Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            {categoriesLoading ? (
+            {categoryTotalsLoading ? (
               <div className="col-span-2 sm:col-span-4 text-center py-4">
                 <p className="text-sm text-muted-foreground">Loading categories...</p>
               </div>
-            ) : categories.length === 0 ? (
-              <div className="col-span-2 sm:col-span-4 text-center py-4">
-                <p className="text-sm text-muted-foreground">No categories available</p>
-              </div>
-            ) : (
-              categories.map((category) => {
-                const categoryTotal = categoryTotals.find(ct => ct.categoryId === category.id);
+            ) : (() => {
+              const totalsForDisplay = categoryTotals.filter(ct => (ct.total || 0) > 0);
+              if (totalsForDisplay.length === 0) {
                 return (
-                  <div
-                    key={category.id}
-                    className="border rounded-lg p-2 sm:p-3 text-center"
-                    style={{
-                      backgroundColor: `${category.color}10`,
-                      borderColor: `${category.color}40`,
-                    }}
-                  >
-                    <div
-                      className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
-                      style={{ backgroundColor: category.color }}
-                    ></div>
-                    <p className="text-xs font-medium text-muted-foreground truncate">{category.name}</p>
-                    <p className="text-xs sm:text-sm font-semibold text-foreground">
-                      {CURRENCIES[currency].symbol}{formatAmountDisplay(categoryTotal?.total || 0)}
-                    </p>
+                  <div className="col-span-2 sm:col-span-4 text-center py-4">
+                    <p className="text-sm text-muted-foreground">No expenses for this date</p>
                   </div>
                 );
-              })
-            )}
+              }
+              return totalsForDisplay.map((ct) => (
+                <div
+                  key={ct.categoryId}
+                  className="border rounded-lg p-2 sm:p-3 text-center"
+                  style={{
+                    backgroundColor: `${ct.category.color}10`,
+                    borderColor: `${ct.category.color}40`,
+                  }}
+                >
+                  <div
+                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
+                    style={{ backgroundColor: ct.category.color }}
+                  ></div>
+                  <p className="text-xs font-medium text-muted-foreground truncate">{ct.category.name}</p>
+                  <p className="text-xs sm:text-sm font-semibold text-foreground">
+                    {CURRENCIES[currency].symbol}{formatAmountDisplay(ct.total || 0)}
+                  </p>
+                </div>
+              ));
+            })()}
           </div>
         </CardContent>
       </Card>
