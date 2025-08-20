@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3 } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, ArrowDown, ArrowUp } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
  
@@ -77,6 +77,8 @@ export default function ExpenseTracker() {
   const [copySourceDate, setCopySourceDate] = useState<string>(getToday());
   const [copyDestDate, setCopyDestDate] = useState<string>(getToday());
   const [currentPartnerDate, setCurrentPartnerDate] = useState<string>(getToday());
+  const [selectedCopyExpenseIds, setSelectedCopyExpenseIds] = useState<string[]>([]);
+  const { toast } = useToast();
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -124,6 +126,7 @@ export default function ExpenseTracker() {
           setCopySourceDate(currentPartnerDate);
           setCopyDestDate(getToday()); // Default destination to today
           setCustomCopyOpen(true);
+          setSelectedCopyExpenseIds([]);
           return;
         }
         // For other views, show the today confirmation
@@ -134,6 +137,15 @@ export default function ExpenseTracker() {
     setCurrentView("entry");
     setFocusAmountTrigger((t) => (t ?? 0) + 1);
   };
+
+  useEffect(() => {
+    // Reset selections whenever dialog opens/closes or source date changes
+    if (!customCopyOpen) {
+      setSelectedCopyExpenseIds([]);
+      return;
+    }
+    setSelectedCopyExpenseIds([]);
+  }, [customCopyOpen, copySourceDate]);
 
   useEffect(() => {
     const updateOverlayTop = () => {
@@ -968,6 +980,72 @@ export default function ExpenseTracker() {
                     </span>
                   </div>
                 )}
+                {(() => {
+                  const sourceExpenses = (partnerData?.expenses || []).filter(e => e.date === copySourceDate);
+                  const partnerRemaining = sourceExpenses.filter(e => !selectedCopyExpenseIds.includes(e.id));
+                  const categoryById = new Map<string, Category>();
+                  (partnerData?.categories || []).forEach(c => categoryById.set(c.id, c));
+                  const symbol = currency === 'INR' ? '₹' : '$';
+                  return (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200">Partner Today</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{partnerRemaining.length} item(s)</span>
+                          {partnerRemaining.length > 0 && (
+                            <button
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.35)] hover:shadow-[0_0_14px_rgba(244,63,94,0.55)] hover:from-rose-600 hover:to-pink-600 ring-1 ring-white/40 dark:ring-black/30 transition"
+                              onClick={() => {
+                                setSelectedCopyExpenseIds(prev => {
+                                  const set = new Set(prev);
+                                  partnerRemaining.forEach(e => set.add(e.id));
+                                  return Array.from(set);
+                                });
+                              }}
+                              title="Select all to copy down"
+                            >
+                              Copy all
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {partnerRemaining.length === 0 ? (
+                        <div className="text-xs text-muted-foreground">No expenses remaining on partner list.</div>
+                      ) : (
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {partnerRemaining.map(exp => {
+                            const cat = categoryById.get(exp.categoryId || '');
+                            const color = cat?.color || '#CBD5E1';
+                            return (
+                              <div
+                                key={exp.id}
+                                className="group flex items-center gap-2 p-2 rounded-md border border-border shadow-sm bg-card hover:bg-muted/50 transition-colors transition-transform hover:-translate-y-0.5"
+                              >
+                                <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: color }} />
+                                <button
+                                  className="shrink-0 grid place-items-center rounded-full bg-rose-500/90 hover:bg-rose-600 text-white w-7 h-7 shadow-sm ring-1 ring-white/50 dark:ring-black/30"
+                                  aria-label="Select to copy down"
+                                  onClick={() => setSelectedCopyExpenseIds(prev => prev.includes(exp.id) ? prev : [...prev, exp.id])}
+                                  title="Move to My date"
+                                >
+                                  <ArrowDown className="w-4 h-4" />
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate text-foreground">{exp.name}</div>
+                                  <div className="text-[11px] text-muted-foreground truncate">
+                                    {(cat?.name) || 'Uncategorized'}
+                                  </div>
+                                </div>
+                                <div className="text-sm font-semibold text-foreground">{symbol}{formatAmountDisplay(parseFloat(exp.amount || '0'))}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             <div>
@@ -984,61 +1062,82 @@ export default function ExpenseTracker() {
                     </span>
                   </div>
                 )}
+                {(() => {
+                  const sourceExpenses = (partnerData?.expenses || []).filter(e => e.date === copySourceDate);
+                  const mySelected = sourceExpenses.filter(e => selectedCopyExpenseIds.includes(e.id));
+                  const categoryById = new Map<string, Category>();
+                  (partnerData?.categories || []).forEach(c => categoryById.set(c.id, c));
+                  const symbol = currency === 'INR' ? '₹' : '$';
+                  const selectedTotal = mySelected.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
+                  return (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">Selected for My Date</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{mySelected.length} item(s){mySelected.length > 0 ? ` • ${symbol}${formatAmountDisplay(selectedTotal)}` : ''}</span>
+                          {mySelected.length > 0 && (
+                            <button
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.35)] hover:shadow-[0_0_14px_rgba(14,165,233,0.55)] hover:from-sky-600 hover:to-blue-600 ring-1 ring-white/40 dark:ring-black/30 transition"
+                              onClick={() => setSelectedCopyExpenseIds([])}
+                              title="Move all back to Partner list"
+                            >
+                              Move all back
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {mySelected.length === 0 ? (
+                        <div className="text-xs text-muted-foreground">No selected expenses yet.</div>
+                      ) : (
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {mySelected.map(exp => {
+                            const cat = categoryById.get(exp.categoryId || '');
+                            const color = cat?.color || '#CBD5E1';
+                            return (
+                              <div
+                                key={exp.id}
+                                className="group flex items-center gap-2 p-2 rounded-md border border-border shadow-sm bg-card hover:bg-muted/50 transition-colors transition-transform hover:-translate-y-0.5"
+                              >
+                                <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: color }} />
+                                <button
+                                  className="shrink-0 grid place-items-center rounded-full bg-sky-500/90 hover:bg-sky-600 text-white w-7 h-7 shadow-sm ring-1 ring-white/50 dark:ring-black/30"
+                                  aria-label="Send back up to partner list"
+                                  onClick={() => setSelectedCopyExpenseIds(prev => prev.filter(id => id !== exp.id))}
+                                  title="Move back to Partner"
+                                >
+                                  <ArrowUp className="w-4 h-4" />
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate text-foreground">{exp.name}</div>
+                                  <div className="text-[11px] text-muted-foreground truncate">{(cat?.name) || 'Uncategorized'}</div>
+                                </div>
+                                <div className="text-sm font-semibold text-foreground">{symbol}{formatAmountDisplay(parseFloat(exp.amount || '0'))}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             
-            {/* Special highlight when both dates are Today */}
-            {copySourceDate === getToday() && copyDestDate === getToday() && (
-              <div className="rounded-lg border-2 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30 p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-2xl">🎯</span>
-                  <span className="text-lg font-bold text-green-800 dark:text-green-200">Today → Today</span>
-                </div>
-                <div className="text-sm text-green-700 dark:text-green-300">
-                  Copying partner's today's expenses to your today
-                </div>
-              </div>
-            )}
             
-            {/* Preview of expenses to be copied */}
-            {(() => {
-              const sourceExpenses = (partnerData?.expenses || []).filter(e => e.date === copySourceDate);
-              const categoryById = new Map<string, Category>();
-              (partnerData?.categories || []).forEach(c => categoryById.set(c.id, c));
-              
-              if (sourceExpenses.length === 0) return null;
-              
-              return (
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="text-sm font-medium text-foreground mb-3 text-center">
-                    Preview: {sourceExpenses.length} expense(s) to copy
-                  </div>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {sourceExpenses.map((exp) => (
-                      <div key={exp.id} className="flex items-center justify-between text-sm bg-background rounded-full px-3 py-2 border border-border shadow-sm">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate text-foreground">{exp.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {categoryById.get(exp.categoryId || '')?.name || 'Uncategorized'}
-                          </div>
-                        </div>
-                        <div className="flex-shrink-0 ml-2 text-sm font-semibold text-foreground">
-                          {currency === 'INR' ? '₹' : '$'}{parseFloat(exp.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+            
+            
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCustomCopyOpen(false)}>Cancel</Button>
             <Button
-              className="bg-rose-600 hover:bg-rose-700 text-white"
+              className="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white shadow-md ring-1 ring-white/40 dark:ring-black/20"
               onClick={() => {
                 try {
-                  const items = (partnerData?.expenses || []).filter(e => e.date === copySourceDate);
+                  let items = (partnerData?.expenses || []).filter(e => e.date === copySourceDate);
+                  if (selectedCopyExpenseIds.length > 0) {
+                    items = items.filter(e => selectedCopyExpenseIds.includes(e.id));
+                  }
                   if (items.length === 0) return;
                   const myCategories = getCategories();
                   const uncategorizedId = (() => {
@@ -1054,12 +1153,17 @@ export default function ExpenseTracker() {
                       date: copyDestDate,
                     });
                   });
+                  toast({
+                    title: 'Expenses copied!',
+                    description: `Partner's expenses successfully copied to your ${new Date(copyDestDate).toLocaleDateString()} expenses.`,
+                  });
                 } finally {
+                  setSelectedCopyExpenseIds([]);
                   setCustomCopyOpen(false);
                 }
               }}
             >
-              Copy expenses
+              {selectedCopyExpenseIds.length > 0 ? `Copy selected (${selectedCopyExpenseIds.length})` : 'Copy expenses'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1172,14 +1276,14 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">Partner's Today's Expenses</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">{selectedDate === getToday() ? "Partner's Today's Expenses" : "Partner's Expenses"}</h2>
               <div className="flex items-center gap-2">
                 <DatePicker value={selectedDate} onChange={(v: string) => setSelectedDate(v)} className="h-8 text-sm" />
                 <span className="text-sm font-medium text-primary">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </div>
             </div>
             <div className="text-center">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Today</p>
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">{selectedDate === getToday() ? "Today" : "Selected Date"}</p>
               <p className="text-xl sm:text-2xl font-bold text-primary">{symbol}{formatAmountDisplay(totalForDate)}</p>
             </div>
           </div>
