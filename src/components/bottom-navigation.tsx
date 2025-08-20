@@ -1,13 +1,14 @@
-import { Home, Calendar, BarChart3, Repeat } from "lucide-react";
+import { Home, Calendar, BarChart3, Repeat, Users } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BottomNavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
   colorVariant?: 'primary' | 'rose';
+  isCoupleTab?: boolean;
 }
 
-export default function BottomNavigation({ currentView, onViewChange, colorVariant = 'primary' }: BottomNavigationProps) {
+export default function BottomNavigation({ currentView, onViewChange, colorVariant = 'primary', isCoupleTab }: BottomNavigationProps) {
   const isMobile = useIsMobile();
 
   if (!isMobile) {
@@ -34,10 +35,10 @@ export default function BottomNavigation({ currentView, onViewChange, colorVaria
       active: currentView === "recurring",
     },
     {
-      id: "charts",
-      label: "Insights",
-      icon: BarChart3,
-      active: currentView === "charts",
+      id: isCoupleTab ? "chat" : "charts",
+      label: isCoupleTab ? "Chat" : "Insights",
+      icon: isCoupleTab ? Users : BarChart3,
+      active: isCoupleTab ? currentView === "chat" : currentView === "charts",
     },
   ];
 

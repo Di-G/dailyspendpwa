@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3 } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
  
@@ -33,7 +33,7 @@ import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingReque
 import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
 
-type ViewType = "entry" | "charts" | "calendar" | "recurring";
+type ViewType = "entry" | "charts" | "calendar" | "recurring" | "chat";
 type CurrencyCode = "USD" | "INR";
 
 export default function ExpenseTracker() {
@@ -70,6 +70,7 @@ export default function ExpenseTracker() {
   const stopPartnerDocRef = useRef<null | (() => void)>(null);
   const [confirmCopyOpen, setConfirmCopyOpen] = useState<boolean>(false);
   const [customCopyOpen, setCustomCopyOpen] = useState<boolean>(false);
+  const [hasAcceptedRequest, setHasAcceptedRequest] = useState<boolean>(false);
   const [copySourceDate, setCopySourceDate] = useState<string>(getToday());
   const [copyDestDate, setCopyDestDate] = useState<string>(getToday());
   const [currentPartnerDate, setCurrentPartnerDate] = useState<string>(getToday());
@@ -174,6 +175,7 @@ export default function ExpenseTracker() {
         setHasPartner(false);
         setPartnerUid(null);
         setPartnerData(null);
+        setHasAcceptedRequest(false); // Reset accepted request flag
         try { stopPartnerDocRef.current?.(); } catch {}
         stopPartnerDocRef.current = null;
         return;
@@ -189,8 +191,10 @@ export default function ExpenseTracker() {
         setHasPartner(false);
         setPartnerUid(null);
         setPartnerData(null);
+        setHasAcceptedRequest(true); // Mark that user has accepted a request
         try { stopPartnerDocRef.current?.(); } catch {}
         stopPartnerDocRef.current = null;
+
         return;
       }
       
@@ -224,7 +228,7 @@ export default function ExpenseTracker() {
       try { stopPartnerDocRef.current?.(); } catch {}
       stopPartnerDocRef.current = null;
     };
-  }, [user?.uid, isVerified]);
+  }, [user?.uid, isVerified, hasAcceptedRequest]);
 
   const hasPendingIncoming = useMemo(() => incomingRequests.some(r => r.status === 'pending'), [incomingRequests]);
   const pendingOutgoing = useMemo(() => outgoingRequests.filter(r => r.status === 'pending'), [outgoingRequests]);
@@ -243,6 +247,8 @@ export default function ExpenseTracker() {
     prevTopTabRef.current = topTab;
   }, [topTab, rejectedUnseen.length]);
 
+
+
   const handleOpenAddPartner = () => {
     if (!isVerified) {
       setSubmitMessage("This functionality is only available to verified users. Please verify your email in Profile.");
@@ -260,6 +266,9 @@ export default function ExpenseTracker() {
       setTopTab('my');
       return;
     }
+    
+
+    
     setTopTab(v as typeof topTab);
   };
 
@@ -576,7 +585,7 @@ export default function ExpenseTracker() {
 
                 {/* Blur overlay */}
                 <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
-                {/* CTA above blur */}
+                                {/* CTA above blur */}
                 <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
                   <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
                     Add a Partner/Friend
@@ -599,11 +608,33 @@ export default function ExpenseTracker() {
                         <div className="rounded-lg border border-blue-200 bg-blue-50 text-blue-800 text-xs sm:text-sm px-3 py-2">
                           You're connected with {userAcceptedRequest.fromName || userAcceptedRequest.fromEmail}. Add your own partner to start sharing expenses.
                         </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                        );
+                      }
+                      return null;
+                    })()}
                 </div>
+
+                {/* Chat/Insights button for users who accepted partner requests */}
+                {hasAcceptedRequest && (
+                  <div className="fixed bottom-0 right-0 z-[85] pb-[env(safe-area-inset-bottom)]">
+                    <button
+                      onClick={() => setCurrentView(topTab === 'couple' ? 'chat' : 'charts')}
+                      style={{ width: '25vw' }}
+                      className="h-16 flex flex-col items-center justify-center transition-all duration-200 bg-rose-600 text-white"
+                    >
+                      {topTab === 'couple' ? (
+                        <Users className="w-5 h-5 mb-1 text-white" />
+                      ) : (
+                        <BarChart3 className="w-5 h-5 mb-1 text-white" />
+                      )}
+                      <span className="text-xs font-medium text-white">
+                        {topTab === 'couple' ? 'Chat' : 'Insights'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+
               </>
             )}
 
@@ -627,6 +658,24 @@ export default function ExpenseTracker() {
                       <div className="p-4 text-sm text-muted-foreground">Charts for partner will be available soon.</div>
                     )}
                   </>
+                )}
+              </>
+            )}
+
+            {/* Content views for users who accepted partner requests (follower users) */}
+            {!hasPartner && hasAcceptedRequest && (
+              <>
+                {currentView === 'entry' && (
+                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
+                )}
+                {currentView === 'calendar' && (
+                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
+                )}
+                {currentView === 'recurring' && (
+                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
+                )}
+                {currentView === 'charts' && (
+                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
                 )}
               </>
             )}
@@ -681,9 +730,10 @@ export default function ExpenseTracker() {
 
       {/* Bottom Navigation - Mobile only */}
       <BottomNavigation
-        currentView={currentView}
+        currentView={hasAcceptedRequest && topTab === 'couple' && !hasPartner ? 'none' : currentView}
         onViewChange={(v) => setCurrentView(v as ViewType)}
         colorVariant={topTab === 'couple' ? 'rose' : 'primary'}
+        isCoupleTab={topTab === 'couple'}
       />
 
       {/* Incoming partner request popup when user opens app */}
