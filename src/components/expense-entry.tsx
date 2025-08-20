@@ -534,11 +534,15 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       </div>
 
       {/* Selected Date Expenses List */}
-      <Card>
+      <Card className="overflow-hidden">
             <div className="p-4 sm:p-6 border-b border">
               <h3 className="text-lg font-semibold text-foreground">
-                {selectedDate === today ? "My Today's Expenses" : "My Expenses"}
+                Expense List
               </h3>
+              <p className="text-xs mt-1">
+                <span className="text-muted-foreground mr-1">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                <span className="font-medium text-primary">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+              </p>
             </div>
         <CardContent className="p-4 sm:p-6">
           {selectedDateExpenses.length === 0 ? (
@@ -546,7 +550,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
               <p>No expenses added for this date. Start by adding your first expense above.</p>
             </div>
           ) : (
-            <div className="rounded-lg overflow-hidden">
+            <div>
               {selectedDateExpenses.map((expense) => (
                 <button
                   key={expense.id}

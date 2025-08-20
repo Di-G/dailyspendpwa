@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -134,6 +134,14 @@ export default function CalendarView({ currency }: CalendarViewProps) {
       }
     });
   };
+
+  // Show today's preview by default
+  useEffect(() => {
+    setPreviewDate(today);
+    const items = getRecurringItemsForDate(today).map(i => ({ name: i.name, amount: i.amount }));
+    setPreviewItems(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const previousMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));

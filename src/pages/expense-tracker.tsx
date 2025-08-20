@@ -1309,7 +1309,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
 function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previewItems, setPreviewItems] = useState<Array<{ name: string; amount: string }>>([]);
-  const [previewDate, setPreviewDate] = useState<string | null>(null);
+  const [previewDate, setPreviewDate] = useState<string | null>(getToday());
   const [copyExpenseDialogOpen, setCopyExpenseDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [copyLoading, setCopyLoading] = useState(false);
@@ -1420,6 +1420,14 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
         ]
       : []
   );
+
+  // Show today's preview by default
+  useEffect(() => {
+    if (!previewDate) return;
+    const items = getRecurringItemsForDate(previewDate).map(i => ({ name: i.name, amount: i.amount }));
+    setPreviewItems(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getTotalForDate = (dateString: string) => {
     const found = monthlyTotals.find(mt => mt.date === dateString);

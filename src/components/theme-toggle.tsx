@@ -9,7 +9,15 @@ export default function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      onClick={toggleTheme}
+      className="hover:bg-transparent hover:text-inherit active:bg-accent active:text-accent-foreground"
+      onMouseDown={(e) => {
+        // Prevent mouse clicks from keeping focus on the button
+        e.preventDefault();
+      }}
+      onClick={(e) => {
+        toggleTheme();
+        try { (e.currentTarget as HTMLButtonElement).blur(); } catch {}
+      }}
       aria-label="Toggle theme"
     >
       {theme === "dark" ? (
