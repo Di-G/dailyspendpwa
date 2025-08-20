@@ -32,6 +32,7 @@ import { useAuth } from "@/lib/auth";
 import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest } from "@/lib/sync";
 import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
+import PartnerChat from "@/components/partner-chat";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring" | "chat";
 type CurrencyCode = "USD" | "INR";
@@ -62,6 +63,8 @@ export default function ExpenseTracker() {
   });
   const [partnerUid, setPartnerUid] = useState<string | null>(null);
   const [partnerNameResolved, setPartnerNameResolved] = useState<string>("");
+  const [acceptedPeerUid, setAcceptedPeerUid] = useState<string | null>(null);
+  const [acceptedPeerName, setAcceptedPeerName] = useState<string>("");
   const [partnerData, setPartnerData] = useState<{
     categories: Category[];
     expenses: Expense[];
@@ -176,6 +179,8 @@ export default function ExpenseTracker() {
         setPartnerUid(null);
         setPartnerData(null);
         setHasAcceptedRequest(false); // Reset accepted request flag
+        setAcceptedPeerUid(null);
+        setAcceptedPeerName("");
         try { stopPartnerDocRef.current?.(); } catch {}
         stopPartnerDocRef.current = null;
         return;
@@ -192,6 +197,8 @@ export default function ExpenseTracker() {
         setPartnerUid(null);
         setPartnerData(null);
         setHasAcceptedRequest(true); // Mark that user has accepted a request
+        setAcceptedPeerUid(userAcceptedRequest.fromUid);
+        setAcceptedPeerName(userAcceptedRequest.fromName || userAcceptedRequest.fromEmail);
         try { stopPartnerDocRef.current?.(); } catch {}
         stopPartnerDocRef.current = null;
 
@@ -266,8 +273,9 @@ export default function ExpenseTracker() {
       setTopTab('my');
       return;
     }
+    // Reset bottom view to default when switching any top tab
+    setCurrentView('entry');
     
-
     
     setTopTab(v as typeof topTab);
   };
@@ -318,7 +326,7 @@ export default function ExpenseTracker() {
 
   // Lock page scroll whenever couple tab is active and no partner is set
   useEffect(() => {
-    const shouldLock = topTab === 'couple' && !hasPartner;
+    const shouldLock = topTab === 'couple' && !hasPartner && currentView !== 'chat';
     const html = document.documentElement;
     const body = document.body;
     const prevHtmlOverflow = html.style.overflow;
@@ -331,7 +339,7 @@ export default function ExpenseTracker() {
       html.style.overflow = prevHtmlOverflow;
       body.style.overflow = prevBodyOverflow;
     };
-  }, [topTab, hasPartner]);
+  }, [topTab, hasPartner, currentView]);
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ transform: pullPx ? `translateY(${pullPx}px)` : undefined, transition: pullPx ? "none" : "transform 200ms ease" }}>
@@ -485,8 +493,8 @@ export default function ExpenseTracker() {
           </>
         ) : topTab === 'couple' ? (
           <div className="relative">
-            {/* If no accepted partner yet, show placeholder content + overlay and CTA */}
-            {!hasPartner && (
+            {/* If no accepted partner yet AND user hasn't accepted anyone, show placeholder content + overlay and CTA */}
+            {!hasPartner && !hasAcceptedRequest && (
               <>
                 {/* Visual scaffold to mimic a fresh home layout without data (dummy copy) */}
                 <div className="space-y-4 sm:space-y-6">
@@ -584,8 +592,11 @@ export default function ExpenseTracker() {
                 </div>
 
                 {/* Blur overlay */}
-                <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
-                                {/* CTA above blur */}
+                {(true) && (
+                  <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
+                )}
+                {/* CTA above blur (hidden during chat) */}
+                {true && (
                 <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
                   <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
                     Add a Partner/Friend
@@ -613,26 +624,9 @@ export default function ExpenseTracker() {
                       return null;
                     })()}
                 </div>
-
-                {/* Chat/Insights button for users who accepted partner requests */}
-                {hasAcceptedRequest && (
-                  <div className="fixed bottom-0 right-0 z-[85] pb-[env(safe-area-inset-bottom)]">
-                    <button
-                      onClick={() => setCurrentView(topTab === 'couple' ? 'chat' : 'charts')}
-                      style={{ width: '25vw' }}
-                      className="h-16 flex flex-col items-center justify-center transition-all duration-200 bg-rose-600 text-white"
-                    >
-                      {topTab === 'couple' ? (
-                        <Users className="w-5 h-5 mb-1 text-white" />
-                      ) : (
-                        <BarChart3 className="w-5 h-5 mb-1 text-white" />
-                      )}
-                      <span className="text-xs font-medium text-white">
-                        {topTab === 'couple' ? 'Chat' : 'Insights'}
-                      </span>
-                    </button>
-                  </div>
                 )}
+
+                {/* No chat button in this state; user hasn't accepted any request */}
 
 
               </>
@@ -657,25 +651,144 @@ export default function ExpenseTracker() {
                     {currentView === 'charts' && (
                       <div className="p-4 text-sm text-muted-foreground">Charts for partner will be available soon.</div>
                     )}
+                    {currentView === 'chat' && (
+                      <div className="p-4">
+                        <PartnerChat peerUid={partnerUid} peerName={partnerNameResolved} />
+                      </div>
+                    )}
                   </>
                 )}
               </>
             )}
 
-            {/* Content views for users who accepted partner requests (follower users) */}
+            {/* Follower users (accepted someone else's request): show chat when selected; other content placeholders otherwise */}
             {!hasPartner && hasAcceptedRequest && (
               <>
-                {currentView === 'entry' && (
-                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
+                {currentView !== 'chat' && (
+                  <>
+                    {/* Visual scaffold to mimic a fresh home layout without data (dummy copy) */}
+                    <div className="space-y-4 sm:space-y-6">
+                      <Card>
+                        <CardContent className="p-4 sm:p-6">
+                          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+                            <div>
+                              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">My Today's Expenses</h2>
+                              <div className="flex items-center gap-2">
+                                <DatePicker value={getToday()} onChange={() => {}} className="h-8 text-sm" />
+                                <span className="text-sm font-medium text-primary">{new Date().toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-6 gap-4 sm:gap-0">
+                              <div className="text-center">
+                                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Yesterday</p>
+                                <p className="text-lg sm:text-xl font-semibold text-foreground">—</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Today</p>
+                                <p className="text-xl sm:text-2xl font-bold text-primary">—</p>
+                              </div>
+                            </div>
+                          </div>
+                          {(() => {
+                            const mockCategories = [
+                              { id: 'food', name: 'Food', color: '#EF4444' },
+                              { id: 'travel', name: 'Travel', color: '#3B82F6' },
+                              { id: 'groceries', name: 'Groceries', color: '#10B981' },
+                              { id: 'shopping', name: 'Shopping', color: '#F59E0B' },
+                              { id: 'entertain', name: 'Entertainment', color: '#8B5CF6' },
+                              { id: 'health', name: 'Health', color: '#EC4899' },
+                              { id: 'bills', name: 'Bills', color: '#06B6D4' },
+                              { id: 'other', name: 'Other', color: '#94A3B8' },
+                            ];
+                            return (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-0">
+                                {mockCategories.map((category) => (
+                                  <div
+                                    key={category.id}
+                                    className="border rounded-lg p-2 sm:p-3 text-center"
+                                    style={{ backgroundColor: `${category.color}10`, borderColor: `${category.color}40` }}
+                                  >
+                                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2" style={{ backgroundColor: category.color }} />
+                                    <div className="h-3 w-16 mx-auto rounded-sm mb-1" style={{ backgroundColor: `${category.color}30` }} />
+                                    <div className="h-4 w-20 mx-auto rounded-sm" style={{ backgroundColor: `${category.color}20` }} />
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </CardContent>
+                      </Card>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                        <div className="lg:col-span-2">
+                          <Card>
+                            <CardContent className="p-4 sm:p-6">
+                              <h3 className="text-lg font-semibold text-foreground/80 mb-4">Add New Expense</h3>
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div className="h-10 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                                  <div className="h-10 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                                </div>
+                                <div className="h-10 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                                <div className="h-24 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                                <div className="h-10 rounded" style={{ backgroundColor: '#D1D5DB' }} />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                      <Card>
+                        <div className="p-4 sm:p-6 border-b border">
+                          <h3 className="text-lg font-semibold text-foreground/80">My Today's Expenses</h3>
+                        </div>
+                        <CardContent className="p-0">
+                          <div className="divide-y">
+                            {Array.from({ length: 3 }).map((_, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-4">
+                                <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: '#E5E7EB', borderColor: '#CBD5E1' }} />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="h-4 w-40 rounded mb-2" style={{ backgroundColor: '#E5E7EB' }} />
+                                    <div className="h-3 w-24 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                                  </div>
+                                </div>
+                                <div className="flex-shrink-0 ml-3 sm:ml-4">
+                                  <div className="h-4 w-16 rounded" style={{ backgroundColor: '#E5E7EB' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </>
                 )}
-                {currentView === 'calendar' && (
-                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
+                {currentView === 'chat' && (
+                  <div className="p-4">
+                    <PartnerChat peerUid={acceptedPeerUid} peerName={acceptedPeerName} />
+                  </div>
                 )}
-                {currentView === 'recurring' && (
-                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
-                )}
-                {currentView === 'charts' && (
-                  <div className="p-4 text-sm text-muted-foreground">Add your own partner to start sharing expenses.</div>
+
+                {/* Blur overlay + Chat CTA for follower until they open chat */}
+                {currentView !== 'chat' && (
+                  <>
+                    <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
+                    <div className="fixed bottom-0 right-0 z-[85] pb-[env(safe-area-inset-bottom)]">
+                      <button
+                        onClick={() => setCurrentView('chat')}
+                        style={{ width: '25vw' }}
+                        className="h-16 flex flex-col items-center justify-center transition-all duration-200 bg-rose-600 text-white"
+                      >
+                        <Users className="w-5 h-5 mb-1 text-white" />
+                        <span className="text-xs font-medium text-white">Chat</span>
+                      </button>
+                    </div>
+                    {/* Also show Add Partner/Friend CTA like in leader placeholder */}
+                    <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
+                      <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
+                        Add a Partner/Friend
+                      </Button>
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -721,19 +834,24 @@ export default function ExpenseTracker() {
         </Dialog>
       </div>
 
-      {/* Floating Action Button - Mobile only */}
-      <FloatingActionButton
-        onClick={handleFabClick}
-        colorVariant={topTab === 'couple' ? 'rose' : 'primary'}
-        disabled={topTab === 'couple' && !hasPartner}
-      />
+      
+
+      {/* Floating Action Button - Mobile only (hidden while in chat to avoid intercepting input) */}
+      {currentView !== 'chat' && (
+        <FloatingActionButton
+          onClick={handleFabClick}
+          colorVariant={topTab === 'couple' ? 'rose' : 'primary'}
+          disabled={topTab === 'couple' && !hasPartner}
+        />
+      )}
 
       {/* Bottom Navigation - Mobile only */}
       <BottomNavigation
-        currentView={hasAcceptedRequest && topTab === 'couple' && !hasPartner ? 'none' : currentView}
+        currentView={hasAcceptedRequest && topTab === 'couple' && !hasPartner ? currentView : currentView}
         onViewChange={(v) => setCurrentView(v as ViewType)}
         colorVariant={topTab === 'couple' ? 'rose' : 'primary'}
         isCoupleTab={topTab === 'couple'}
+        disabledIds={topTab === 'couple' && hasAcceptedRequest && !hasPartner ? ['entry','calendar','recurring'] : []}
       />
 
       {/* Incoming partner request popup when user opens app */}

@@ -6,9 +6,10 @@ interface BottomNavigationProps {
   onViewChange: (view: string) => void;
   colorVariant?: 'primary' | 'rose';
   isCoupleTab?: boolean;
+  disabledIds?: string[];
 }
 
-export default function BottomNavigation({ currentView, onViewChange, colorVariant = 'primary', isCoupleTab }: BottomNavigationProps) {
+export default function BottomNavigation({ currentView, onViewChange, colorVariant = 'primary', isCoupleTab, disabledIds = [] }: BottomNavigationProps) {
   const isMobile = useIsMobile();
 
   if (!isMobile) {
@@ -47,18 +48,22 @@ export default function BottomNavigation({ currentView, onViewChange, colorVaria
       <div className="flex items-stretch h-16">
         {navigationItems.map((item) => {
           const Icon = item.icon;
+          const isDisabled = disabledIds.includes(item.id);
           return (
             <button
               key={item.id}
-              onClick={() => onViewChange(item.id)}
+              onClick={() => { if (!isDisabled) onViewChange(item.id); }}
+              disabled={isDisabled}
               className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
-                item.active
+                isDisabled
+                  ? "opacity-50 cursor-not-allowed"
+                  : item.active
                   ? `${colorVariant === 'rose' ? 'bg-rose-600' : 'bg-primary'} text-white`
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >
-              <Icon className={`w-5 h-5 mb-1 ${item.active ? "text-white" : "text-gray-600"}`} />
-              <span className={`text-xs font-medium ${item.active ? "text-white" : "text-gray-600"}`}>
+              <Icon className={`w-5 h-5 mb-1 ${isDisabled ? "text-gray-400" : item.active ? "text-white" : "text-gray-600"}`} />
+              <span className={`text-xs font-medium ${isDisabled ? "text-gray-400" : item.active ? "text-white" : "text-gray-600"}`}>
                 {item.label}
               </span>
             </button>

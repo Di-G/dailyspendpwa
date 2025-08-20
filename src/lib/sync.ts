@@ -309,3 +309,134 @@ export function subscribeToAcceptedIncomingPartners(
 }
 
 
+// ----- 1:1 Chat helpers -----
+
+export type ChatMessage = {
+  id: string;
+  chatId: string;
+  fromUid: string;
+  text: string;
+  createdAt?: unknown;
+  fromName?: string | null;
+};
+
+export type ChatMeta = {
+  chatId: string;
+  participants: string[];
+  clearedAtBy?: Record<string, unknown>;
+  remindClearAtBy?: Record<string, unknown>;
+  updatedAt?: unknown;
+  lastMessage?: string;
+  lastFromUid?: string;
+};
+
+/** Deterministic chat id for a pair of users */
+export function getDirectChatId(uidA: string, uidB: string): string {
+  return [uidA, uidB].sort().join("_");
+}
+
+/** Ensure chat metadata document exists with participants */
+export async function ensureDirectChat(chatId: string, uidA: string, uidB: string): Promise<void> {
+  const chatRef = doc(db, "chats", chatId);
+  await setDoc(
+    chatRef,
+    {
+      chatId,
+      participants: [uidA, uidB].sort(),
+      updatedAt: serverTimestamp(),
+    } as any,
+    { merge: true }
+  );
+}
+
+/** Subscribe to messages for a chat, ordered by createdAt asc */
+export function subscribeToChatMessages(
+  chatId: string,
+  onChange: (messages: ChatMessage[]) => void
+): Unsubscribe {
+  const ref = collection(db, "chats", chatId, "messages");
+  const qy = query(ref, orderBy("createdAt", "asc"));
+  return onSnapshot(qy, (snap) => {
+    const list: ChatMessage[] = [];
+    snap.forEach((d) => {
+      if (d.exists()) list.push(d.data() as ChatMessage);
+    });
+    onChange(list);
+  });
+}
+
+/** Subscribe to chat metadata (participants, clearedAtBy, reminders, etc.) */
+export function subscribeToChatMeta(
+  chatId: string,
+  onChange: (meta: ChatMeta | null) => void
+): Unsubscribe {
+  const ref = doc(db, "chats", chatId);
+  return onSnapshot(ref, (snap) => {
+    if (!snap.exists()) return onChange(null);
+    onChange(snap.data() as unknown as ChatMeta);
+  });
+}
+
+/** Send a message to a chat */
+export async function sendChatMessage(params: {
+  chatId: string;
+  fromUid: string;
+  peerUid: string;
+  text: string;
+  fromName?: string;
+}): Promise<void> {
+  const { chatId, fromUid, peerUid, text, fromName } = params;
+  // Ensure chat metadata exists first so message reads pass rules
+  await ensureDirectChat(chatId, fromUid, peerUid);
+  const messagesRef = collection(db, "chats", chatId, "messages");
+  const msgRef = doc(messagesRef);
+  const payload: ChatMessage = {
+    id: msgRef.id,
+    chatId,
+    fromUid,
+    text,
+    fromName: fromName ?? null,
+    createdAt: serverTimestamp(),
+  } as any;
+  await setDoc(msgRef, payload as any, { merge: true });
+  // Upsert chat metadata (for future list views)
+  await setDoc(
+    doc(db, "chats", chatId),
+    {
+      chatId,
+      participants: [fromUid, peerUid].sort(),
+      lastMessage: text,
+      lastFromUid: fromUid,
+      updatedAt: serverTimestamp(),
+    } as any,
+    { merge: true }
+  );
+}
+
+/** Update a user's clearedAt in chat metadata */
+export async function updateChatClearedAt(chatId: string, uid: string): Promise<void> {
+  const ref = doc(db, "chats", chatId);
+  const field = `clearedAtBy.${uid}` as any;
+  await setDoc(
+    ref,
+    {
+      updatedAt: serverTimestamp(),
+      clearedAtBy: { [uid]: serverTimestamp() },
+    } as any,
+    { merge: true }
+  );
+}
+
+/** Send a reminder to the other user to clear chat (stored in chat meta) */
+export async function sendChatReminder(chatId: string, toUid: string): Promise<void> {
+  const ref = doc(db, "chats", chatId);
+  await setDoc(
+    ref,
+    {
+      updatedAt: serverTimestamp(),
+      remindClearAtBy: { [toUid]: serverTimestamp() },
+    } as any,
+    { merge: true }
+  );
+}
+
