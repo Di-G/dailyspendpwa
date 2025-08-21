@@ -173,6 +173,7 @@ function App() {
               expenses: 'Trip Expenses',
               recurring: 'Trip Recurring',
             }}
+            allowOutsideClick={true}
           />
         )}
       </TooltipProvider>

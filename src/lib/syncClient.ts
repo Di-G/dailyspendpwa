@@ -130,7 +130,7 @@ export function useRealtimeSync() {
             tripRecurring: (remoteSnapshot as any).tripRecurring || [],
           } : null;
           const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
-          const hasTripsConflicts = tripsConflict.hasOnlineData && (
+          const hasTripsConflicts = (tripsConflict.hasOnlineData || tripsConflict.hasLocalData) && (
             tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
           );
           if (hasTripsConflicts) {
@@ -143,13 +143,22 @@ export function useRealtimeSync() {
 
         // Either session is in-sync or no conflicts detected; proceed with upload
         if (Date.now() < suppressUploadsUntil.current) return;
+        
+        // Check if there are pending trips conflicts before uploading trips data
+        const hasPendingTripsConflict = (() => {
+          try { return localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'; } catch { return false; }
+        })();
+        
         await uploadAllForUser(user.uid, {
           categories: getCategories(),
           expenses: getExpenses(),
           recurring: getRecurringExpenses(),
-          trips: getTrips(),
-          tripExpenses: getTripExpensesRaw(),
-          tripRecurring: getTripRecurringRaw(),
+          // Only include trips data if there are no pending trips conflicts
+          ...(hasPendingTripsConflict ? {} : {
+            trips: getTrips(),
+            tripExpenses: getTripExpensesRaw(),
+            tripRecurring: getTripRecurringRaw(),
+          })
         }, sessionIdRef.current);
       } catch (e) {
         console.error('Background upload failed', e);
@@ -242,7 +251,7 @@ export function useRealtimeSync() {
               tripRecurring: (remoteSnapshot as any).tripRecurring || [],
             } : null;
             const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
-            const hasTripsConflicts = tripsConflict.hasOnlineData && (
+            const hasTripsConflicts = (tripsConflict.hasOnlineData || tripsConflict.hasLocalData) && (
               tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
             );
             if (hasTripsConflicts) {
@@ -307,7 +316,7 @@ export function useRealtimeSync() {
         tripRecurring: (remoteData as any).tripRecurring || [],
       } : null;
       const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
-      const hasTripsConflicts = tripsConflict.hasLocalData && tripsConflict.hasOnlineData && (
+      const hasTripsConflicts = (tripsConflict.hasLocalData || tripsConflict.hasOnlineData) && (
         tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
       );
       if (hasTripsConflicts) {
@@ -368,14 +377,13 @@ export function useRealtimeSync() {
         resolvedData.recurring
       );
       
-      // Upload resolved data to cloud
+      // Upload resolved data to cloud (only expenses data, not trips)
       await uploadAllForUser(
         user!.uid,
         {
           ...resolvedData as any,
-          trips: getTrips(),
-          tripExpenses: getTripExpensesRaw(),
-          tripRecurring: getTripRecurringRaw(),
+          // Don't include trips data when resolving expenses conflicts
+          // Trips conflicts should be resolved separately
         },
         sessionIdRef.current,
         { overwrite: shouldOverwriteRemote }
@@ -440,6 +448,10 @@ export function useRealtimeSync() {
       await performTripsSync(pendingTripsConflict, resolution);
       setTripsConflictDialogOpen(false);
       setPendingTripsConflict(null);
+      // Navigate to trips tab after successful resolution
+      try {
+        window.dispatchEvent(new CustomEvent('dailyspend:navigate-trips'));
+      } catch {}
     } catch (e) {
       console.error('Trips conflict resolution failed:', e);
       throw e;
@@ -464,12 +476,11 @@ export function useRealtimeSync() {
     pendingTripsConflict,
     onTripsConflictResolve: handleTripsConflictResolution,
     onTripsConflictDialogClose: async () => {
-      // Clear the pending flag so Trips is accessible
-      try { localStorage.setItem('dailyspend_trips_conflict_pending', 'false'); } catch {}
-      // Fire events to update UI state
+      // User cancelled - keep the conflict pending and navigate back to My Expenses
+      try { localStorage.setItem('dailyspend_trips_conflict_pending', 'true'); } catch {}
+      // Fire events to update UI state and navigate back to My Expenses
       try {
-        window.dispatchEvent(new CustomEvent('dailyspend:trips-conflict-resolved'));
-        window.dispatchEvent(new CustomEvent('dailyspend:navigate-trips'));
+        window.dispatchEvent(new CustomEvent('dailyspend:navigate-home'));
       } catch {}
       setTripsConflictDialogOpen(false);
       setPendingTripsConflict(null);

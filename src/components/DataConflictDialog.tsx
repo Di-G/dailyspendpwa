@@ -19,9 +19,10 @@ interface DataConflictDialogProps {
     recurring?: string;
   };
   descriptionOverride?: string;
+  allowOutsideClick?: boolean; // Allow clicking outside to close (for trips conflicts)
 }
 
-export default function DataConflictDialog({ open, onClose, conflict, onResolve, titleOverride, sectionsLabelOverride, descriptionOverride }: DataConflictDialogProps) {
+export default function DataConflictDialog({ open, onClose, conflict, onResolve, titleOverride, sectionsLabelOverride, descriptionOverride, allowOutsideClick = false }: DataConflictDialogProps) {
   const { toast } = useToast();
   const [selectedResolution, setSelectedResolution] = useState<ConflictResolution | null>(null);
   const [isResolving, setIsResolving] = useState(false);
@@ -73,7 +74,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
         onClose();
       }
     }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => allowOutsideClick ? undefined : e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />

@@ -5,7 +5,11 @@ import {
   analyzeDataConflicts, 
   mergeData, 
   applyConflictResolution,
-  type DataConflict 
+  analyzeTripsConflicts,
+  mergeTripsData,
+  applyTripsConflictResolution,
+  type DataConflict,
+  type TripsConflict
 } from './dataConflictResolver';
 
 // Mock data for testing
@@ -81,6 +85,51 @@ export function testConflictResolution() {
   return { mergedResult, localResult, onlineResult };
 }
 
+// Test trips conflict detection
+export function testTripsConflictDetection() {
+  console.log('=== Testing Trips Conflict Detection ===');
+  
+  // Test case 1: Online has trips, local has no trips (user deleted trips offline)
+  const localDataNoTrips = { trips: [], tripExpenses: [], tripRecurring: [] };
+  const onlineDataWithTrips = {
+    trips: [{ id: '1', name: 'Vacation', friends: 2 }],
+    tripExpenses: [{ id: '1', tripId: '1', name: 'Hotel', amount: '100', date: '2024-01-01', createdAt: '2024-01-01T00:00:00Z' }],
+    tripRecurring: []
+  };
+  
+  const conflict1 = analyzeTripsConflicts(localDataNoTrips, onlineDataWithTrips);
+  console.log('Case 1 - Online has trips, local has no trips:');
+  console.log('Has conflicts:', conflict1.conflicts.trips || conflict1.conflicts.tripExpenses || conflict1.conflicts.tripRecurring);
+  console.log('Conflict result:', conflict1);
+  
+  // Test case 2: Online has no trips, local has trips (user created trips offline)
+  const localDataWithTrips = {
+    trips: [{ id: '1', name: 'Business Trip', friends: 1 }],
+    tripExpenses: [{ id: '1', tripId: '1', name: 'Flight', amount: '200', date: '2024-01-01', createdAt: '2024-01-01T00:00:00Z' }],
+    tripRecurring: []
+  };
+  const onlineDataNoTrips = { trips: [], tripExpenses: [], tripRecurring: [] };
+  
+  const conflict2 = analyzeTripsConflicts(localDataWithTrips, onlineDataNoTrips);
+  console.log('Case 2 - Online has no trips, local has trips:');
+  console.log('Has conflicts:', conflict2.conflicts.trips || conflict2.conflicts.tripExpenses || conflict2.conflicts.tripRecurring);
+  console.log('Conflict result:', conflict2);
+  
+  // Test case 3: Both have trips but different data
+  const conflict3 = analyzeTripsConflicts(localDataWithTrips, onlineDataWithTrips);
+  console.log('Case 3 - Both have trips but different data:');
+  console.log('Has conflicts:', conflict3.conflicts.trips || conflict3.conflicts.tripExpenses || conflict3.conflicts.tripRecurring);
+  console.log('Conflict result:', conflict3);
+  
+  // Test case 4: Neither has trips (no conflict)
+  const conflict4 = analyzeTripsConflicts(localDataNoTrips, onlineDataNoTrips);
+  console.log('Case 4 - Neither has trips:');
+  console.log('Has conflicts:', conflict4.conflicts.trips || conflict4.conflicts.tripExpenses || conflict4.conflicts.tripRecurring);
+  console.log('Conflict result:', conflict4);
+  
+  return { conflict1, conflict2, conflict3, conflict4 };
+}
+
 // Run all tests
 export function runAllTests() {
   console.log('🧪 Running Data Conflict Resolution Tests...\n');
@@ -91,6 +140,8 @@ export function runAllTests() {
     testDataMerging();
     console.log('');
     testConflictResolution();
+    console.log('');
+    testTripsConflictDetection();
     console.log('');
     console.log('✅ All tests completed successfully!');
   } catch (error) {

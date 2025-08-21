@@ -22,12 +22,7 @@ import { formatAmountDisplay } from "@/lib/utils";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 
-const CURRENCIES = {
-  USD: { symbol: "$", name: "US Dollar" },
-  INR: { symbol: "₹", name: "Indian Rupee" }
-} as const;
-
-type CurrencyCode = keyof typeof CURRENCIES;
+import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 
 interface ExpenseEntryProps {
   currency: CurrencyCode;

@@ -7,9 +7,10 @@ import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getRecurringExpenses } from "@/lib/localStorage";
 import type { RecurringExpense, ExpenseWithCategory } from "@shared/schema";
+import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 
 interface CalendarViewProps {
-  currency: "USD" | "INR";
+  currency: CurrencyCode;
 }
 
 export default function CalendarView({ currency }: CalendarViewProps) {
@@ -30,10 +31,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   // Get recurring expenses for the month
   const recurringExpenses = getRecurringExpenses();
 
-  const CURRENCIES = {
-    USD: { symbol: "$" },
-    INR: { symbol: "₹" }
-  } as const;
+
 
   // Expenses for the clicked date
   const { data: previewExpenses = [] } = useQuery<ExpenseWithCategory[]>({

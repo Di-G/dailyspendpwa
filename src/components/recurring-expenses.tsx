@@ -22,8 +22,10 @@ import { getCategories, getRecurringExpensesWithCategories, createRecurringExpen
 import { InsertRecurringExpense, RecurringExpenseWithCategory, Category } from "@shared/schema";
 import { formatDate } from "@/lib/date-utils";
 
+import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
+
 interface RecurringExpensesProps {
-  currency: "USD" | "INR";
+  currency: CurrencyCode;
 }
 
 export default function RecurringExpenses({ currency }: RecurringExpensesProps) {
@@ -45,10 +47,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
   });
   const { toast } = useToast();
 
-  const CURRENCIES = {
-    USD: { symbol: "$", name: "US Dollar" },
-    INR: { symbol: "₹", name: "Indian Rupee" }
-  } as const;
+
 
   useEffect(() => {
     loadData();

@@ -11,13 +11,7 @@ import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartner
 import { Trash, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-
-type CurrencyCode = "USD" | "INR";
-
-const CURRENCIES = {
-  USD: { symbol: "$", name: "US Dollar" },
-  INR: { symbol: "₹", name: "Indian Rupee" },
-} as const;
+import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 
 interface SettingsDrawerProps {
   currency: CurrencyCode;
@@ -61,9 +55,11 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
   // Persist currency preference
   const onCurrencyChange = (value: string) => {
     const next = (value as CurrencyCode);
-    localStorage.setItem("dailyspend_currency", next);
+    const storageKey = topTab === 'trips' ? "dailyspend_trips_currency" : "dailyspend_expenses_currency";
+    localStorage.setItem(storageKey, next);
     setCurrency(next);
-    toast({ title: "Currency updated", description: `Now using ${next}` });
+    const context = topTab === 'trips' ? 'trips' : 'expenses';
+    toast({ title: "Currency updated", description: `${context} now using ${next}` });
   };
 
   const data = useMemo(() => {
@@ -376,20 +372,30 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
           >
             Currency
           </button>
-          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-96' : 'max-h-0'}`}>
+          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-[800px]' : 'max-h-0'}`}>
             <div className="pt-2">
-              <Select value={currency} onValueChange={onCurrencyChange}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CURRENCIES).map(([code, curr]) => (
-                    <SelectItem key={code} value={code}>
-                      {curr.symbol} {code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">
+                  Current: {currency ? `${CURRENCIES[currency].symbol} ${currency} - ${CURRENCIES[currency].name}` : "None selected"}
+                </div>
+                <Select value={currency} onValueChange={onCurrencyChange}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue>
+                      {currency ? `${CURRENCIES[currency].symbol} ${currency}` : "Select currency"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto z-[9999]">
+                    {Object.entries(CURRENCIES).map(([code, curr]) => (
+                      <SelectItem key={code} value={code}>
+                        {curr.symbol} {code} - {curr.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  Click the dropdown above to select a currency
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -38,9 +38,9 @@ import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingReque
 import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
 import PartnerChat from "@/components/partner-chat";
+import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring" | "chat";
-type CurrencyCode = "USD" | "INR";
 
 export default function ExpenseTracker() {
   const [currentView, setCurrentView] = useState<ViewType>("entry");
@@ -48,8 +48,12 @@ export default function ExpenseTracker() {
   const [tripsBlocked, setTripsBlocked] = useState<boolean>(() => {
     try { return localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'; } catch { return false; }
   });
-  const [currency, setCurrency] = useState<CurrencyCode>(() => {
-    const saved = localStorage.getItem("dailyspend_currency") as CurrencyCode | null;
+  const [expensesCurrency, setExpensesCurrency] = useState<CurrencyCode>(() => {
+    const saved = localStorage.getItem("dailyspend_expenses_currency") as CurrencyCode | null;
+    return saved || "USD";
+  });
+  const [tripsCurrency, setTripsCurrency] = useState<CurrencyCode>(() => {
+    const saved = localStorage.getItem("dailyspend_trips_currency") as CurrencyCode | null;
     return saved || "USD";
   });
   const isMobile = useIsMobile();
@@ -489,8 +493,8 @@ export default function ExpenseTracker() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-6">
                     <SettingsDrawer 
-                      currency={currency} 
-                      setCurrency={setCurrency} 
+                      currency={topTab === 'trips' ? tripsCurrency : expensesCurrency} 
+                      setCurrency={topTab === 'trips' ? setTripsCurrency : setExpensesCurrency} 
                       topTab={topTab}
                       onPartnerRemoved={handlePartnerRemoved}
                       onTripsChanged={(hasAny) => { setHasTrips(hasAny); setTripsRevision((v) => v + 1); }}
@@ -561,15 +565,15 @@ export default function ExpenseTracker() {
           <>
             {currentView === "entry" && (
               <ExpenseEntry
-                currency={currency}
-                setCurrency={setCurrency}
+                currency={expensesCurrency}
+                setCurrency={setExpensesCurrency}
                 focusAmountTrigger={focusAmountTrigger}
                 onFocusAmountConsumed={() => setFocusAmountTrigger(null)}
               />
             )}
-            {currentView === "charts" && <ChartsView currency={currency} />}
-            {currentView === "calendar" && <CalendarView currency={currency} />}
-            {currentView === "recurring" && <RecurringExpenses currency={currency} />}
+            {currentView === "charts" && <ChartsView currency={expensesCurrency} />}
+            {currentView === "calendar" && <CalendarView currency={expensesCurrency} />}
+            {currentView === "recurring" && <RecurringExpenses currency={expensesCurrency} />}
           </>
         ) : topTab === 'couple' ? (
           <div className="relative">
@@ -720,13 +724,13 @@ export default function ExpenseTracker() {
                 ) : (
                   <>
                     {currentView === 'entry' && (
-                      <PartnerHomeReadOnly currency={currency} data={partnerData} setCurrentPartnerDate={setCurrentPartnerDate} />
+                      <PartnerHomeReadOnly currency={expensesCurrency} data={partnerData} setCurrentPartnerDate={setCurrentPartnerDate} />
                     )}
                     {currentView === 'calendar' && (
-                      <PartnerCalendarReadOnly currency={currency} data={partnerData} />
+                      <PartnerCalendarReadOnly currency={expensesCurrency} data={partnerData} />
                     )}
                     {currentView === 'recurring' && (
-                      <PartnerRecurringReadOnly currency={currency} data={partnerData} />
+                      <PartnerRecurringReadOnly currency={expensesCurrency} data={partnerData} />
                     )}
                     {currentView === 'charts' && (
                       <div className="p-4 text-sm text-muted-foreground">Charts for partner will be available soon.</div>
@@ -876,9 +880,9 @@ export default function ExpenseTracker() {
         ) : topTab === 'trips' ? (
           hasTrips ? (
             <>
-              {currentView === 'entry' && <TripHome currency={currency} />}
-              {currentView === 'calendar' && <TripCalendar currency={currency} />}
-              {currentView === 'recurring' && <TripRecurring currency={currency} />}
+                              {currentView === 'entry' && <TripHome currency={tripsCurrency} />}
+                {currentView === 'calendar' && <TripCalendar currency={tripsCurrency} />}
+                {currentView === 'recurring' && <TripRecurring currency={tripsCurrency} />}
               {currentView === 'charts' && (
                 <div className="p-4 text-sm text-muted-foreground">Charts for trips will be available soon.</div>
               )}
@@ -1145,7 +1149,7 @@ export default function ExpenseTracker() {
                   const partnerRemaining = sourceExpenses.filter(e => !selectedCopyExpenseIds.includes(e.id));
                   const categoryById = new Map<string, Category>();
                   (partnerData?.categories || []).forEach(c => categoryById.set(c.id, c));
-                  const symbol = currency === 'INR' ? '₹' : '$';
+                  const symbol = CURRENCIES[expensesCurrency].symbol;
                   return (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center justify-between text-xs">
@@ -1227,7 +1231,7 @@ export default function ExpenseTracker() {
                   const mySelected = sourceExpenses.filter(e => selectedCopyExpenseIds.includes(e.id));
                   const categoryById = new Map<string, Category>();
                   (partnerData?.categories || []).forEach(c => categoryById.set(c.id, c));
-                  const symbol = currency === 'INR' ? '₹' : '$';
+                  const symbol = CURRENCIES[expensesCurrency].symbol;
                   const selectedTotal = mySelected.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
                   return (
                     <div className="mt-3 space-y-2">
@@ -1423,7 +1427,6 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
   const [editTripFields, setEditTripFields] = useState<{ name: string; amount: string; details: string; friendIndex: number } | null>(null);
   const [showEditTripDetails, setShowEditTripDetails] = useState(false);
 
-  const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
   const symbol = CURRENCIES[currency].symbol;
 
   // Storage helpers for trip expenses
@@ -1774,7 +1777,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
   });
   const { toast } = useToast();
 
-  const CURRENCIES = { USD: { symbol: '$' }, INR: { symbol: '₹' } } as const;
+
   const symbol = CURRENCIES[currency].symbol;
 
   useEffect(() => {
@@ -2082,7 +2085,6 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
   };
   const getTripRecurring = () => getTripRecurringRaw();
 
-  const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
   const symbol = CURRENCIES[currency].symbol;
 
   const monthlyTotals = useMemo(() => {
@@ -2310,7 +2312,6 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
     }
   };
 
-  const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
   const symbol = CURRENCIES[currency].symbol;
 
   const expensesForDate = useMemo(() => data.expenses.filter(e => e.date === selectedDate), [data.expenses, selectedDate]);
@@ -2492,7 +2493,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
   const monthInfo = getMonthInfo(currentDate);
   const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
 
-  const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
+
 
   const monthlyTotals = useMemo(() => {
     const map = new Map<string, number>();

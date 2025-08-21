@@ -10,6 +10,7 @@ import { Button as UIButton } from "@/components/ui/button";
 import type { Category } from "@shared/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatAmountDisplay } from "@/lib/utils";
+import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 
 declare global {
   interface Window {
@@ -18,7 +19,7 @@ declare global {
 }
 
 interface ChartsViewProps {
-  currency: "USD" | "INR";
+  currency: CurrencyCode;
 }
 
 export default function ChartsView({ currency }: ChartsViewProps) {
@@ -30,10 +31,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   const barChartInstance = useRef<any>(null);
   const isMobile = useIsMobile();
 
-  const CURRENCIES = {
-    USD: { symbol: "$", name: "US Dollar" },
-    INR: { symbol: "₹", name: "Indian Rupee" }
-  } as const;
+
 
   // Queries
   const { data: categoryTotals = [] } = useQuery<Array<{ categoryId: string; total: number; category: Category }>>({

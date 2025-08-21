@@ -138,7 +138,8 @@ export function analyzeTripsConflicts(
     (onlineData.trips?.length || 0) + (onlineData.tripExpenses?.length || 0) + (onlineData.tripRecurring?.length || 0)
   ) > 0;
 
-  if (!hasLocalData || !hasOnlineData) {
+  // If neither local nor online has data, no conflicts
+  if (!hasLocalData && !hasOnlineData) {
     return {
       hasLocalData,
       hasOnlineData,
@@ -148,6 +149,18 @@ export function analyzeTripsConflicts(
     };
   }
 
+  // If only one side has data, there's a conflict
+  if (!hasLocalData || !hasOnlineData) {
+    return {
+      hasLocalData,
+      hasOnlineData,
+      conflicts: { trips: true, tripExpenses: true, tripRecurring: true },
+      localData,
+      onlineData: onlineData || { trips: [], tripExpenses: [], tripRecurring: [] },
+    };
+  }
+
+  // Both sides have data, check for actual conflicts
   const tripsConflict = !areArraysEqual(localData.trips, onlineData!.trips || []);
   const tripExpensesConflict = !areArraysEqual(localData.tripExpenses, onlineData!.tripExpenses || []);
   const tripRecurringConflict = !areArraysEqual(localData.tripRecurring, onlineData!.tripRecurring || []);
@@ -173,7 +186,23 @@ export function mergeTripsData(
   ).map((t: any) => ({ id: t.id, name: t.name, friends: t.friends } as Trip));
 
   const mergedTripExpenses = mergeArraysByTimestamp(localData.tripExpenses, onlineData.tripExpenses || [], 'createdAt');
-  const mergedTripRecurring = mergeArraysByTimestamp(localData.tripRecurring, onlineData.tripRecurring || [], 'createdAt');
+  const mergedTripRecurring = mergeArraysByTimestamp(
+    localData.tripRecurring.map(t => ({ ...t, createdAt: (t as any).createdAt || '1970-01-01T00:00:00.000Z' })) as any,
+    (onlineData.tripRecurring || []).map(t => ({ ...t, createdAt: (t as any).createdAt || '1970-01-01T00:00:00.000Z' })) as any,
+    'createdAt'
+  ).map((t: any) => ({ 
+    id: t.id, 
+    tripId: t.tripId, 
+    name: t.name, 
+    amount: t.amount, 
+    details: t.details, 
+    friendIndex: t.friendIndex, 
+    frequency: t.frequency, 
+    customDays: t.customDays, 
+    startDate: t.startDate, 
+    endDate: t.endDate, 
+    isActive: t.isActive 
+  } as TripRecurring));
 
   return { trips: mergedTrips, tripExpenses: mergedTripExpenses, tripRecurring: mergedTripRecurring };
 }
