@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest } from "@/lib/sync";
 import { Trash, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -508,6 +509,8 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
   const [trips, setTrips] = useState<Array<{ id: string; name: string; friends: { name: string }[] }>>(() => {
     try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
   });
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     // Refresh on open
@@ -515,8 +518,6 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
   }, []);
 
   const handleDeleteTrip = (id: string) => {
-    const confirmed = window.confirm('Delete this trip? This cannot be undone.');
-    if (!confirmed) return;
     try {
       const next = trips.filter(t => t.id !== id);
       localStorage.setItem('dailyspend_trips', JSON.stringify(next));
@@ -526,6 +527,11 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
     } catch (e) {
       toast({ title: 'Delete failed', description: 'Could not delete trip', variant: 'destructive' });
     }
+  };
+
+  const promptDeleteTrip = (trip: { id: string; name: string }) => {
+    setTripToDelete({ id: trip.id, name: trip.name });
+    setDeleteOpen(true);
   };
 
   if (trips.length === 0) {
@@ -546,12 +552,36 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
               <div className="text-sm font-medium truncate">{trip.name}</div>
               <div className="text-xs text-muted-foreground truncate">{trip.friends.length} friend{trip.friends.length === 1 ? '' : 's'}</div>
             </div>
-            <Button variant="destructive" size="icon" title="Delete trip" onClick={() => handleDeleteTrip(trip.id)}>
+            <Button variant="destructive" size="icon" title="Delete trip" onClick={() => promptDeleteTrip({ id: trip.id, name: trip.name })}>
               <Trash className="w-4 h-4" />
             </Button>
           </div>
         ))}
       </div>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="z-[100]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Trip</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Are you sure you want to delete "${tripToDelete?.name || 'this trip'}"? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setDeleteOpen(false); setTripToDelete(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (tripToDelete) {
+                  handleDeleteTrip(tripToDelete.id);
+                }
+                setDeleteOpen(false);
+                setTripToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
