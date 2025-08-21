@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
 import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest } from "@/lib/sync";
+import { Trash, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 type CurrencyCode = "USD" | "INR";
 
@@ -21,9 +23,10 @@ interface SettingsDrawerProps {
   setCurrency: (c: CurrencyCode) => void;
   topTab?: "my" | "couple" | "trips" | "followups";
   onPartnerRemoved?: (requestId: string) => void;
+  onTripsChanged?: (hasTrips: boolean) => void;
 }
 
-export default function SettingsDrawer({ currency, setCurrency, topTab = "my", onPartnerRemoved }: SettingsDrawerProps) {
+export default function SettingsDrawer({ currency, setCurrency, topTab = "my", onPartnerRemoved, onTripsChanged }: SettingsDrawerProps) {
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -358,6 +361,11 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
 
   return (
     <div className="space-y-4">
+      {/* Trips management - only on Trips tab */}
+      {topTab === 'trips' && (
+        <TripsManagement onTripsChanged={onTripsChanged} />
+      )}
+
       {/* Currency */}
       {topTab !== 'couple' && (
         <div>
@@ -395,7 +403,7 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
 
       <Separator />
 
-      {/* Manage Categories or Partners based on top tab */}
+      {/* Manage Friends (Trips) or Categories based on top tab */}
       {topTab === 'couple' ? (
         <div>
           <div className="pt-2">
@@ -415,11 +423,15 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
             className="w-full text-left text-sm font-medium text-foreground py-2"
             onClick={() => toggle("categories")}
           >
-            Manage Categories
+            {topTab === 'trips' ? 'Manage Friends' : 'Manage Categories'}
           </button>
           <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
             <div className="pt-2">
-              <CategoryManagement hideHeader />
+              {topTab === 'trips' ? (
+                <ManageFriends onTripsChanged={onTripsChanged} />
+              ) : (
+                <CategoryManagement hideHeader />
+              )}
             </div>
           </div>
         </div>
@@ -490,4 +502,240 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
   );
 }
 
+
+function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boolean) => void }) {
+  const { toast } = useToast();
+  const [trips, setTrips] = useState<Array<{ id: string; name: string; friends: { name: string }[] }>>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    // Refresh on open
+    try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
+  }, []);
+
+  const handleDeleteTrip = (id: string) => {
+    const confirmed = window.confirm('Delete this trip? This cannot be undone.');
+    if (!confirmed) return;
+    try {
+      const next = trips.filter(t => t.id !== id);
+      localStorage.setItem('dailyspend_trips', JSON.stringify(next));
+      setTrips(next);
+      onTripsChanged?.(next.length > 0);
+      toast({ title: 'Trip deleted' });
+    } catch (e) {
+      toast({ title: 'Delete failed', description: 'Could not delete trip', variant: 'destructive' });
+    }
+  };
+
+  if (trips.length === 0) {
+    return (
+      <div className="p-3 border rounded-md">
+        <div className="text-sm text-muted-foreground">No trips created yet.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold">Trips</h3>
+      <div className="space-y-2">
+        {trips.map(trip => (
+          <div key={trip.id} className="flex items-center justify-between p-2 border rounded-md bg-card">
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{trip.name}</div>
+              <div className="text-xs text-muted-foreground truncate">{trip.friends.length} friend{trip.friends.length === 1 ? '' : 's'}</div>
+            </div>
+            <Button variant="destructive" size="icon" title="Delete trip" onClick={() => handleDeleteTrip(trip.id)}>
+              <Trash className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ManageFriends({ onTripsChanged }: { onTripsChanged?: (hasTrips: boolean) => void }) {
+  const { toast } = useToast();
+  const [selectedColor, setSelectedColor] = useState<string>("#14B8A6");
+  const [customSwatchColor, setCustomSwatchColor] = useState<string>("#000000");
+  const colorInputRef = useRef<HTMLInputElement | null>(null);
+  const [trips, setTrips] = useState<Array<{ id: string; name: string; friends: { name: string }[] }>>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
+  });
+  const [activeTripId, setActiveTripId] = useState<string>(() => (trips[0]?.id || ''));
+  const activeTripIndex = trips.findIndex(t => t.id === activeTripId);
+  const activeTrip = trips[activeTripIndex] || null;
+  const [newFriendName, setNewFriendName] = useState<string>("");
+
+  useEffect(() => {
+    try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
+  }, []);
+
+  const COLOR_OPTIONS = [
+    "#14B8A6", // teal
+    "#6366F1", // indigo
+    "#84CC16", // lime
+    "#D946EF", // fuchsia
+    "#F97316", // orange
+    "#0EA5E9", // sky
+    "#F43F5E", // rose
+  ];
+
+  const persistTrips = (next: typeof trips) => {
+    try { localStorage.setItem('dailyspend_trips', JSON.stringify(next)); } catch {}
+    setTrips(next);
+    onTripsChanged?.(next.length > 0);
+  };
+
+  const addFriend = () => {
+    const name = newFriendName.trim() || `Friend ${(activeTrip?.friends.length || 0) + 1}`;
+    if (!activeTrip) return;
+    const nextTrips = [...trips];
+    const t = { ...activeTrip, friends: [...activeTrip.friends, { name }] };
+    nextTrips[activeTripIndex] = t;
+    persistTrips(nextTrips);
+    setNewFriendName("");
+    toast({ title: 'Friend added', description: name });
+  };
+
+  const removeFriend = (idx: number) => {
+    if (!activeTrip) return;
+    const confirmed = window.confirm('Remove this friend from the trip?');
+    if (!confirmed) return;
+    const nextTrips = [...trips];
+    const t = { ...activeTrip, friends: activeTrip.friends.filter((_, i) => i !== idx) };
+    nextTrips[activeTripIndex] = t;
+    persistTrips(nextTrips);
+    toast({ title: 'Friend removed' });
+  };
+
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState<string>("");
+  const commitRename = (idx: number) => {
+    if (!activeTrip) return;
+    const name = editingName.trim();
+    if (!name) { setEditingIndex(null); setEditingName(""); return; }
+    const nextTrips = [...trips];
+    const nextFriends = [...activeTrip.friends];
+    nextFriends[idx] = { name };
+    nextTrips[activeTripIndex] = { ...activeTrip, friends: nextFriends };
+    persistTrips(nextTrips);
+    setEditingIndex(null);
+    setEditingName("");
+    toast({ title: 'Renamed', description: 'Friend name updated' });
+  };
+
+  if (!activeTrip) {
+    return <div className="text-sm text-muted-foreground">No trips available.</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-muted-foreground">Trip</label>
+        <select
+          className="border rounded-md h-8 px-2 bg-background"
+          value={activeTripId}
+          onChange={(e) => setActiveTripId(e.target.value)}
+        >
+          {trips.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Add New Friend */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground/80">Friend Name</label>
+        <Input placeholder="e.g., John" value={newFriendName} onChange={(e) => setNewFriendName(e.target.value)} />
+        <div>
+          <span className="text-sm font-medium text-foreground/80 mb-2 block">Color</span>
+          <div className="flex space-x-2 overflow-x-auto pb-4 pt-1 -mx-2 px-2 scrollbar-hide">
+            {COLOR_OPTIONS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
+                  selectedColor === color ? "border-gray-600 scale-105" : "border-transparent hover:border-gray-400"
+                }`}
+                style={{ backgroundColor: color }}
+                onClick={() => setSelectedColor(color)}
+              />
+            ))}
+            <button
+              type="button"
+              className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex-shrink-0 ${
+                selectedColor.toLowerCase() === customSwatchColor.toLowerCase() ? "border-muted-foreground scale-105" : "border-dashed border hover:border-muted-foreground"
+              }`}
+              style={
+                selectedColor.toLowerCase() === customSwatchColor.toLowerCase()
+                  ? { backgroundColor: customSwatchColor }
+                  : { backgroundImage: 'linear-gradient(90deg, #14B8A6, #6366F1, #84CC16, #D946EF, #F97316, #0EA5E9, #F43F5E)' }
+              }
+              onClick={() => colorInputRef.current?.click()}
+              aria-label="Choose custom color"
+              title="Choose custom color"
+            />
+            <input
+              ref={colorInputRef}
+              type="color"
+              value={customSwatchColor}
+              onChange={(e) => {
+                setCustomSwatchColor(e.target.value);
+                setSelectedColor(e.target.value);
+              }}
+              className="hidden"
+            />
+          </div>
+        </div>
+        <Button className="w-full bg-secondary hover:bg-green-700 text-sm" onClick={addFriend}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Friend
+        </Button>
+      </div>
+
+      {/* Existing Friends */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-foreground/80 mb-3">Existing Friends</h4>
+        {(activeTrip.friends.length === 0) ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No friends added yet</p>
+        ) : (
+          activeTrip.friends.map((f, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div className="flex items-center min-w-0 flex-1">
+                <div className="w-4 h-4 rounded-full mr-3 flex-shrink-0" style={{ backgroundColor: COLOR_OPTIONS[idx % COLOR_OPTIONS.length] }} />
+                {editingIndex === idx ? (
+                  <input
+                    className="bg-transparent border-b border-border focus:outline-none text-sm flex-1 min-w-0"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => commitRename(idx)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename(idx);
+                      if (e.key === 'Escape') { setEditingIndex(null); setEditingName(''); }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    className="text-left text-sm font-medium text-foreground truncate"
+                    onClick={() => { setEditingIndex(idx); setEditingName(f.name || `Friend ${idx+1}`); }}
+                    title="Click to rename"
+                  >
+                    {f.name || `Friend ${idx+1}`}
+                  </button>
+                )}
+              </div>
+              <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 text-sm p-1 sm:p-2 flex-shrink-0" onClick={() => removeFriend(idx)}>
+                <Trash className="w-4 h-4" />
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, ArrowDown, ArrowUp } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, ArrowDown, ArrowUp, Plus, Edit } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
  
@@ -22,11 +22,16 @@ import { queryClient } from "@/lib/queryClient";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { getToday, getMonthInfo, generateCalendarDays } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { getCategories, createExpense } from "@/lib/localStorage";
+import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest } from "@/lib/sync";
@@ -79,6 +84,53 @@ export default function ExpenseTracker() {
   const [currentPartnerDate, setCurrentPartnerDate] = useState<string>(getToday());
   const [selectedCopyExpenseIds, setSelectedCopyExpenseIds] = useState<string[]>([]);
   const { toast } = useToast();
+
+  // Trips: Add Trip dialog state
+  const [addTripOpen, setAddTripOpen] = useState<boolean>(false);
+  const [tripNameInput, setTripNameInput] = useState<string>("");
+  const [selectedFriendsCount, setSelectedFriendsCount] = useState<number | null>(null);
+  const [friendNames, setFriendNames] = useState<string[]>([]);
+  const [hasTrips, setHasTrips] = useState<boolean>(() => {
+    try { return (JSON.parse(localStorage.getItem('dailyspend_trips') || '[]') as any[]).length > 0; } catch { return false; }
+  });
+  const [tripsRevision, setTripsRevision] = useState<number>(0);
+
+  const getStoredTrips = () => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]') as Array<{ id: string; name: string; friends: { name: string }[] }>; } catch { return []; }
+  };
+  const getNextDefaultTripName = () => {
+    const trips = getStoredTrips();
+    const taken = new Set(trips.map(t => t.name));
+    let i = 1;
+    while (taken.has(`Trip ${i}`)) i++;
+    return `Trip ${i}`;
+  };
+  const resetAddTripState = () => {
+    setTripNameInput("");
+    setSelectedFriendsCount(null);
+    setFriendNames([]);
+  };
+  const handleCreateTrip = () => {
+    const finalName = (tripNameInput.trim()) || getNextDefaultTripName();
+    const count = selectedFriendsCount || 0;
+    const finalFriends: { name: string }[] = Array.from({ length: count }, (_, idx) => ({
+      name: (friendNames[idx] || "").trim() || `Friend ${idx + 1}`,
+    }));
+    const newTrip = { id: `${Date.now()}-${Math.floor(Math.random() * 1e6)}`, name: finalName, friends: finalFriends };
+    const trips = getStoredTrips();
+    trips.push(newTrip);
+    try { localStorage.setItem('dailyspend_trips', JSON.stringify(trips)); } catch {}
+    toast({ title: 'Trip created', description: `${finalName} with ${count} friend${count === 1 ? '' : 's'}` });
+    setHasTrips(true);
+    setAddTripOpen(false);
+    resetAddTripState();
+  };
+
+  useEffect(() => {
+    if (topTab === 'trips') {
+      setHasTrips(getStoredTrips().length > 0);
+    }
+  }, [topTab]);
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -383,11 +435,12 @@ export default function ExpenseTracker() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-6">
                     <SettingsDrawer 
-          currency={currency} 
-          setCurrency={setCurrency} 
-          topTab={topTab}
-          onPartnerRemoved={handlePartnerRemoved}
-        />
+                      currency={currency} 
+                      setCurrency={setCurrency} 
+                      topTab={topTab}
+                      onPartnerRemoved={handlePartnerRemoved}
+                      onTripsChanged={(hasAny) => { setHasTrips(hasAny); setTripsRevision((v) => v + 1); }}
+                    />
                   </div>
                 </SheetContent>
               </Sheet>
@@ -396,49 +449,10 @@ export default function ExpenseTracker() {
         </div>
       </header>
 
-      {/* Secondary Nav Bar - Only show on desktop */}
-      {!isMobile && (
-        <div className="bg-card border-b border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center space-x-2 sm:space-x-4 h-12">
-              <Button
-                onClick={() => setCurrentView("entry")}
-                size="default"
-                className={`${currentView === "entry" ? "bg-primary hover:bg-blue-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
-              >
-                Home
-              </Button>
-              <Button
-                onClick={() => setCurrentView("calendar")}
-                size="default"
-                className={`${currentView === "calendar" ? "bg-primary hover:bg-blue-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                Calendar View
-              </Button>
-              <Button
-                onClick={() => setCurrentView("charts")}
-                size="default"
-                className={`${currentView === "charts" ? "bg-secondary hover:bg-green-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
-              >
-                <PieChart className="w-4 h-4 mr-2" />
-                Insights
-              </Button>
-              <Button
-                onClick={() => setCurrentView("recurring")}
-                size="default"
-                className={`${currentView === "recurring" ? "bg-primary hover:bg-blue-700" : "bg-gray-600 hover:bg-gray-700"} text-white transition duration-200`}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                Recurring
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      
 
       {/* Main Content */}
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 ${isMobile ? 'pb-[calc(env(safe-area-inset-bottom)+7rem)]' : ''}`}>
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pb-[calc(env(safe-area-inset-bottom)+7rem)]`}>
         {/* Top Tabs: below header, above content (edge-to-edge like bottom bar) */}
         <div ref={tabsContainerRef} className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-8 mb-4">
           <Tabs value={topTab} onValueChange={handleTopTabChange}>
@@ -470,7 +484,7 @@ export default function ExpenseTracker() {
               <TabsTrigger
                 value="trips"
                 aria-label="My trips"
-                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-none"
               >
                 <HiOutlineUserGroup className="w-6 h-6" />
                 <span className="sr-only">My Trips</span>
@@ -805,6 +819,98 @@ export default function ExpenseTracker() {
               </>
             )}
           </div>
+        ) : topTab === 'trips' ? (
+          hasTrips ? (
+            <>
+              {currentView === 'entry' && <TripHome currency={currency} />}
+              {currentView === 'calendar' && <TripCalendar currency={currency} />}
+              {currentView === 'recurring' && <TripRecurring currency={currency} />}
+              {currentView === 'charts' && (
+                <div className="p-4 text-sm text-muted-foreground">Charts for trips will be available soon.</div>
+              )}
+            </>
+          ) : (
+          <div className="relative">
+            {/* Placeholder scaffold (optional minimal content behind blur) */}
+            <div className="space-y-4 sm:space-y-6 opacity-70 pointer-events-none select-none">
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">Trips</h2>
+                      <p className="text-sm text-muted-foreground">Plan and track trip expenses</p>
+                    </div>
+                    <div className="h-8 w-24 rounded bg-emerald-600/20" />
+                  </div>
+                  {(() => {
+                    const mockCategories = [
+                      { id: 'food', name: 'Food', color: '#14B8A6' },    // teal-500
+                      { id: 'travel', name: 'Travel', color: '#6366F1' }, // indigo-500
+                      { id: 'groceries', name: 'Groceries', color: '#84CC16' }, // lime-500
+                      { id: 'shopping', name: 'Shopping', color: '#D946EF' }, // fuchsia-500
+                      { id: 'entertain', name: 'Entertainment', color: '#F97316' }, // orange-500
+                    ];
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mt-4">
+                        {mockCategories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="border rounded-lg p-2 sm:p-3 text-center"
+                            style={{ backgroundColor: `${category.color}10`, borderColor: `${category.color}40` }}
+                          >
+                            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2" style={{ backgroundColor: category.color }} />
+                            <div className="h-3 w-16 mx-auto rounded-sm mb-1" style={{ backgroundColor: `${category.color}30` }} />
+                            <div className="h-4 w-20 mx-auto rounded-sm" style={{ backgroundColor: `${category.color}20` }} />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="h-40 rounded bg-muted" />
+                    </CardContent>
+                  </Card>
+                </div>
+                <div>
+                  <Card>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 rounded bg-muted" />
+                        <div className="h-4 w-24 rounded bg-muted" />
+                        <div className="h-4 w-28 rounded bg-muted" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+
+            {!hasTrips && (
+              <>
+                {/* Full-screen blur overlay below the tabs */}
+                <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
+
+                {/* Centered CTA */}
+                <div className="fixed left-0 right-0 bottom-0 z-[80] flex items-center justify-center" style={{ top: overlayTopPx }}>
+                  <div className="flex flex-col items-center gap-3">
+                    <Button
+                      size={isMobile ? 'default' : 'lg'}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => setAddTripOpen(true)}
+                    >
+                      Add a Trip
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          )
         ) : (
           <div />
         )}
@@ -852,7 +958,7 @@ export default function ExpenseTracker() {
       {currentView !== 'chat' && (
         <FloatingActionButton
           onClick={handleFabClick}
-          colorVariant={topTab === 'couple' ? 'rose' : 'primary'}
+          colorVariant={topTab === 'couple' ? 'rose' : topTab === 'trips' ? 'emerald' : 'primary'}
           disabled={topTab === 'couple' && !hasPartner}
         />
       )}
@@ -861,7 +967,7 @@ export default function ExpenseTracker() {
       <BottomNavigation
         currentView={hasAcceptedRequest && topTab === 'couple' && !hasPartner ? currentView : currentView}
         onViewChange={(v) => setCurrentView(v as ViewType)}
-        colorVariant={topTab === 'couple' ? 'rose' : 'primary'}
+        colorVariant={topTab === 'couple' ? 'rose' : topTab === 'trips' ? 'emerald' : 'primary'}
         isCoupleTab={topTab === 'couple'}
         disabledIds={topTab === 'couple' && hasAcceptedRequest && !hasPartner ? ['entry','calendar','recurring'] : []}
       />
@@ -1168,6 +1274,797 @@ export default function ExpenseTracker() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Trips: Add Trip Dialog */}
+      <Dialog open={addTripOpen} onOpenChange={(v) => { setAddTripOpen(v); if (!v) resetAddTripState(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a Trip</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Trip name</label>
+              <Input
+                value={tripNameInput}
+                onChange={(e) => setTripNameInput(e.target.value)}
+                placeholder={`e.g. ${getNextDefaultTripName()}`}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Leave empty to use the next available default name.</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Number of friends to add</label>
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {Array.from({ length: 5 }, (_, i) => i + 1).map((n) => (
+                  <Button
+                    key={n}
+                    type="button"
+                    variant={selectedFriendsCount === n ? 'default' : 'outline'}
+                    className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                    onClick={() => {
+                      setSelectedFriendsCount(n);
+                      setFriendNames((prev) => {
+                        const next = Array.from({ length: n }, (_, idx) => prev[idx] || '');
+                        return next;
+                      });
+                    }}
+                  >
+                    {n}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {selectedFriendsCount != null && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Friend names</label>
+                {Array.from({ length: selectedFriendsCount }, (_, idx) => (
+                  <Input
+                    key={idx}
+                    value={friendNames[idx] || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFriendNames((prev) => {
+                        const copy = [...prev];
+                        copy[idx] = val;
+                        return copy;
+                      });
+                    }}
+                    placeholder={`Friend ${idx + 1}`}
+                  />
+                ))}
+                <p className="text-xs text-muted-foreground">Leave any blank to auto-name as Friend 1, Friend 2, ...</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddTripOpen(false); resetAddTripState(); }}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateTrip} disabled={selectedFriendsCount == null}>
+              Create Trip
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+type Trip = { id: string; name: string; friends: { name: string }[] };
+
+function TripHome({ currency }: { currency: CurrencyCode }) {
+  const [trips, setTrips] = useState<Trip[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
+  });
+  const [activeTripId, setActiveTripId] = useState<string>(() => (trips[0]?.id || ''));
+  const activeTrip = trips.find(t => t.id === activeTripId) || trips[0] || null;
+  const [selectedFriendIndex, setSelectedFriendIndex] = useState<number>(0);
+  const [date, setDate] = useState<string>(getToday());
+  const [name, setName] = useState<string>('');
+  const [amount, setAmount] = useState<string>('');
+  const [details, setDetails] = useState<string>('');
+  const [showAddDetails, setShowAddDetails] = useState<boolean>(false);
+  const { toast } = useToast();
+
+  const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
+  const symbol = CURRENCIES[currency].symbol;
+
+  // Storage helpers for trip expenses
+  type TripExpense = { id: string; tripId: string; friendIndex: number; name: string; amount: string; details?: string | null; date: string; createdAt: string };
+  const getTripExpenses = (): TripExpense[] => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trip_expenses') || '[]'); } catch { return []; }
+  };
+  const setTripExpenses = (items: TripExpense[]) => {
+    try { localStorage.setItem('dailyspend_trip_expenses', JSON.stringify(items)); } catch {}
+  };
+
+  useEffect(() => {
+    // Refresh trips when storage may have changed (renames, add/remove)
+    try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
+  }, [localStorage.getItem('dailyspend_trips')]);
+
+  useEffect(() => {
+    if (!activeTrip && trips[0]) setActiveTripId(trips[0].id);
+  }, [trips, activeTrip]);
+
+  const expensesForDate = useMemo(() => {
+    const all = getTripExpenses();
+    if (!activeTrip) return [] as TripExpense[];
+    return all.filter(e => e.tripId === activeTrip.id && e.date === date);
+  }, [activeTrip?.id, date]);
+
+  const totalForDate = useMemo(() => expensesForDate.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0), [expensesForDate]);
+
+  const friendTotalsForDate = useMemo(() => {
+    const all = getTripExpenses();
+    const totals = new Map<number, number>();
+    if (!activeTrip) return totals;
+    all.forEach(e => {
+      if (e.tripId === activeTrip.id && e.date === date) {
+        const prev = totals.get(e.friendIndex) || 0;
+        totals.set(e.friendIndex, prev + parseFloat(e.amount || '0'));
+      }
+    });
+    return totals;
+  }, [activeTrip?.id, date]);
+
+  const FRIEND_COLORS = [
+    '#14B8A6', // teal
+    '#6366F1', // indigo
+    '#84CC16', // lime
+    '#D946EF', // fuchsia
+    '#F97316', // orange
+  ];
+
+  const handleAddExpense = () => {
+    if (!activeTrip) return;
+    const trimmedName = name.trim();
+    const trimmedAmount = amount.trim();
+    if (!trimmedName || !trimmedAmount || isNaN(Number(trimmedAmount))) {
+      toast({ title: 'Enter valid name and amount', variant: 'destructive' });
+      return;
+    }
+    const newItem: TripExpense = {
+      id: `${Date.now()}-${Math.floor(Math.random()*1e6)}`,
+      tripId: activeTrip.id,
+      friendIndex: selectedFriendIndex,
+      name: trimmedName,
+      amount: trimmedAmount,
+      details: details.trim() || undefined,
+      date,
+      createdAt: new Date().toISOString(),
+    };
+    const all = getTripExpenses();
+    all.push(newItem);
+    setTripExpenses(all);
+    setName(''); setAmount(''); setDetails('');
+    toast({ title: 'Added', description: `${trimmedName} added for ${activeTrip.friends[selectedFriendIndex]?.name || 'Friend ' + (selectedFriendIndex+1)}` });
+  };
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">{activeTrip ? activeTrip.name : 'Trips'}</h2>
+              <div className="flex items-center gap-2">
+                <DatePicker value={date} onChange={(v: string) => setDate(v)} className="h-8 text-sm" />
+                <span className="text-sm font-medium text-primary">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+              </div>
+            </div>
+            {trips.length > 1 && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">Trip</label>
+                <select
+                  className="border rounded-md h-8 px-2 bg-background"
+                  value={activeTrip?.id || ''}
+                  onChange={(e) => setActiveTripId(e.target.value)}
+                >
+                  {trips.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          {activeTrip && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mt-4">
+              {activeTrip.friends.map((f, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedFriendIndex(idx)}
+                  className={`border rounded-lg p-2 sm:p-3 text-center transition ${idx === selectedFriendIndex ? 'ring-2 ring-emerald-500' : ''}`}
+                  style={{ backgroundColor: `${FRIEND_COLORS[idx % FRIEND_COLORS.length]}10`, borderColor: `${FRIEND_COLORS[idx % FRIEND_COLORS.length]}40` }}
+                >
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2" style={{ backgroundColor: FRIEND_COLORS[idx % FRIEND_COLORS.length] }} />
+                  <div className="text-xs font-medium text-muted-foreground truncate">{f.name || `Friend ${idx+1}`}</div>
+                  <div className="text-xs font-semibold text-foreground mt-1">{symbol}{formatAmountDisplay(friendTotalsForDate.get(idx) || 0)}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add Expense */}
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Add New Expense</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Amount ({symbol})</label>
+                <Input type="number" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Expense Name</label>
+                <Input placeholder="e.g., Lunch at cafe" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Friend</label>
+              <div className="mt-2">
+                <Select value={String(selectedFriendIndex)} onValueChange={(v) => setSelectedFriendIndex(parseInt(v))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a friend" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(activeTrip?.friends || []).map((f, idx) => (
+                      <SelectItem key={idx} value={String(idx)}>
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: FRIEND_COLORS[idx % FRIEND_COLORS.length] }} />
+                          {f.name || `Friend ${idx+1}`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowAddDetails(!showAddDetails)}
+                className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal"
+              >
+                <span className="text-sm">Additional Details (Optional)</span>
+              </Button>
+              {showAddDetails && (
+                <Textarea
+                  placeholder="Add any additional notes about this expense..."
+                  rows={3}
+                  value={details}
+                  onChange={(e) => setDetails(e.target.value)}
+                  className="transition-all duration-200 ease-in-out"
+                />
+              )}
+            </div>
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 transition duration-200" onClick={handleAddExpense}>
+              Add Expense
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Today's Expenses */}
+      <Card className="overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border">
+          <h3 className="text-lg font-semibold text-foreground">Expense List</h3>
+          <p className="text-xs mt-1">
+            <span className="text-muted-foreground mr-1">{new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            <span className="font-medium text-primary">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+          </p>
+        </div>
+        <CardContent className="p-4 sm:p-6">
+          {expensesForDate.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">No expenses for today.</div>
+          ) : (
+            <div>
+              {expensesForDate.map((e) => (
+                <div key={e.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-muted/30">
+                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '55' }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-foreground truncate">{e.name}</p>
+                      {e.details && (
+                        <p className="text-xs sm:text-sm text-muted-foreground whitespace-normal break-words">{e.details}</p>
+                      )}
+                      <p className="text-[11px] sm:text-xs text-muted-foreground">{activeTrip?.friends[e.friendIndex]?.name || `Friend ${e.friendIndex+1}`} • {new Date(e.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 ml-3 sm:ml-4">
+                    <span className="font-semibold text-foreground text-sm sm:text-base">{symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function TripRecurring({ currency }: { currency: CurrencyCode }) {
+  const [trips, setTrips] = useState<Trip[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
+  });
+  const [activeTripId, setActiveTripId] = useState<string>(() => (trips[0]?.id || ''));
+  const activeTrip = trips.find(t => t.id === activeTripId) || null;
+  const [recurring, setRecurring] = useState<Array<{ id: string; tripId: string; name: string; amount: string; details?: string; friendIndex: number; frequency: 'daily'|'weekly'|'monthly'|'custom'; customDays?: number; startDate: string; endDate?: string | null; isActive: boolean }>>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trip_recurring') || '[]'); } catch { return []; }
+  });
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState<{ name: string; amount: string; details: string; friendIndex: number; frequency: 'daily'|'weekly'|'monthly'|'custom'; customDays?: number; startDate: string; endDate: string }>({
+    name: '', amount: '', details: '', friendIndex: 0, frequency: 'monthly', customDays: undefined, startDate: getToday(), endDate: ''
+  });
+  const { toast } = useToast();
+
+  const CURRENCIES = { USD: { symbol: '$' }, INR: { symbol: '₹' } } as const;
+  const symbol = CURRENCIES[currency].symbol;
+
+  useEffect(() => {
+    try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
+  }, []);
+
+  const persist = (items: typeof recurring) => {
+    try { localStorage.setItem('dailyspend_trip_recurring', JSON.stringify(items)); } catch {}
+    setRecurring(items);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTrip) return;
+    if (!form.name || !form.amount || !form.startDate) {
+      toast({ title: 'Validation Error', description: 'Fill required fields', variant: 'destructive' });
+      return;
+    }
+    const today = getToday();
+    if (form.startDate < today) {
+      toast({ title: 'Validation Error', description: 'Start date cannot be in the past.', variant: 'destructive' });
+      return;
+    }
+    if (form.frequency === 'custom' && !form.customDays) {
+      toast({ title: 'Validation Error', description: 'Specify custom days.', variant: 'destructive' });
+      return;
+    }
+    if (editingId) {
+      const next = recurring.map(r => r.id === editingId ? {
+        ...r,
+        name: form.name,
+        amount: form.amount,
+        details: form.details || undefined,
+        friendIndex: form.friendIndex,
+        frequency: form.frequency,
+        customDays: form.customDays,
+        startDate: form.startDate,
+        endDate: form.endDate || null,
+      } : r);
+      persist(next);
+      toast({ title: 'Updated' });
+    } else {
+      const item = {
+        id: `${Date.now()}-${Math.floor(Math.random()*1e6)}`,
+        tripId: activeTrip.id,
+        name: form.name,
+        amount: form.amount,
+        details: form.details || undefined,
+        friendIndex: form.friendIndex,
+        frequency: form.frequency,
+        customDays: form.customDays,
+        startDate: form.startDate,
+        endDate: form.endDate || null,
+        isActive: true,
+      } as typeof recurring[number];
+      persist([...recurring, item]);
+      toast({ title: 'Added recurring' });
+      // Immediate add if startDate is today
+      if (form.startDate === getToday()) {
+        try {
+          const key = 'dailyspend_trip_expenses';
+          const current: any[] = JSON.parse(localStorage.getItem(key) || '[]');
+          current.push({
+            id: `${Date.now()}-${Math.floor(Math.random()*1e6)}`,
+            tripId: activeTrip.id,
+            friendIndex: form.friendIndex,
+            name: form.name,
+            amount: form.amount,
+            details: form.details || null,
+            categoryId: null,
+            date: getToday(),
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem(key, JSON.stringify(current));
+        } catch {}
+      }
+    }
+    setEditingId(null);
+    setIsAdding(false);
+    setForm({ name: '', amount: '', details: '', friendIndex: 0, frequency: 'monthly', customDays: undefined, startDate: getToday(), endDate: '' });
+  };
+
+  const handleToggle = (id: string) => {
+    const next = recurring.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r);
+    persist(next);
+  };
+  const handleDelete = (id: string) => {
+    const next = recurring.filter(r => r.id !== id);
+    persist(next);
+    toast({ title: 'Deleted' });
+  };
+  const handleEdit = (r: typeof recurring[number]) => {
+    setEditingId(r.id);
+    setIsAdding(true);
+    setForm({
+      name: r.name,
+      amount: r.amount,
+      details: r.details || '',
+      friendIndex: r.friendIndex,
+      frequency: r.frequency,
+      customDays: r.customDays,
+      startDate: r.startDate,
+      endDate: r.endDate || '',
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
+          <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {trips.length > 1 && (
+            <select className="border rounded-md h-8 px-2 bg-background" value={activeTripId} onChange={(e) => setActiveTripId(e.target.value)}>
+              {trips.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+            </select>
+          )}
+          <Button
+            onClick={() => setIsAdding(true)}
+            aria-label="Add Recurring"
+            className="bg-emerald-600 hover:bg-emerald-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
+          >
+            <Plus className="w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+
+      {isAdding && (
+        <Card>
+          <CardContent className="p-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Name *</Label>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g., Hotel" />
+                </div>
+                <div>
+                  <Label>Amount *</Label>
+                  <Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0.00" />
+                </div>
+              </div>
+              <div>
+                <Label>Details</Label>
+                <Input value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} placeholder="Optional description" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Friend</Label>
+                  <Select value={String(form.friendIndex)} onValueChange={(v) => setForm({ ...form, friendIndex: parseInt(v) })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select friend" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(activeTrip?.friends || []).map((f, idx) => (
+                        <SelectItem key={idx} value={String(idx)}>
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: ['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][idx % 5] }} />
+                            {f.name || `Friend ${idx+1}`}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Frequency *</Label>
+                  <Select value={form.frequency} onValueChange={(v: any) => setForm({ ...form, frequency: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {form.frequency === 'custom' && (
+                <div>
+                  <Label>Every X Days *</Label>
+                  <Input type="number" min="1" value={form.customDays || ''} onChange={(e) => setForm({ ...form, customDays: parseInt(e.target.value) || undefined })} placeholder="e.g., 14" />
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Start Date *</Label>
+                  <Input type="date" value={form.startDate} min={getToday()} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+                </div>
+                <div>
+                  <Label>End Date (Optional)</Label>
+                  <Input type="date" value={form.endDate} min={form.startDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">{editingId ? 'Update' : 'Create'}</Button>
+                {editingId && <Button type="button" variant="destructive" onClick={() => { if (editingId) { setPendingDeleteId(editingId); setShowDeleteDialog(true); } }}>Delete</Button>}
+                <Button type="button" variant="outline" onClick={() => { setIsAdding(false); setEditingId(null); }}>Cancel</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Recurring Expense</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the recurring expense.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDeleteDialog(false); setPendingDeleteId(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDeleteId) {
+                  handleDelete(pendingDeleteId);
+                  setIsAdding(false);
+                  setEditingId(null);
+                }
+                setShowDeleteDialog(false);
+                setPendingDeleteId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">Active Recurring Expenses</h3>
+        {recurring.filter(r => r.tripId === activeTripId).length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Repeat className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+              <h4 className="text-lg font-medium text-foreground mb-2">No Recurring Expenses</h4>
+              <p className="text-muted-foreground">Create your first recurring expense to get started.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {recurring.filter(r => r.tripId === activeTripId).map((r) => (
+              <Card key={r.id}>
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3 mb-2 min-w-0">
+                        <h4 className="font-medium text-foreground truncate">{r.name}</h4>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0">
+                        <span className="font-medium text-gray-900">{symbol}{r.amount}</span>
+                        <span className="flex items-center">
+                          <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: ['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][r.friendIndex % 5] }} />
+                          {(activeTrip?.friends[r.friendIndex]?.name) || `Friend ${r.friendIndex+1}`}
+                        </span>
+                      </div>
+                      {r.details && <p className="text-sm text-muted-foreground mt-2 break-words">{r.details}</p>}
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={r.isActive ? 'default' : 'secondary'}>{r.isActive ? 'Active' : 'Inactive'}</Badge>
+                          <Badge variant="outline">{r.frequency === 'custom' ? `Every ${r.customDays} days` : r.frequency[0].toUpperCase()+r.frequency.slice(1)}</Badge>
+                        </div>
+                        {r.endDate && (
+                          <div className="text-sm text-muted-foreground">Ends: {r.endDate}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 ml-4 shrink-0">
+                      <Switch checked={r.isActive} onCheckedChange={() => handleToggle(r.id)} />
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(r)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TripCalendar({ currency }: { currency: CurrencyCode }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const monthInfo = getMonthInfo(currentDate);
+  const calendarDays = generateCalendarDays(monthInfo.year, monthInfo.month - 1);
+  const [trips] = useState<Trip[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
+  });
+  const activeTripId = trips[0]?.id || '';
+  const [previewDate, setPreviewDate] = useState<string | null>(getToday());
+  const [previewItems, setPreviewItems] = useState<Array<{ key: string; name: string; amount: string; isRecurring: boolean }>>([]);
+
+  type TripExpense = { id: string; tripId: string; friendIndex: number; name: string; amount: string; details?: string | null; date: string; createdAt: string };
+  const getTripExpenses = (): TripExpense[] => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trip_expenses') || '[]'); } catch { return []; }
+  };
+  const getTripRecurring = () => getTripRecurringRaw();
+
+  const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
+  const symbol = CURRENCIES[currency].symbol;
+
+  const monthlyTotals = useMemo(() => {
+    const all = getTripExpenses();
+    const map = new Map<string, number>();
+    all.forEach(e => {
+      if (e.tripId !== activeTripId) return;
+      const d = new Date(e.date);
+      if (d.getFullYear() === monthInfo.year && (d.getMonth() + 1) === monthInfo.month) {
+        map.set(e.date, (map.get(e.date) || 0) + parseFloat(e.amount || '0'));
+      }
+    });
+    return Array.from(map.entries()).map(([date, total]) => ({ date, total }));
+  }, [currentDate, activeTripId]);
+
+  const getTotalForDate = (dateString: string) => {
+    const found = monthlyTotals.find(mt => mt.date === dateString);
+    return found ? found.total : 0;
+  };
+
+  const previousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const hasRecurringExpenseOnDate = (dateString: string) => {
+    return getTripRecurring().some(r => {
+      if (!r.isActive) return false;
+      if (r.endDate && dateString > r.endDate) return false;
+      if (dateString < r.startDate) return false;
+      const startDate = new Date(r.startDate);
+      const targetDate = new Date(dateString);
+      switch (r.frequency) {
+        case 'daily':
+          return true;
+        case 'weekly': {
+          const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          return daysDiff % 7 === 0;
+        }
+        case 'monthly': {
+          const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
+          const dayOfMonth = startDate.getDate();
+          return monthsDiff >= 0 && targetDate.getDate() === dayOfMonth;
+        }
+        case 'custom': {
+          if (r.customDays) {
+            const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysDiff % r.customDays === 0;
+          }
+          return false;
+        }
+        default:
+          return false;
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Monthly Calendar</h2>
+            <div className="flex items-center justify-center sm:justify-start space-x-4">
+              <Button variant="ghost" size="sm" onClick={previousMonth} className="p-2 text-muted-foreground hover:text-foreground">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-lg font-medium text-foreground">{monthInfo.monthName}</span>
+              <Button variant="ghost" size="sm" onClick={nextMonth} className="p-2 text-muted-foreground hover:text-foreground">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid grid-cols-7 gap-1 mb-4">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2 sm:py-3">{day}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((day, index) => {
+              const total = getTotalForDate(day.dateString);
+              const hasExpenses = total > 0;
+              const hasRecurring = hasRecurringExpenseOnDate(day.dateString);
+              return (
+                <div
+                  key={index}
+                  onClick={() => {
+                    if (!day.isCurrentMonth) {
+                      setPreviewItems([]);
+                      setPreviewDate(null);
+                      return;
+                    }
+                    setPreviewDate(day.dateString);
+                    const items = getTripRecurring().filter(r => r.isActive && (!r.endDate || day.dateString <= r.endDate) && day.dateString >= r.startDate)
+                      .map((r, idx) => ({ key: `rec-${idx}-${r.name}-${r.amount}`, name: r.name, amount: r.amount, isRecurring: true }));
+                    setPreviewItems(items);
+                  }}
+                  className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
+                    day.isToday
+                      ? "bg-emerald-600 text-white"
+                      : day.isCurrentMonth
+                      ? "hover:bg-muted border-2 border-transparent hover:border-emerald-600 cursor-pointer"
+                      : "text-muted-foreground hover:bg-muted"
+                  } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
+                >
+                  <div className={`text-xs sm:text-sm font-medium ${day.isToday ? "text-white" : "text-foreground"}`}>{day.date.getDate()}</div>
+                  {day.isCurrentMonth && (
+                    <>
+                      {hasExpenses && (
+                        <div className={`text-xs font-medium mt-1 ${day.isToday ? "text-white" : "text-foreground"}`}>{total === 0 ? "0" : Math.round(total)}</div>
+                      )}
+                      {hasRecurring && (
+                        <div className="flex items-center justify-center mt-1">
+                          <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {previewDate && (
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <div className="space-y-2">
+              {[...getTripExpenses().filter(e => e.tripId === activeTripId && e.date === previewDate).map(exp => ({
+                key: exp.id,
+                name: exp.name,
+                amount: exp.amount,
+                isRecurring: false,
+              })), ...previewItems].map((item) => (
+                <div key={item.key} className={`flex items-center justify-between ${!item.isRecurring ? 'p-2 rounded hover:bg-muted/50' : ''}`}>
+                  <span className="text-sm text-foreground font-medium flex items-center gap-1">
+                    {item.isRecurring && <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />}
+                    {item.name}
+                  </span>
+                  <span className="text-sm text-foreground font-semibold">{symbol}{formatAmountDisplay(parseFloat(item.amount || '0'))}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

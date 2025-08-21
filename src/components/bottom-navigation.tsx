@@ -1,20 +1,14 @@
 import { Home, Calendar, BarChart3, Repeat, Users } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BottomNavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
-  colorVariant?: 'primary' | 'rose';
+  colorVariant?: 'primary' | 'rose' | 'emerald';
   isCoupleTab?: boolean;
   disabledIds?: string[];
 }
 
 export default function BottomNavigation({ currentView, onViewChange, colorVariant = 'primary', isCoupleTab, disabledIds = [] }: BottomNavigationProps) {
-  const isMobile = useIsMobile();
-
-  if (!isMobile) {
-    return null; // Only show on mobile devices
-  }
 
   const navigationItems = [
     {
@@ -58,7 +52,7 @@ export default function BottomNavigation({ currentView, onViewChange, colorVaria
                 isDisabled
                   ? "opacity-50 cursor-not-allowed"
                   : item.active
-                  ? `${colorVariant === 'rose' ? 'bg-rose-600' : 'bg-primary'} text-white`
+                  ? `${colorVariant === 'rose' ? 'bg-rose-600' : colorVariant === 'emerald' ? 'bg-emerald-600' : 'bg-primary'} text-white`
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >

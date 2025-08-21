@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertCategorySchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
-import { createCategory, deleteCategory } from "@/lib/localStorage";
+import { createCategory, deleteCategory, updateCategory } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2 } from "lucide-react";
 import type { Category } from "@shared/schema";
@@ -32,6 +32,8 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
   const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
   const [customSwatchColor, setCustomSwatchColor] = useState<string>("#000000");
   const colorInputRef = useRef<HTMLInputElement | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>("");
 
   // Query
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -97,6 +99,29 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
       ...data,
       color: selectedColor,
     });
+  };
+
+  const commitRename = (catId: string) => {
+    const name = editingName.trim();
+    if (!name) {
+      setEditingId(null);
+      setEditingName("");
+      return;
+    }
+    try {
+      updateCategory(catId, { name });
+      // Invalidate all relevant queries so the rename reflects everywhere
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
+      toast({ title: "Renamed", description: "Category name updated" });
+    } finally {
+      setEditingId(null);
+      setEditingName("");
+    }
   };
 
   return (
@@ -182,16 +207,30 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
         <p className="text-sm text-muted-foreground text-center py-4">No categories created yet</p>
         ) : (
           categories.map((category) => (
-            <div
-              key={category.id}
-          className="flex items-center justify-between p-3 bg-muted rounded-lg"
-            >
+            <div key={category.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex items-center min-w-0 flex-1">
-                <div
-                  className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
-                  style={{ backgroundColor: category.color }}
-                ></div>
-            <span className="text-sm font-medium text-foreground truncate">{category.name}</span>
+                <div className="w-4 h-4 rounded-full mr-3 flex-shrink-0" style={{ backgroundColor: category.color }} />
+                {editingId === category.id ? (
+                  <input
+                    className="bg-transparent border-b border-border focus:outline-none text-sm flex-1 min-w-0"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => commitRename(category.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename(category.id);
+                      if (e.key === 'Escape') { setEditingId(null); setEditingName(''); }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    className="text-left text-sm font-medium text-foreground truncate"
+                    onClick={() => { setEditingId(category.id); setEditingName(category.name); }}
+                    title="Click to rename"
+                  >
+                    {category.name}
+                  </button>
+                )}
               </div>
               <Button
                 size="sm"

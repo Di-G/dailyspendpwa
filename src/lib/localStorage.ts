@@ -7,6 +7,10 @@ const CATEGORIES_KEY = 'dailyspend_categories';
 const EXPENSES_KEY = 'dailyspend_expenses';
 const RECURRING_EXPENSES_KEY = 'dailyspend_recurring_expenses';
 const LAST_PROCESSED_DATE_KEY = 'dailyspend_last_processed_date';
+// Trips storage keys
+const TRIP_EXPENSES_KEY = 'dailyspend_trip_expenses';
+const TRIP_RECURRING_KEY = 'dailyspend_trip_recurring';
+const TRIP_LAST_PROCESSED_DATE_KEY = 'dailyspend_trip_last_processed_date';
 
 // Helper functions
 const generateId = (): string => {
@@ -497,4 +501,96 @@ export const updateAllData = (
     console.error('Error updating all data:', error);
     throw error;
   }
+};
+
+// Trips helpers (for recurring auto-generation)
+type TripExpense = Expense & { tripId: string; friendIndex: number };
+type TripRecurring = {
+  id: string;
+  tripId: string;
+  name: string;
+  amount: string;
+  details?: string | null;
+  friendIndex: number;
+  frequency: 'daily'|'weekly'|'monthly'|'custom';
+  customDays?: number;
+  startDate: string;
+  endDate?: string | null;
+  isActive: boolean;
+};
+
+export const getTripExpensesRaw = (): TripExpense[] => {
+  return getFromStorage<TripExpense[]>(TRIP_EXPENSES_KEY, []);
+};
+export const setTripExpensesRaw = (items: TripExpense[]): void => {
+  setToStorage(TRIP_EXPENSES_KEY, items);
+  emitDataChanged();
+};
+export const getTripRecurringRaw = (): TripRecurring[] => {
+  return getFromStorage<TripRecurring[]>(TRIP_RECURRING_KEY, []);
+};
+export const setTripRecurringRaw = (items: TripRecurring[]): void => {
+  setToStorage(TRIP_RECURRING_KEY, items);
+  emitDataChanged();
+};
+export const getTripLastProcessedDate = (): string | null => {
+  return getFromStorage<string | null>(TRIP_LAST_PROCESSED_DATE_KEY, null);
+};
+export const setTripLastProcessedDate = (date: string): void => {
+  setToStorage(TRIP_LAST_PROCESSED_DATE_KEY, date);
+};
+
+export const generateTripExpensesFromRecurring = (date: string): TripExpense[] => {
+  const recurring = getTripRecurringRaw().filter(r => r.isActive);
+  const generated: TripExpense[] = [];
+  recurring.forEach(r => {
+    if (r.endDate && date > r.endDate) return;
+    if (date < r.startDate) return;
+    let shouldGenerate = false;
+    const startDate = new Date(r.startDate);
+    const targetDate = new Date(date);
+    switch (r.frequency) {
+      case 'daily': shouldGenerate = true; break;
+      case 'weekly': {
+        const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000*60*60*24));
+        shouldGenerate = daysDiff % 7 === 0; break;
+      }
+      case 'monthly': {
+        const monthsDiff = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth());
+        const dayOfMonth = startDate.getDate();
+        shouldGenerate = monthsDiff >= 0 && targetDate.getDate() === dayOfMonth; break;
+      }
+      case 'custom': {
+        if (r.customDays) {
+          const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000*60*60*24));
+          shouldGenerate = daysDiff % r.customDays === 0;
+        }
+        break;
+      }
+    }
+    if (shouldGenerate) {
+      const generatedExpense: TripExpense = {
+        id: generateId(),
+        tripId: r.tripId,
+        friendIndex: r.friendIndex,
+        name: r.name,
+        amount: r.amount,
+        details: r.details ?? null,
+        categoryId: null,
+        date,
+        createdAt: new Date().toISOString(),
+      } as TripExpense;
+      generated.push(generatedExpense);
+    }
+  });
+  return generated;
+};
+
+export const processTripRecurringForDate = (date: string): number => {
+  const toAdd = generateTripExpensesFromRecurring(date);
+  if (toAdd.length === 0) return 0;
+  const current = getTripExpensesRaw();
+  const updated = [...current, ...toAdd];
+  setTripExpensesRaw(updated);
+  return toAdd.length;
 };

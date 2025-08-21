@@ -8,7 +8,7 @@ import AddToHomeScreen from "@/components/AddToHomeScreen";
 import DataConflictDialog from "@/components/DataConflictDialog";
 import { useEffect } from "react";
 import { useRealtimeSync } from "@/lib/syncClient";
-import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate } from "./lib/localStorage";
+import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate, processTripRecurringForDate, getTripLastProcessedDate, setTripLastProcessedDate } from "./lib/localStorage";
 import { formatDate } from "./lib/date-utils";
 
 function Router() {
@@ -65,6 +65,7 @@ function App() {
     const processTodayIfNeeded = async () => {
       const todayStr = formatDate(new Date());
       const lastProcessed = getLastProcessedDate();
+      const tripLastProcessed = getTripLastProcessedDate();
       if (lastProcessed !== todayStr) {
         const added = processRecurringForDate(todayStr);
         if (added > 0) {
@@ -74,6 +75,15 @@ function App() {
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
         }
         setLastProcessedDate(todayStr);
+      }
+      if (tripLastProcessed !== todayStr) {
+        const addedTrips = processTripRecurringForDate(todayStr);
+        if (addedTrips > 0) {
+          // No react-query cache key, trips UI reads localStorage directly
+          // Fire a generic data change event to refresh any UI listening
+          // (emitDataChanged is used elsewhere; we rely on same onDataChanged listener)
+        }
+        setTripLastProcessedDate(todayStr);
       }
     };
 
@@ -92,6 +102,12 @@ function App() {
           await queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
         }
         setLastProcessedDate(runDate);
+        // Trips recurring at midnight
+        const addedTrips = processTripRecurringForDate(runDate);
+        if (addedTrips > 0) {
+          // trigger UI refresh by emitting data-changed event elsewhere
+        }
+        setTripLastProcessedDate(runDate);
         // Schedule the next midnight run
         scheduleMidnightRun();
       }, msUntilMidnight);
