@@ -335,12 +335,6 @@ export default function ExpenseTracker() {
   };
 
   const handleTopTabChange = (v: string) => {
-    if (v === 'couple' && !isVerified) {
-      setSubmitMessage("This functionality is only available to verified users. Please verify your email in Profile.");
-      setAddPartnerOpen(true);
-      setTopTab('my');
-      return;
-    }
     if (v === 'trips' && tripsBlockedEffective) {
       // Prevent entering Trips until conflict is resolved; directly open the Trips conflict dialog
       setTopTab('my');
@@ -580,7 +574,7 @@ export default function ExpenseTracker() {
         ) : topTab === 'couple' ? (
           <div className="relative">
             {/* If no accepted partner yet AND user hasn't accepted anyone, show placeholder content + overlay and CTA */}
-            {!hasPartner && !hasAcceptedRequest && (
+            {(!hasPartner && !hasAcceptedRequest) || !isVerified ? (
               <>
                 {/* Visual scaffold to mimic a fresh home layout without data (dummy copy) */}
                 <div className="space-y-4 sm:space-y-6">
@@ -716,7 +710,7 @@ export default function ExpenseTracker() {
 
 
               </>
-            )}
+            ) : null}
 
             {/* Partner read-only views when accepted */}
             {hasPartner && (
@@ -748,7 +742,7 @@ export default function ExpenseTracker() {
             )}
 
             {/* Follower users (accepted someone else's request): show chat when selected; other content placeholders otherwise */}
-            {!hasPartner && hasAcceptedRequest && (
+            {!hasPartner && hasAcceptedRequest && isVerified && (
               <>
                 {currentView !== 'chat' && (
                   <>
