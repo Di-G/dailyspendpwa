@@ -679,7 +679,7 @@ export default function ExpenseTracker() {
                 {true && (
                 <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
                   <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
-                    Add a Partner/Friend
+                    Add a Partner
                   </Button>
                   {pendingOutgoing.length > 0 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs sm:text-sm px-3 py-2">
@@ -864,9 +864,9 @@ export default function ExpenseTracker() {
                     </div>
                     {/* Also show Add Partner/Friend CTA like in leader placeholder */}
                     <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
-                      <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
-                        Add a Partner/Friend
-                      </Button>
+                                        <Button onClick={handleOpenAddPartner} size={isMobile ? 'default' : 'lg'} className="bg-rose-600 hover:bg-rose-700 text-white">
+                    Add a Partner
+                  </Button>
                     </div>
                   </>
                 )}
@@ -973,7 +973,7 @@ export default function ExpenseTracker() {
         <Dialog open={addPartnerOpen} onOpenChange={setAddPartnerOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add a Partner/Friend</DialogTitle>
+                              <DialogTitle>Add a Partner</DialogTitle>
             </DialogHeader>
             {!!submitMessage && (
               <Alert className="mb-2">
