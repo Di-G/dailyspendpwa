@@ -20,6 +20,10 @@ type SyncPayload = {
   categories: unknown;
   expenses: unknown;
   recurring: unknown;
+  // Trips-related payloads (optional; present when trips sync is used)
+  trips?: unknown;
+  tripExpenses?: unknown;
+  tripRecurring?: unknown;
   updatedAt?: unknown;
 };
 

@@ -8,14 +8,27 @@ import {
   subscribeToUserDoc,
 } from "@/lib/sync";
 import { queryClient } from "@/lib/queryClient";
-import { getCategories, getExpenses, getRecurringExpenses, updateAllData } from "@/lib/localStorage";
+import { 
+  getCategories, 
+  getExpenses, 
+  getRecurringExpenses, 
+  updateAllData,
+  getTrips,
+  getTripExpensesRaw,
+  getTripRecurringRaw,
+  updateAllTripsData
+} from "@/lib/localStorage";
 import { 
   analyzeDataConflicts, 
   applyConflictResolution, 
   getCurrentLocalData,
   mergeData,
   type DataConflict,
-  type ConflictResolution 
+  type ConflictResolution,
+  analyzeTripsConflicts,
+  applyTripsConflictResolution,
+  mergeTripsData,
+  type TripsConflict
 } from "./dataConflictResolver";
 
 export function useRealtimeSync() {
@@ -24,8 +37,12 @@ export function useRealtimeSync() {
   const lastUserId = useRef<string | null>(null);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<DataConflict | null>(null);
+  const [tripsConflictDialogOpen, setTripsConflictDialogOpen] = useState(false);
+  const [pendingTripsConflict, setPendingTripsConflict] = useState<TripsConflict | null>(null);
   const conflictDialogOpenRef = useRef(false);
   const pendingConflictRef = useRef<DataConflict | null>(null);
+  const tripsConflictDialogOpenRef = useRef(false);
+  const pendingTripsConflictRef = useRef<TripsConflict | null>(null);
   const suppressConflictsUntil = useRef<number>(0);
   const suppressUploadsUntil = useRef<number>(0);
   const sessionSynced = useRef<boolean>(false);
@@ -44,6 +61,14 @@ export function useRealtimeSync() {
   useEffect(() => {
     pendingConflictRef.current = pendingConflict;
   }, [pendingConflict]);
+
+  useEffect(() => {
+    tripsConflictDialogOpenRef.current = tripsConflictDialogOpen;
+  }, [tripsConflictDialogOpen]);
+
+  useEffect(() => {
+    pendingTripsConflictRef.current = pendingTripsConflict;
+  }, [pendingTripsConflict]);
 
   useEffect(() => {
     // Reset initialization when user changes (including logout/login)
@@ -75,6 +100,7 @@ export function useRealtimeSync() {
       try {
         // If a conflict dialog is already open or recently resolved, skip background handling
         if (conflictDialogOpenRef.current || pendingConflictRef.current) return;
+        if (tripsConflictDialogOpenRef.current || pendingTripsConflictRef.current) return;
         if (Date.now() < suppressConflictsUntil.current) return;
 
         if (!sessionSynced.current) {
@@ -95,6 +121,24 @@ export function useRealtimeSync() {
             setConflictDialogOpen(true);
             return;
           }
+
+          // Trips conflicts
+          const tripsLocal = { trips: getTrips(), tripExpenses: getTripExpensesRaw(), tripRecurring: getTripRecurringRaw() };
+          const tripsOnline = remoteSnapshot as any ? {
+            trips: (remoteSnapshot as any).trips || [],
+            tripExpenses: (remoteSnapshot as any).tripExpenses || [],
+            tripRecurring: (remoteSnapshot as any).tripRecurring || [],
+          } : null;
+          const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
+          const hasTripsConflicts = tripsConflict.hasOnlineData && (
+            tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
+          );
+          if (hasTripsConflicts) {
+            // Do not auto-open Trips dialog; just record pending and block the tab
+            setPendingTripsConflict(tripsConflict);
+            try { localStorage.setItem('dailyspend_trips_conflict_pending', 'true'); } catch {}
+            return;
+          }
         }
 
         // Either session is in-sync or no conflicts detected; proceed with upload
@@ -103,6 +147,9 @@ export function useRealtimeSync() {
           categories: getCategories(),
           expenses: getExpenses(),
           recurring: getRecurringExpenses(),
+          trips: getTrips(),
+          tripExpenses: getTripExpensesRaw(),
+          tripRecurring: getTripRecurringRaw(),
         }, sessionIdRef.current);
       } catch (e) {
         console.error('Background upload failed', e);
@@ -141,6 +188,16 @@ export function useRealtimeSync() {
         // Suppress upload loop from local change event
         suppressUploadsUntil.current = Date.now() + 2000;
         updateAllData(merged.categories as any, merged.expenses as any, merged.recurring as any);
+
+        // Trips live merge
+        const tripsLocal = { trips: getTrips(), tripExpenses: getTripExpensesRaw(), tripRecurring: getTripRecurringRaw() };
+        const tripsOnline = {
+          trips: ((data as any).trips as any[]) || [],
+          tripExpenses: ((data as any).tripExpenses as any[]) || [],
+          tripRecurring: ((data as any).tripRecurring as any[]) || [],
+        };
+        const tripsMerged = mergeTripsData(tripsLocal as any, tripsOnline as any);
+        updateAllTripsData(tripsMerged.trips as any, tripsMerged.tripExpenses as any, tripsMerged.tripRecurring as any);
         // Proactively refresh UI queries immediately
         void queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
         void queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -167,6 +224,39 @@ export function useRealtimeSync() {
     };
   }, [user, isVerified]);
 
+  // Listen for a global request to open the Trips conflict dialog from UI
+  useEffect(() => {
+    const onOpenTripsConflict = () => {
+      if (pendingTripsConflictRef.current) {
+        setTripsConflictDialogOpen(true);
+      } else {
+        // If no pending snapshot (e.g., after reload), re-run a quick conflict check
+        (async () => {
+          try {
+            if (!user) return;
+            const remoteSnapshot = await downloadAllForUser(user.uid);
+            const tripsLocal = { trips: getTrips(), tripExpenses: getTripExpensesRaw(), tripRecurring: getTripRecurringRaw() };
+            const tripsOnline = remoteSnapshot as any ? {
+              trips: (remoteSnapshot as any).trips || [],
+              tripExpenses: (remoteSnapshot as any).tripExpenses || [],
+              tripRecurring: (remoteSnapshot as any).tripRecurring || [],
+            } : null;
+            const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
+            const hasTripsConflicts = tripsConflict.hasOnlineData && (
+              tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
+            );
+            if (hasTripsConflicts) {
+              setPendingTripsConflict(tripsConflict);
+              setTripsConflictDialogOpen(true);
+            }
+          } catch {}
+        })();
+      }
+    };
+    window.addEventListener('dailyspend:open-trips-conflict', onOpenTripsConflict);
+    return () => window.removeEventListener('dailyspend:open-trips-conflict', onOpenTripsConflict);
+  }, [user, isVerified]);
+
   const handleInitialSync = async () => {
     try {
       console.log('[Sync] Starting initial sync for user:', user!.uid);
@@ -185,7 +275,7 @@ export function useRealtimeSync() {
         recurring: (remoteData.recurring as any[])?.length || 0
       } : 'No remote data');
       
-      // Analyze potential conflicts
+      // Analyze potential conflicts (expenses/categories/recurring)
       const conflict = analyzeDataConflicts(localData, remoteData as any);
       
       console.log('[Sync] Conflict analysis:', {
@@ -208,10 +298,55 @@ export function useRealtimeSync() {
           return;
         }
       }
-      
-      console.log('[Sync] No conflicts, proceeding with normal sync');
-      // No conflicts or no data overlap - proceed with normal sync
-      await performSync(conflict, 'merge');
+
+      // Analyze trips conflicts
+      const tripsLocal = { trips: getTrips(), tripExpenses: getTripExpensesRaw(), tripRecurring: getTripRecurringRaw() };
+      const tripsOnline = remoteData ? {
+        trips: (remoteData as any).trips || [],
+        tripExpenses: (remoteData as any).tripExpenses || [],
+        tripRecurring: (remoteData as any).tripRecurring || [],
+      } : null;
+      const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
+      const hasTripsConflicts = tripsConflict.hasLocalData && tripsConflict.hasOnlineData && (
+        tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
+      );
+      if (hasTripsConflicts) {
+        console.log('[Sync] Trips conflicts detected; blocking Trips until resolved');
+        // Do not open dialog automatically; block Trips tab and let user resolve from UI
+        try { localStorage.setItem('dailyspend_trips_conflict_pending', 'true'); } catch {}
+        // Skip automatic merge/upload for trips; proceed without modifying trips data
+      } else {
+        // No trips conflicts; perform a merge and upload for trips as well
+        const tripsMerged = mergeTripsData(tripsLocal as any, (tripsOnline as any) || { trips: [], tripExpenses: [], tripRecurring: [] } as any);
+        // Suppress loops then update local snapshots
+        suppressUploadsUntil.current = Date.now() + 2000;
+        updateAllTripsData(tripsMerged.trips as any, tripsMerged.tripExpenses as any, tripsMerged.tripRecurring as any);
+        try { localStorage.setItem('dailyspend_trips_conflict_pending', 'false'); } catch {}
+      }
+
+      console.log('[Sync] Proceeding with expenses sync');
+      // Merge expenses/categories/recurring unconditionally (no conflicts or will have shown dialog above)
+      const merged = mergeData(localData as any, (remoteData as any) || { categories: [], expenses: [], recurring: [] } as any);
+      // Suppress loops then update local snapshots
+      suppressUploadsUntil.current = Date.now() + 2000;
+      updateAllData(merged.categories as any, merged.expenses as any, merged.recurring as any);
+      // Upload combined payload
+      await uploadAllForUser(
+        user!.uid,
+        {
+          categories: merged.categories,
+          expenses: merged.expenses,
+          recurring: merged.recurring,
+          // Only include trips when no trips conflicts; otherwise keep server state until user resolves
+          ...(hasTripsConflicts ? {} : {
+            trips: getTrips(),
+            tripExpenses: getTripExpensesRaw(),
+            tripRecurring: getTripRecurringRaw(),
+          })
+        } as any,
+        sessionIdRef.current,
+        { overwrite: false }
+      );
       
     } catch (e) {
       console.error('[Sync] Initial sync failed:', e);
@@ -236,7 +371,12 @@ export function useRealtimeSync() {
       // Upload resolved data to cloud
       await uploadAllForUser(
         user!.uid,
-        resolvedData as any,
+        {
+          ...resolvedData as any,
+          trips: getTrips(),
+          tripExpenses: getTripExpensesRaw(),
+          tripRecurring: getTripRecurringRaw(),
+        },
         sessionIdRef.current,
         { overwrite: shouldOverwriteRemote }
       );
@@ -253,6 +393,34 @@ export function useRealtimeSync() {
     }
   };
 
+  const performTripsSync = async (conflict: TripsConflict, resolution: ConflictResolution) => {
+    try {
+      suppressConflictsUntil.current = Date.now() + 2000;
+      const resolved = applyTripsConflictResolution(resolution, conflict.localData as any, conflict.onlineData as any);
+      updateAllTripsData(resolved.trips as any, resolved.tripExpenses as any, resolved.tripRecurring as any);
+      await uploadAllForUser(
+        user!.uid,
+        {
+          categories: getCategories(),
+          expenses: getExpenses(),
+          recurring: getRecurringExpenses(),
+          trips: resolved.trips,
+          tripExpenses: resolved.tripExpenses,
+          tripRecurring: resolved.tripRecurring,
+        } as any,
+        sessionIdRef.current,
+        { overwrite: resolution === 'overwrite-online' }
+      );
+      try { localStorage.setItem('dailyspend_trips_conflict_pending', 'false'); } catch {}
+      window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));
+      window.dispatchEvent(new CustomEvent('dailyspend:trips-conflict-resolved'));
+      sessionSynced.current = true;
+    } catch (e) {
+      console.error('Trips sync failed', e);
+      throw e;
+    }
+  };
+
   const handleConflictResolution = async (resolution: ConflictResolution) => {
     if (!pendingConflict) return;
     
@@ -263,6 +431,18 @@ export function useRealtimeSync() {
     } catch (error) {
       console.error('Conflict resolution failed:', error);
       throw error;
+    }
+  };
+
+  const handleTripsConflictResolution = async (resolution: ConflictResolution) => {
+    if (!pendingTripsConflict) return;
+    try {
+      await performTripsSync(pendingTripsConflict, resolution);
+      setTripsConflictDialogOpen(false);
+      setPendingTripsConflict(null);
+    } catch (e) {
+      console.error('Trips conflict resolution failed:', e);
+      throw e;
     }
   };
 
@@ -279,6 +459,20 @@ export function useRealtimeSync() {
       try {
         window.dispatchEvent(new CustomEvent('dailyspend:open-profile'));
       } catch {}
+    },
+    tripsConflictDialogOpen,
+    pendingTripsConflict,
+    onTripsConflictResolve: handleTripsConflictResolution,
+    onTripsConflictDialogClose: async () => {
+      // Clear the pending flag so Trips is accessible
+      try { localStorage.setItem('dailyspend_trips_conflict_pending', 'false'); } catch {}
+      // Fire events to update UI state
+      try {
+        window.dispatchEvent(new CustomEvent('dailyspend:trips-conflict-resolved'));
+        window.dispatchEvent(new CustomEvent('dailyspend:navigate-trips'));
+      } catch {}
+      setTripsConflictDialogOpen(false);
+      setPendingTripsConflict(null);
     }
   };
 }

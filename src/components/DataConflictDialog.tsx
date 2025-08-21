@@ -12,9 +12,16 @@ interface DataConflictDialogProps {
   onClose: () => void;
   conflict: DataConflict;
   onResolve: (resolution: ConflictResolution) => Promise<void>;
+  titleOverride?: string;
+  sectionsLabelOverride?: {
+    categories?: string;
+    expenses?: string;
+    recurring?: string;
+  };
+  descriptionOverride?: string;
 }
 
-export default function DataConflictDialog({ open, onClose, conflict, onResolve }: DataConflictDialogProps) {
+export default function DataConflictDialog({ open, onClose, conflict, onResolve, titleOverride, sectionsLabelOverride, descriptionOverride }: DataConflictDialogProps) {
   const { toast } = useToast();
   const [selectedResolution, setSelectedResolution] = useState<ConflictResolution | null>(null);
   const [isResolving, setIsResolving] = useState(false);
@@ -44,9 +51,9 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
 
   const getConflictSummary = () => {
     const conflicts = [];
-    if (conflict.conflicts.categories) conflicts.push("Categories");
-    if (conflict.conflicts.expenses) conflicts.push("Expenses");
-    if (conflict.conflicts.recurring) conflicts.push("Recurring Expenses");
+    if (conflict.conflicts.categories) conflicts.push(sectionsLabelOverride?.categories || "Categories");
+    if (conflict.conflicts.expenses) conflicts.push(sectionsLabelOverride?.expenses || "Expenses");
+    if (conflict.conflicts.recurring) conflicts.push(sectionsLabelOverride?.recurring || "Recurring Expenses");
     return conflicts.join(", ");
   };
 
@@ -70,11 +77,10 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            Data Synchronization Required
+            {titleOverride || 'Data Synchronization Required'}
           </DialogTitle>
           <DialogDescription>
-            We found different data in your local storage and online account. 
-            Please choose how you'd like to handle this conflict.
+            {descriptionOverride || 'We found different data in your local storage and online account. Please choose how you\'d like to handle this conflict.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -95,7 +101,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
               <div className="space-y-2">
                 {conflict.conflicts.categories && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Categories:</span>
+                    <span className="text-sm">{sectionsLabelOverride?.categories || 'Categories'}:</span>
                     <Badge variant="secondary">
                       {getDataCounts(conflict.localData.categories, "categories")}
                     </Badge>
@@ -103,7 +109,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                 )}
                 {conflict.conflicts.expenses && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Expenses:</span>
+                    <span className="text-sm">{sectionsLabelOverride?.expenses || 'Expenses'}:</span>
                     <Badge variant="secondary">
                       {getDataCounts(conflict.localData.expenses, "expenses")}
                     </Badge>
@@ -111,7 +117,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                 )}
                 {conflict.conflicts.recurring && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Recurring:</span>
+                    <span className="text-sm">{sectionsLabelOverride?.recurring || 'Recurring'}:</span>
                     <Badge variant="secondary">
                       {getDataCounts(conflict.localData.recurring, "recurring expenses")}
                     </Badge>
@@ -125,7 +131,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
               <div className="space-y-2">
                 {conflict.conflicts.categories && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Categories:</span>
+                    <span className="text-sm">{sectionsLabelOverride?.categories || 'Categories'}:</span>
                     <Badge variant="secondary">
                       {getDataCounts(conflict.onlineData.categories, "categories")}
                     </Badge>
@@ -133,7 +139,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                 )}
                 {conflict.conflicts.expenses && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Expenses:</span>
+                    <span className="text-sm">{sectionsLabelOverride?.expenses || 'Expenses'}:</span>
                     <Badge variant="secondary">
                       {getDataCounts(conflict.onlineData.expenses, "expenses")}
                     </Badge>
@@ -141,7 +147,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve 
                 )}
                 {conflict.conflicts.recurring && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Recurring:</span>
+                    <span className="text-sm">{sectionsLabelOverride?.recurring || 'Recurring'}:</span>
                     <Badge variant="secondary">
                       {getDataCounts(conflict.onlineData.recurring, "recurring expenses")}
                     </Badge>

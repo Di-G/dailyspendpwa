@@ -23,6 +23,11 @@ export type DataConflict = {
 
 export type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online';
 
+// Trips types (local only)
+export type Trip = { id: string; name: string; friends: { name: string }[] };
+export type TripExpense = { id: string; tripId: string; friendIndex: number; name: string; amount: string; details?: string | null; categoryId?: string | null; date: string; createdAt: string };
+export type TripRecurring = { id: string; tripId: string; name: string; amount: string; details?: string | null; friendIndex: number; frequency: 'daily'|'weekly'|'monthly'|'custom'; customDays?: number; startDate: string; endDate?: string | null; isActive: boolean };
+
 /**
  * Analyzes data conflicts between local and online storage
  */
@@ -101,6 +106,94 @@ export function analyzeDataConflicts(
     localData,
     onlineData: onlineData || { categories: [], expenses: [], recurring: [] }
   };
+}
+
+// ---- Trips conflict helpers (parallel to main data) ----
+export type TripsConflict = {
+  hasLocalData: boolean;
+  hasOnlineData: boolean;
+  conflicts: {
+    trips: boolean;
+    tripExpenses: boolean;
+    tripRecurring: boolean;
+  };
+  localData: {
+    trips: Trip[];
+    tripExpenses: TripExpense[];
+    tripRecurring: TripRecurring[];
+  };
+  onlineData: {
+    trips: Trip[];
+    tripExpenses: TripExpense[];
+    tripRecurring: TripRecurring[];
+  };
+};
+
+export function analyzeTripsConflicts(
+  localData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] },
+  onlineData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] } | null
+): TripsConflict {
+  const hasLocalData = (localData.trips.length + localData.tripExpenses.length + localData.tripRecurring.length) > 0;
+  const hasOnlineData = !!onlineData && (
+    (onlineData.trips?.length || 0) + (onlineData.tripExpenses?.length || 0) + (onlineData.tripRecurring?.length || 0)
+  ) > 0;
+
+  if (!hasLocalData || !hasOnlineData) {
+    return {
+      hasLocalData,
+      hasOnlineData,
+      conflicts: { trips: false, tripExpenses: false, tripRecurring: false },
+      localData,
+      onlineData: onlineData || { trips: [], tripExpenses: [], tripRecurring: [] },
+    };
+  }
+
+  const tripsConflict = !areArraysEqual(localData.trips, onlineData!.trips || []);
+  const tripExpensesConflict = !areArraysEqual(localData.tripExpenses, onlineData!.tripExpenses || []);
+  const tripRecurringConflict = !areArraysEqual(localData.tripRecurring, onlineData!.tripRecurring || []);
+
+  return {
+    hasLocalData,
+    hasOnlineData,
+    conflicts: { trips: tripsConflict, tripExpenses: tripExpensesConflict, tripRecurring: tripRecurringConflict },
+    localData,
+    onlineData: onlineData || { trips: [], tripExpenses: [], tripRecurring: [] },
+  };
+}
+
+export function mergeTripsData(
+  localData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] },
+  onlineData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] }
+): { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] } {
+  // For trips array, merge by id preferring the most recent createdAt-like heuristic if exists; fallback to local
+  const mergedTrips = mergeArraysByTimestamp(
+    localData.trips.map(t => ({ ...t, createdAt: (t as any).createdAt || '1970-01-01T00:00:00.000Z' })) as any,
+    (onlineData.trips || []).map(t => ({ ...t, createdAt: (t as any).createdAt || '1970-01-01T00:00:00.000Z' })) as any,
+    'createdAt' as any,
+  ).map((t: any) => ({ id: t.id, name: t.name, friends: t.friends } as Trip));
+
+  const mergedTripExpenses = mergeArraysByTimestamp(localData.tripExpenses, onlineData.tripExpenses || [], 'createdAt');
+  const mergedTripRecurring = mergeArraysByTimestamp(localData.tripRecurring, onlineData.tripRecurring || [], 'createdAt');
+
+  return { trips: mergedTrips, tripExpenses: mergedTripExpenses, tripRecurring: mergedTripRecurring };
+}
+
+export function applyTripsConflictResolution(
+  resolution: ConflictResolution,
+  localData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] },
+  onlineData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] } | null
+): { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] } {
+  switch (resolution) {
+    case 'merge':
+      if (!onlineData) return localData;
+      return mergeTripsData(localData, onlineData);
+    case 'overwrite-local':
+      return onlineData || { trips: [], tripExpenses: [], tripRecurring: [] };
+    case 'overwrite-online':
+      return localData;
+    default:
+      return localData;
+  }
 }
 
 /**

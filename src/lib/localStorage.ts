@@ -519,6 +519,8 @@ type TripRecurring = {
   isActive: boolean;
 };
 
+export type Trip = { id: string; name: string; friends: { name: string }[] };
+
 export const getTripExpensesRaw = (): TripExpense[] => {
   return getFromStorage<TripExpense[]>(TRIP_EXPENSES_KEY, []);
 };
@@ -593,4 +595,30 @@ export const processTripRecurringForDate = (date: string): number => {
   const updated = [...current, ...toAdd];
   setTripExpensesRaw(updated);
   return toAdd.length;
+};
+
+// High-level trips helpers used by trips sync
+export const getTrips = (): Trip[] => {
+  return getFromStorage<Trip[]>('dailyspend_trips', []);
+};
+
+export const setTrips = (trips: Trip[]): void => {
+  setToStorage('dailyspend_trips', trips);
+  emitDataChanged();
+};
+
+export const updateAllTripsData = (
+  trips: Trip[],
+  tripExpenses: TripExpense[],
+  tripRecurring: TripRecurring[]
+): void => {
+  try {
+    setToStorage('dailyspend_trips', trips);
+    setToStorage(TRIP_EXPENSES_KEY, tripExpenses);
+    setToStorage(TRIP_RECURRING_KEY, tripRecurring);
+    emitDataChanged();
+  } catch (e) {
+    console.error('Error updating all trips data:', e);
+    throw e;
+  }
 };

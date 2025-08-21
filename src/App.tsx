@@ -32,7 +32,11 @@ function App() {
     conflictDialogOpen, 
     pendingConflict, 
     onConflictResolve, 
-    onConflictDialogClose 
+    onConflictDialogClose,
+    tripsConflictDialogOpen,
+    pendingTripsConflict,
+    onTripsConflictResolve,
+    onTripsConflictDialogClose
   } = useRealtimeSync();
 
   // Initialize default categories on app start
@@ -133,6 +137,42 @@ function App() {
             onClose={onConflictDialogClose}
             conflict={pendingConflict}
             onResolve={onConflictResolve}
+          />
+        )}
+
+        {pendingTripsConflict && (
+          <DataConflictDialog
+            open={tripsConflictDialogOpen}
+            onClose={onTripsConflictDialogClose}
+            conflict={{
+              hasLocalData: pendingTripsConflict.hasLocalData,
+              hasOnlineData: pendingTripsConflict.hasOnlineData,
+              conflicts: {
+                // Map to categories/expenses/recurring labels just for display; we override labels below
+                categories: pendingTripsConflict.conflicts.trips,
+                expenses: pendingTripsConflict.conflicts.tripExpenses,
+                recurring: pendingTripsConflict.conflicts.tripRecurring,
+              },
+              localData: {
+                // Pack into expected slots for display counts
+                categories: (pendingTripsConflict.localData.trips as any),
+                expenses: (pendingTripsConflict.localData.tripExpenses as any),
+                recurring: (pendingTripsConflict.localData.tripRecurring as any),
+              } as any,
+              onlineData: {
+                categories: (pendingTripsConflict.onlineData.trips as any),
+                expenses: (pendingTripsConflict.onlineData.tripExpenses as any),
+                recurring: (pendingTripsConflict.onlineData.tripRecurring as any),
+              } as any,
+            } as any}
+            onResolve={onTripsConflictResolve}
+            titleOverride="Trips Data Synchronization Required"
+            descriptionOverride="We found differences between your local trips and online trips. Please choose how to handle this conflict."
+            sectionsLabelOverride={{
+              categories: 'Trips',
+              expenses: 'Trip Expenses',
+              recurring: 'Trip Recurring',
+            }}
           />
         )}
       </TooltipProvider>

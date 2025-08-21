@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { getToday, getMonthInfo, generateCalendarDays } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw } from "@/lib/localStorage";
+import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +45,9 @@ type CurrencyCode = "USD" | "INR";
 export default function ExpenseTracker() {
   const [currentView, setCurrentView] = useState<ViewType>("entry");
   const [topTab, setTopTab] = useState<"my" | "couple" | "trips" | "followups">("my");
+  const [tripsBlocked, setTripsBlocked] = useState<boolean>(() => {
+    try { return localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'; } catch { return false; }
+  });
   const [currency, setCurrency] = useState<CurrencyCode>(() => {
     const saved = localStorage.getItem("dailyspend_currency") as CurrencyCode | null;
     return saved || "USD";
@@ -62,6 +65,7 @@ export default function ExpenseTracker() {
   const [incomingRequests, setIncomingRequests] = useState<PartnerRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<PartnerRequest[]>([]);
   const { user, isVerified } = useAuth();
+  const tripsBlockedEffective = isVerified && tripsBlocked;
   const [dismissedIncomingPopup, setDismissedIncomingPopup] = useState<boolean>(false);
   const [ackRejectedIds, setAckRejectedIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('dailyspend_ack_rejected_outgoing') || '[]'); } catch { return []; }
@@ -337,12 +341,68 @@ export default function ExpenseTracker() {
       setTopTab('my');
       return;
     }
+    if (v === 'trips' && tripsBlockedEffective) {
+      // Prevent entering Trips until conflict is resolved; directly open the Trips conflict dialog
+      setTopTab('my');
+      try { window.dispatchEvent(new CustomEvent('dailyspend:open-trips-conflict')); } catch {}
+      return;
+    }
     // Reset bottom view to default when switching any top tab
     setCurrentView('entry');
     
     
     setTopTab(v as typeof topTab);
   };
+
+  // Respond to global event to navigate home if trips conflict remains
+  useEffect(() => {
+    const onNavigateHome = () => {
+      try { setTripsBlocked(localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'); } catch {}
+      setTopTab('my');
+      setCurrentView('entry');
+    };
+    window.addEventListener('dailyspend:navigate-home', onNavigateHome);
+    return () => window.removeEventListener('dailyspend:navigate-home', onNavigateHome);
+  }, []);
+
+  // Respond to global event to navigate to trips tab after conflict resolution
+  useEffect(() => {
+    const onNavigateTrips = () => {
+      // Update trips blocked state before navigating
+      try { setTripsBlocked(localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'); } catch {}
+      // Small delay to ensure localStorage update is processed
+      setTimeout(() => {
+        setTopTab('trips');
+        setCurrentView('entry');
+      }, 50);
+    };
+    window.addEventListener('dailyspend:navigate-trips', onNavigateTrips);
+    return () => window.removeEventListener('dailyspend:navigate-trips', onNavigateTrips);
+  }, []);
+
+  // Always navigate to My Expenses Home on login
+  useEffect(() => {
+    if (user) {
+      setTopTab('my');
+      setCurrentView('entry');
+    }
+  }, [user?.uid]);
+
+  // When trips conflict gets resolved elsewhere, unblock UI
+  useEffect(() => {
+    const onDataChanged = () => {
+      try { setTripsBlocked(localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'); } catch {}
+    };
+    const onTripsConflictResolved = () => {
+      try { setTripsBlocked(false); } catch {}
+    };
+    window.addEventListener('dailyspend:data-changed', onDataChanged);
+    window.addEventListener('dailyspend:trips-conflict-resolved', onTripsConflictResolved);
+    return () => {
+      window.removeEventListener('dailyspend:data-changed', onDataChanged);
+      window.removeEventListener('dailyspend:trips-conflict-resolved', onTripsConflictResolved);
+    };
+  }, []);
 
   const handleSubmitPartner = async () => {
     if (!user) return;
@@ -484,7 +544,7 @@ export default function ExpenseTracker() {
               <TabsTrigger
                 value="trips"
                 aria-label="My trips"
-                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-none"
+                className={`flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-none ${tripsBlockedEffective ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <HiOutlineUserGroup className="w-6 h-6" />
                 <span className="sr-only">My Trips</span>
@@ -1362,6 +1422,12 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
   const [details, setDetails] = useState<string>('');
   const [showAddDetails, setShowAddDetails] = useState<boolean>(false);
   const { toast } = useToast();
+  const [tripDataRev, setTripDataRev] = useState<number>(0);
+
+  // Edit dialog state for trip expenses (parity with My expenses)
+  const [editing, setEditing] = useState<TripExpense | null>(null);
+  const [editTripFields, setEditTripFields] = useState<{ name: string; amount: string; details: string; friendIndex: number } | null>(null);
+  const [showEditTripDetails, setShowEditTripDetails] = useState(false);
 
   const CURRENCIES = { USD: { symbol: "$" }, INR: { symbol: "₹" } } as const;
   const symbol = CURRENCIES[currency].symbol;
@@ -1372,7 +1438,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     try { return JSON.parse(localStorage.getItem('dailyspend_trip_expenses') || '[]'); } catch { return []; }
   };
   const setTripExpenses = (items: TripExpense[]) => {
-    try { localStorage.setItem('dailyspend_trip_expenses', JSON.stringify(items)); } catch {}
+    try { setTripExpensesRaw(items as any); } catch { try { localStorage.setItem('dailyspend_trip_expenses', JSON.stringify(items)); } catch {} }
   };
 
   useEffect(() => {
@@ -1388,7 +1454,17 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     const all = getTripExpenses();
     if (!activeTrip) return [] as TripExpense[];
     return all.filter(e => e.tripId === activeTrip.id && e.date === date);
-  }, [activeTrip?.id, date]);
+  }, [activeTrip?.id, date, tripDataRev]);
+
+  // Force refresh on global data change events (e.g., sync merges)
+  useEffect(() => {
+    const onChanged = () => {
+      // Increment revision to force recompute
+      setTripDataRev((v) => v + 1);
+    };
+    window.addEventListener('dailyspend:data-changed', onChanged);
+    return () => window.removeEventListener('dailyspend:data-changed', onChanged);
+  }, []);
 
   const totalForDate = useMemo(() => expensesForDate.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0), [expensesForDate]);
 
@@ -1403,7 +1479,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
       }
     });
     return totals;
-  }, [activeTrip?.id, date]);
+  }, [activeTrip?.id, date, tripDataRev]);
 
   const FRIEND_COLORS = [
     '#14B8A6', // teal
@@ -1434,8 +1510,57 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     const all = getTripExpenses();
     all.push(newItem);
     setTripExpenses(all);
+    // setTripExpensesRaw emits a data-changed event
     setName(''); setAmount(''); setDetails('');
     toast({ title: 'Added', description: `${trimmedName} added for ${activeTrip.friends[selectedFriendIndex]?.name || 'Friend ' + (selectedFriendIndex+1)}` });
+  };
+
+  const openTripEdit = (expense: TripExpense) => {
+    setEditing(expense);
+    setEditTripFields({
+      name: expense.name,
+      amount: expense.amount,
+      details: expense.details || '',
+      friendIndex: expense.friendIndex,
+    });
+    setShowEditTripDetails(!!expense.details);
+  };
+
+  const closeTripEdit = () => {
+    setEditing(null);
+    setEditTripFields(null);
+    setShowEditTripDetails(false);
+  };
+
+  const saveTripExpense = () => {
+    if (!editing || !editTripFields) return;
+    const amountNum = parseFloat(editTripFields.amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast({ title: 'Error', description: 'Please enter a valid amount', variant: 'destructive' });
+      return;
+    }
+    const all = getTripExpenses();
+    const next = all.map((e) => e.id === editing.id ? {
+      ...e,
+      name: editTripFields.name,
+      amount: amountNum.toString(),
+      details: editTripFields.details.trim() === '' ? undefined : editTripFields.details,
+      friendIndex: editTripFields.friendIndex,
+    } : e);
+    setTripExpenses(next);
+    setTripDataRev((v) => v + 1);
+    toast({ title: 'Success', description: 'Expense updated successfully' });
+    closeTripEdit();
+  };
+
+  const deleteTripExpense = () => {
+    if (!editing) return;
+    const all = getTripExpenses();
+    const next = all.filter((e) => e.id !== editing.id);
+    setTripExpenses(next);
+    setTripDataRev((v) => v + 1);
+    toast({ title: 'Deleted', description: 'Expense deleted successfully' });
+    closeTripEdit();
   };
 
   return (
@@ -1560,7 +1685,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
           ) : (
             <div>
               {expensesForDate.map((e) => (
-                <div key={e.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-muted/30">
+                <div key={e.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-muted/30 cursor-pointer" onClick={() => openTripEdit(e)}>
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '55' }} />
                     <div className="min-w-0 flex-1">
@@ -1580,6 +1705,59 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Trip Expense Dialog (parity with My expenses) */}
+      <Dialog open={!!editing} onOpenChange={(open) => { if (!open) closeTripEdit(); }}>
+        <DialogContent className="sm:max-w-md -mt-16 sm:mt-0">
+          <DialogHeader>
+            <DialogTitle>Edit Trip Expense</DialogTitle>
+          </DialogHeader>
+          {editTripFields && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-foreground/80">Amount ({symbol})</label>
+                  <Input type="number" step="0.01" value={editTripFields.amount} onChange={(e) => setEditTripFields({ ...editTripFields, amount: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground/80">Expense Name</label>
+                  <Input value={editTripFields.name} onChange={(e) => setEditTripFields({ ...editTripFields, name: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground/80">Friend</label>
+                <Select value={String(editTripFields.friendIndex)} onValueChange={(v) => setEditTripFields({ ...editTripFields, friendIndex: parseInt(v) })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a friend" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(activeTrip?.friends || []).map((f, idx) => (
+                      <SelectItem key={idx} value={String(idx)}>
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: FRIEND_COLORS[idx % FRIEND_COLORS.length] }} />
+                          {f.name || `Friend ${idx+1}`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-3">
+                <Button type="button" variant="ghost" onClick={() => setShowEditTripDetails(!showEditTripDetails)} className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal">
+                  <span className="text-sm">Additional Details</span>
+                </Button>
+                {showEditTripDetails && (
+                  <Textarea rows={3} value={editTripFields.details} onChange={(e) => setEditTripFields({ ...editTripFields, details: e.target.value })} className="transition-all duration-200 ease-in-out" />
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex flex-row justify-end gap-2">
+            <Button variant="destructive" size="sm" onClick={deleteTripExpense}>Delete</Button>
+            <Button size="sm" onClick={saveTripExpense} className="bg-emerald-600 hover:bg-emerald-700">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
