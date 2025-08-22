@@ -266,6 +266,46 @@ export function useRealtimeSync() {
     return () => window.removeEventListener('dailyspend:open-trips-conflict', onOpenTripsConflict);
   }, [user, isVerified]);
 
+  // Listen for immediate trips upload requests
+  useEffect(() => {
+    const onForceUploadTrips = async () => {
+      if (!user || !isVerified) return;
+      
+      try {
+        console.log('[Sync] Force uploading trips data');
+        // Check if there are pending trips conflicts before uploading
+        const hasPendingTripsConflict = (() => {
+          try { return localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'; } catch { return false; }
+        })();
+        
+        if (hasPendingTripsConflict) {
+          console.log('[Sync] Skipping force upload due to pending trips conflicts');
+          return;
+        }
+        
+        await uploadAllForUser(
+          user.uid,
+          {
+            categories: getCategories(),
+            expenses: getExpenses(),
+            recurring: getRecurringExpenses(),
+            trips: getTrips(),
+            tripExpenses: getTripExpensesRaw(),
+            tripRecurring: getTripRecurringRaw(),
+          } as any,
+          sessionIdRef.current,
+          { overwrite: false }
+        );
+        console.log('[Sync] Force upload completed successfully');
+      } catch (error) {
+        console.error('[Sync] Force upload failed:', error);
+      }
+    };
+    
+    window.addEventListener('dailyspend:force-upload-trips', onForceUploadTrips);
+    return () => window.removeEventListener('dailyspend:force-upload-trips', onForceUploadTrips);
+  }, [user, isVerified]);
+
   const handleInitialSync = async () => {
     try {
       console.log('[Sync] Starting initial sync for user:', user!.uid);
@@ -315,10 +355,27 @@ export function useRealtimeSync() {
         tripExpenses: (remoteData as any).tripExpenses || [],
         tripRecurring: (remoteData as any).tripRecurring || [],
       } : null;
+      
+      console.log('[Sync] Trips conflict analysis:', {
+        localTrips: tripsLocal.trips.length,
+        localTripExpenses: tripsLocal.tripExpenses.length,
+        localTripRecurring: tripsLocal.tripRecurring.length,
+        onlineTrips: tripsOnline?.trips?.length || 0,
+        onlineTripExpenses: tripsOnline?.tripExpenses?.length || 0,
+        onlineTripRecurring: tripsOnline?.tripRecurring?.length || 0,
+      });
+      
       const tripsConflict = analyzeTripsConflicts(tripsLocal as any, tripsOnline as any);
       const hasTripsConflicts = (tripsConflict.hasLocalData || tripsConflict.hasOnlineData) && (
         tripsConflict.conflicts.trips || tripsConflict.conflicts.tripExpenses || tripsConflict.conflicts.tripRecurring
       );
+      
+      console.log('[Sync] Trips conflict result:', {
+        hasLocalData: tripsConflict.hasLocalData,
+        hasOnlineData: tripsConflict.hasOnlineData,
+        conflicts: tripsConflict.conflicts,
+        hasTripsConflicts
+      });
       if (hasTripsConflicts) {
         console.log('[Sync] Trips conflicts detected; blocking Trips until resolved');
         // Do not open dialog automatically; block Trips tab and let user resolve from UI
@@ -340,22 +397,36 @@ export function useRealtimeSync() {
       suppressUploadsUntil.current = Date.now() + 2000;
       updateAllData(merged.categories as any, merged.expenses as any, merged.recurring as any);
       // Upload combined payload
-      await uploadAllForUser(
-        user!.uid,
-        {
-          categories: merged.categories,
-          expenses: merged.expenses,
-          recurring: merged.recurring,
-          // Only include trips when no trips conflicts; otherwise keep server state until user resolves
-          ...(hasTripsConflicts ? {} : {
+      if (hasTripsConflicts) {
+        // Don't upload trips data when there are conflicts - let user resolve first
+        console.log('[Sync] Skipping trips upload due to conflicts');
+        await uploadAllForUser(
+          user!.uid,
+          {
+            categories: merged.categories,
+            expenses: merged.expenses,
+            recurring: merged.recurring,
+            // Explicitly exclude trips data to prevent merge conflicts
+          } as any,
+          sessionIdRef.current,
+          { overwrite: false }
+        );
+      } else {
+        // No trips conflicts, safe to upload everything
+        await uploadAllForUser(
+          user!.uid,
+          {
+            categories: merged.categories,
+            expenses: merged.expenses,
+            recurring: merged.recurring,
             trips: getTrips(),
             tripExpenses: getTripExpensesRaw(),
             tripRecurring: getTripRecurringRaw(),
-          })
-        } as any,
-        sessionIdRef.current,
-        { overwrite: false }
-      );
+          } as any,
+          sessionIdRef.current,
+          { overwrite: false }
+        );
+      }
       
     } catch (e) {
       console.error('[Sync] Initial sync failed:', e);

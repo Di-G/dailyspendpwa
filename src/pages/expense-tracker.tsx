@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, ArrowDown, ArrowUp, Plus, Edit } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, ArrowDown, ArrowUp, Plus, Edit, ChevronDown } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
  
@@ -118,7 +118,7 @@ export default function ExpenseTracker() {
     setSelectedFriendsCount(null);
     setFriendNames([]);
   };
-  const handleCreateTrip = () => {
+  const handleCreateTrip = async () => {
     const finalName = (tripNameInput.trim()) || getNextDefaultTripName();
     const count = selectedFriendsCount || 0;
     const finalFriends: { name: string }[] = Array.from({ length: count }, (_, idx) => ({
@@ -128,6 +128,14 @@ export default function ExpenseTracker() {
     const trips = getStoredTrips();
     trips.push(newTrip);
     try { localStorage.setItem('dailyspend_trips', JSON.stringify(trips)); } catch {}
+    
+    // Trigger immediate upload to Firebase
+    try {
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
+    
     toast({ title: 'Trip created', description: `${finalName} with ${count} friend${count === 1 ? '' : 's'}` });
     setHasTrips(true);
     setAddTripOpen(false);
@@ -887,6 +895,24 @@ export default function ExpenseTracker() {
                 <div className="p-4 text-sm text-muted-foreground">Charts for trips will be available soon.</div>
               )}
             </>
+          ) : tripsBlockedEffective ? (
+            // Show conflict message when trips are blocked
+            <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+              <div className="text-center space-y-2">
+                <h2 className="text-xl font-semibold text-foreground">Data Synchronization Required</h2>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  We found differences between your local trips and online trips. Please resolve the conflict to continue.
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  try { window.dispatchEvent(new CustomEvent('dailyspend:open-trips-conflict')); } catch {}
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                Resolve Conflict
+              </Button>
+            </div>
           ) : (
           <div className="relative">
             {/* Placeholder scaffold (optional minimal content behind blur) */}
@@ -1486,8 +1512,19 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     '#F97316', // orange
   ];
 
-  const handleAddExpense = () => {
-    if (!activeTrip) return;
+  const handleAddExpense = async () => {
+    if (!activeTrip) {
+      toast({ title: 'No active trip', description: 'Please create a trip first or resolve any data conflicts', variant: 'destructive' });
+      return;
+    }
+    
+    // Additional safeguard: check if there are any local trips
+    const localTrips = JSON.parse(localStorage.getItem('dailyspend_trips') || '[]');
+    if (localTrips.length === 0) {
+      toast({ title: 'No local trips', description: 'Please create a trip first or resolve any data conflicts', variant: 'destructive' });
+      return;
+    }
+    
     const trimmedName = name.trim();
     const trimmedAmount = amount.trim();
     if (!trimmedName || !trimmedAmount || isNaN(Number(trimmedAmount))) {
@@ -1507,7 +1544,15 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     const all = getTripExpenses();
     all.push(newItem);
     setTripExpenses(all);
-    // setTripExpensesRaw emits a data-changed event
+    
+    // Trigger immediate upload to Firebase
+    try {
+      // Dispatch a custom event to trigger immediate sync
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
+    
     setName(''); setAmount(''); setDetails('');
     toast({ title: 'Added', description: `${trimmedName} added for ${activeTrip.friends[selectedFriendIndex]?.name || 'Friend ' + (selectedFriendIndex+1)}` });
   };
@@ -1529,7 +1574,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     setShowEditTripDetails(false);
   };
 
-  const saveTripExpense = () => {
+  const saveTripExpense = async () => {
     if (!editing || !editTripFields) return;
     const amountNum = parseFloat(editTripFields.amount);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -1546,16 +1591,32 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     } : e);
     setTripExpenses(next);
     setTripDataRev((v) => v + 1);
+    
+    // Trigger immediate upload to Firebase
+    try {
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
+    
     toast({ title: 'Success', description: 'Expense updated successfully' });
     closeTripEdit();
   };
 
-  const deleteTripExpense = () => {
+  const deleteTripExpense = async () => {
     if (!editing) return;
     const all = getTripExpenses();
     const next = all.filter((e) => e.id !== editing.id);
     setTripExpenses(next);
     setTripDataRev((v) => v + 1);
+    
+    // Trigger immediate upload to Firebase
+    try {
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
+    
     toast({ title: 'Deleted', description: 'Expense deleted successfully' });
     closeTripEdit();
   };
@@ -1564,28 +1625,34 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
     <div className="space-y-4 sm:space-y-6">
       <Card>
         <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-col gap-3">
             <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">{activeTrip ? activeTrip.name : 'Trips'}</h2>
+              {trips.length > 1 ? (
+                <Select value={activeTrip?.id || ''} onValueChange={(value) => setActiveTripId(value)}>
+                  <SelectTrigger className="h-auto p-0 border-none bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 [&>svg]:hidden">
+                    <SelectValue>
+                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 cursor-pointer hover:text-foreground/60 transition-colors">
+                        {activeTrip ? activeTrip.name : 'Trips'}
+                        <ChevronDown className="inline-block w-4 h-4 ml-2 text-muted-foreground" />
+                      </h2>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trips.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80">{activeTrip ? activeTrip.name : 'Trips'}</h2>
+              )}
               <div className="flex items-center gap-2">
                 <DatePicker value={date} onChange={(v: string) => setDate(v)} className="h-8 text-sm" />
                 <span className="text-sm font-medium text-primary">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </div>
             </div>
-            {trips.length > 1 && (
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground">Trip</label>
-                <select
-                  className="border rounded-md h-8 px-2 bg-background"
-                  value={activeTrip?.id || ''}
-                  onChange={(e) => setActiveTripId(e.target.value)}
-                >
-                  {trips.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
           {activeTrip && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mt-4">
@@ -1789,9 +1856,19 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     setRecurring(items);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTrip) return;
+    if (!activeTrip) {
+      toast({ title: 'No active trip', description: 'Please create a trip first or resolve any data conflicts', variant: 'destructive' });
+      return;
+    }
+    
+    // Additional safeguard: check if there are any local trips
+    const localTrips = JSON.parse(localStorage.getItem('dailyspend_trips') || '[]');
+    if (localTrips.length === 0) {
+      toast({ title: 'No local trips', description: 'Please create a trip first or resolve any data conflicts', variant: 'destructive' });
+      return;
+    }
     if (!form.name || !form.amount || !form.startDate) {
       toast({ title: 'Validation Error', description: 'Fill required fields', variant: 'destructive' });
       return;
@@ -1818,6 +1895,14 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
         endDate: form.endDate || null,
       } : r);
       persist(next);
+      
+      // Trigger immediate upload to Firebase
+      try {
+        window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+      } catch (error) {
+        console.error('Failed to trigger immediate upload:', error);
+      }
+      
       toast({ title: 'Updated' });
     } else {
       const item = {
@@ -1834,6 +1919,14 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
         isActive: true,
       } as typeof recurring[number];
       persist([...recurring, item]);
+      
+      // Trigger immediate upload to Firebase
+      try {
+        window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+      } catch (error) {
+        console.error('Failed to trigger immediate upload:', error);
+      }
+      
       toast({ title: 'Added recurring' });
       // Immediate add if startDate is today
       if (form.startDate === getToday()) {
@@ -1860,13 +1953,28 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     setForm({ name: '', amount: '', details: '', friendIndex: 0, frequency: 'monthly', customDays: undefined, startDate: getToday(), endDate: '' });
   };
 
-  const handleToggle = (id: string) => {
+  const handleToggle = async (id: string) => {
     const next = recurring.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r);
     persist(next);
+    
+    // Trigger immediate upload to Firebase
+    try {
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
   };
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const next = recurring.filter(r => r.id !== id);
     persist(next);
+    
+    // Trigger immediate upload to Firebase
+    try {
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
+    
     toast({ title: 'Deleted' });
   };
   const handleEdit = (r: typeof recurring[number]) => {
@@ -1888,23 +1996,36 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
+          {trips.length > 1 ? (
+            <Select value={activeTripId} onValueChange={(value) => setActiveTripId(value)}>
+              <SelectTrigger className="h-auto p-0 border-none bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 [&>svg]:hidden">
+                <SelectValue>
+                  <h2 className="text-2xl font-bold text-foreground cursor-pointer hover:text-foreground/80 transition-colors">
+                    Recurring Expenses
+                    <ChevronDown className="inline-block w-4 h-4 ml-2 text-muted-foreground" />
+                  </h2>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {trips.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
+          )}
           <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
         </div>
-        <div className="flex items-center gap-2">
-          {trips.length > 1 && (
-            <select className="border rounded-md h-8 px-2 bg-background" value={activeTripId} onChange={(e) => setActiveTripId(e.target.value)}>
-              {trips.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
-            </select>
-          )}
-          <Button
-            onClick={() => setIsAdding(true)}
-            aria-label="Add Recurring"
-            className="bg-emerald-600 hover:bg-emerald-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
-          >
-            <Plus className="w-5 h-5" />
-          </Button>
-        </div>
+        <Button
+          onClick={() => setIsAdding(true)}
+          aria-label="Add Recurring"
+          className="bg-emerald-600 hover:bg-emerald-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
+        >
+          <Plus className="w-5 h-5" />
+        </Button>
       </div>
 
       {isAdding && (

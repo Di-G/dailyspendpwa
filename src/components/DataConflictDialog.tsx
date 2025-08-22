@@ -60,6 +60,17 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
 
   const getDataCounts = (data: any[], label: string) => {
     const count = data?.length || 0;
+    
+    // Special handling for trips to show trip names
+    if (label === 'trips' && count > 0) {
+      const tripNames = data.map((trip: any) => trip.name || 'Unnamed Trip').join(', ');
+      if (count === 1) {
+        return `1 Trip (${tripNames})`;
+      } else {
+        return `${count} Trips (${tripNames})`;
+      }
+    }
+    
     return count > 0 ? `${count} ${label}` : `No ${label}`;
   };
 

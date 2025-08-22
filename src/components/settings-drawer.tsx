@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
 import PartnerManagement from "@/components/partner-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories, updateAllData, initializeDefaultCategories } from "@/lib/localStorage";
+import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
 import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest } from "@/lib/sync";
 import { Trash, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 
 interface SettingsDrawerProps {
@@ -517,17 +518,85 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
   });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<{ id: string; name: string } | null>(null);
+  
+  // Add Trip dialog state
+  const [addTripOpen, setAddTripOpen] = useState<boolean>(false);
+  const [tripNameInput, setTripNameInput] = useState<string>("");
+  const [selectedFriendsCount, setSelectedFriendsCount] = useState<number | null>(null);
+  const [friendNames, setFriendNames] = useState<string[]>([]);
 
   useEffect(() => {
     // Refresh on open
     try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
   }, []);
 
-  const handleDeleteTrip = (id: string) => {
+  const getNextDefaultTripName = () => {
+    const trips = getStoredTrips();
+    const taken = new Set(trips.map(t => t.name));
+    let i = 1;
+    while (taken.has(`Trip ${i}`)) i++;
+    return `Trip ${i}`;
+  };
+
+  const getStoredTrips = () => {
+    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]') as Array<{ id: string; name: string; friends: { name: string }[] }>; } catch { return []; }
+  };
+
+  const resetAddTripState = () => {
+    setTripNameInput("");
+    setSelectedFriendsCount(null);
+    setFriendNames([]);
+  };
+
+  const handleCreateTrip = async () => {
+    const finalName = (tripNameInput.trim()) || getNextDefaultTripName();
+    const count = selectedFriendsCount || 0;
+    const finalFriends: { name: string }[] = Array.from({ length: count }, (_, idx) => ({
+      name: (friendNames[idx] || "").trim() || `Friend ${idx + 1}`,
+    }));
+    const newTrip = { id: `${Date.now()}-${Math.floor(Math.random() * 1e6)}`, name: finalName, friends: finalFriends };
+    const trips = getStoredTrips();
+    trips.push(newTrip);
+    try { localStorage.setItem('dailyspend_trips', JSON.stringify(trips)); } catch {}
+    
+    // Trigger immediate upload to Firebase
     try {
+      window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+    } catch (error) {
+      console.error('Failed to trigger immediate upload:', error);
+    }
+    
+    toast({ title: 'Trip created', description: `${finalName} with ${count} friend${count === 1 ? '' : 's'}` });
+    setTrips(trips);
+    onTripsChanged?.(trips.length > 0);
+    setAddTripOpen(false);
+    resetAddTripState();
+  };
+
+  const handleDeleteTrip = async (id: string) => {
+    try {
+      // Delete the trip
       const next = trips.filter(t => t.id !== id);
       localStorage.setItem('dailyspend_trips', JSON.stringify(next));
       setTrips(next);
+      
+      // Clean up associated trip expenses
+      const tripExpenses = getTripExpensesRaw();
+      const filteredTripExpenses = tripExpenses.filter((expense) => expense.tripId !== id);
+      setTripExpensesRaw(filteredTripExpenses);
+      
+      // Clean up associated trip recurring expenses
+      const tripRecurring = getTripRecurringRaw();
+      const filteredTripRecurring = tripRecurring.filter((recurring) => recurring.tripId !== id);
+      setTripRecurringRaw(filteredTripRecurring);
+      
+      // Trigger immediate upload to Firebase
+      try {
+        window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+      } catch (error) {
+        console.error('Failed to trigger immediate upload:', error);
+      }
+      
       onTripsChanged?.(next.length > 0);
       toast({ title: 'Trip deleted' });
     } catch (e) {
@@ -540,30 +609,109 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
     setDeleteOpen(true);
   };
 
-  if (trips.length === 0) {
-    return (
-      <div className="p-3 border rounded-md">
-        <div className="text-sm text-muted-foreground">No trips created yet.</div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
-      <h3 className="text-lg font-semibold">Trips</h3>
-      <div className="space-y-2">
-        {trips.map(trip => (
-          <div key={trip.id} className="flex items-center justify-between p-2 border rounded-md bg-card">
-            <div className="min-w-0">
-              <div className="text-sm font-medium truncate">{trip.name}</div>
-              <div className="text-xs text-muted-foreground truncate">{trip.friends.length} friend{trip.friends.length === 1 ? '' : 's'}</div>
-            </div>
-            <Button variant="destructive" size="icon" title="Delete trip" onClick={() => promptDeleteTrip({ id: trip.id, name: trip.name })}>
-              <Trash className="w-4 h-4" />
-            </Button>
-          </div>
-        ))}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Trips</h3>
+        <Button 
+          size="sm" 
+          onClick={() => setAddTripOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Add Trip
+        </Button>
       </div>
+      
+      {trips.length === 0 ? (
+        <div className="p-3 border rounded-md">
+          <div className="text-sm text-muted-foreground">No trips created yet.</div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {trips.map(trip => (
+            <div key={trip.id} className="flex items-center justify-between p-2 border rounded-md bg-card">
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{trip.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{trip.friends.length} friend{trip.friends.length === 1 ? '' : 's'}</div>
+              </div>
+              <Button variant="destructive" size="icon" title="Delete trip" onClick={() => promptDeleteTrip({ id: trip.id, name: trip.name })}>
+                <Trash className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Trip Dialog */}
+      <Dialog open={addTripOpen} onOpenChange={(v) => { setAddTripOpen(v); if (!v) resetAddTripState(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a Trip</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Trip name</label>
+              <Input
+                value={tripNameInput}
+                onChange={(e) => setTripNameInput(e.target.value)}
+                placeholder={`e.g. ${getNextDefaultTripName()}`}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Leave empty to use the next available default name.</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Number of friends to add</label>
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {Array.from({ length: 5 }, (_, i) => i + 1).map((n) => (
+                  <Button
+                    key={n}
+                    type="button"
+                    variant={selectedFriendsCount === n ? 'default' : 'outline'}
+                    className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                    onClick={() => {
+                      setSelectedFriendsCount(n);
+                      setFriendNames((prev) => {
+                        const next = Array.from({ length: n }, (_, idx) => prev[idx] || '');
+                        return next;
+                      });
+                    }}
+                  >
+                    {n}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {selectedFriendsCount != null && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Friend names</label>
+                {Array.from({ length: selectedFriendsCount }, (_, idx) => (
+                  <Input
+                    key={idx}
+                    value={friendNames[idx] || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFriendNames((prev) => {
+                        const copy = [...prev];
+                        copy[idx] = val;
+                        return copy;
+                      });
+                    }}
+                    placeholder={`Friend ${idx + 1}`}
+                  />
+                ))}
+                <p className="text-xs text-muted-foreground">Leave any blank to auto-name as Friend 1, Friend 2, ...</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddTripOpen(false); resetAddTripState(); }}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateTrip} disabled={selectedFriendsCount == null}>
+              Create Trip
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent className="z-[100]">
           <AlertDialogHeader>

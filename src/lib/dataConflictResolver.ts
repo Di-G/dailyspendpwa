@@ -133,12 +133,27 @@ export function analyzeTripsConflicts(
   localData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] },
   onlineData: { trips: Trip[]; tripExpenses: TripExpense[]; tripRecurring: TripRecurring[] } | null
 ): TripsConflict {
-  const hasLocalData = (localData.trips.length + localData.tripExpenses.length + localData.tripRecurring.length) > 0;
-  const hasOnlineData = !!onlineData && (
-    (onlineData.trips?.length || 0) + (onlineData.tripExpenses?.length || 0) + (onlineData.tripRecurring?.length || 0)
-  ) > 0;
+  // Consider trips as the primary data - if no trips exist, treat as no local data
+  // This prevents orphaned expenses from being considered as "local data"
+  const hasLocalTrips = localData.trips.length > 0;
+  const hasOnlineTrips = !!onlineData && (onlineData.trips?.length || 0) > 0;
+  
+  // For conflict detection, we care about trips primarily
+  const hasLocalData = hasLocalTrips;
+  const hasOnlineData = hasOnlineTrips;
+  
+  console.log('[ConflictResolver] Trips conflict analysis:', {
+    hasLocalTrips,
+    hasOnlineTrips,
+    hasLocalData,
+    hasOnlineData,
+    localTripsCount: localData.trips.length,
+    onlineTripsCount: onlineData?.trips?.length || 0,
+    localExpensesCount: localData.tripExpenses.length,
+    onlineExpensesCount: onlineData?.tripExpenses?.length || 0,
+  });
 
-  // If neither local nor online has data, no conflicts
+  // If neither local nor online has trips, no conflicts
   if (!hasLocalData && !hasOnlineData) {
     return {
       hasLocalData,
@@ -149,7 +164,7 @@ export function analyzeTripsConflicts(
     };
   }
 
-  // If only one side has data, there's a conflict
+  // If only one side has trips, there's a conflict
   if (!hasLocalData || !hasOnlineData) {
     return {
       hasLocalData,
@@ -160,7 +175,7 @@ export function analyzeTripsConflicts(
     };
   }
 
-  // Both sides have data, check for actual conflicts
+  // Both sides have trips, check for actual conflicts
   const tripsConflict = !areArraysEqual(localData.trips, onlineData!.trips || []);
   const tripExpensesConflict = !areArraysEqual(localData.tripExpenses, onlineData!.tripExpenses || []);
   const tripRecurringConflict = !areArraysEqual(localData.tripRecurring, onlineData!.tripRecurring || []);
