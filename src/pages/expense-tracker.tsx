@@ -532,7 +532,7 @@ export default function ExpenseTracker() {
                 aria-label="My expenses"
                 className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
               >
-                <Wallet className="w-6 h-6" />
+                <Wallet className="w-6 h-6 stroke-2" />
                 <span className="sr-only">My expenses</span>
               </TabsTrigger>
               <TabsTrigger
@@ -541,7 +541,7 @@ export default function ExpenseTracker() {
                 className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-rose-600 data-[state=active]:text-white data-[state=active]:shadow-none relative"
               >
                 <div className="relative">
-                  <Users className="w-6 h-6" />
+                  <Users className="w-6 h-6 stroke-2" />
                 </div>
                 {rejectedUnseen.length > 0 && (
                   <span className="absolute top-3 right-3 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Recent partner request was rejected" />
@@ -556,7 +556,7 @@ export default function ExpenseTracker() {
                 aria-label="My trips"
                 className={`flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-none ${tripsBlockedEffective ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <HiOutlineUserGroup className="w-6 h-6" />
+                <HiOutlineUserGroup className="w-6 h-6 stroke-2" />
                 <span className="sr-only">My Trips</span>
               </TabsTrigger>
               <TabsTrigger
