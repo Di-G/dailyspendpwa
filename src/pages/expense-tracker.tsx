@@ -556,7 +556,7 @@ export default function ExpenseTracker() {
                 aria-label="My trips"
                 className={`flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-none ${tripsBlockedEffective ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <HiOutlineUserGroup className="w-6 h-6 stroke-[1.75]" />
+                <HiOutlineUserGroup className="w-7 h-7 stroke-[1.6]" />
                 <span className="sr-only">My Trips</span>
               </TabsTrigger>
               <TabsTrigger
@@ -565,7 +565,7 @@ export default function ExpenseTracker() {
                 className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-none"
               >
                 <div className="relative">
-                  <FollowupsTwoPeopleSimpleIcon className="w-8 h-8 stroke-[1.4]" />
+                  <FollowupsTwoPeopleSimpleIcon className="w-9 h-9 stroke-[1.3] translate-y-0.5" />
                 </div>
                 <span className="sr-only">FollowUps</span>
               </TabsTrigger>
