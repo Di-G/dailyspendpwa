@@ -7,6 +7,7 @@ import { formatAmountDisplay } from "@/lib/utils";
 import FollowupsTwoPeopleIcon from "@/components/icons/followups-two-people";
 import FollowupsSeniorJuniorIcon from "@/components/icons/followups-senior-junior";
 import FollowupsTwoPeopleCheckIcon from "@/components/icons/followups-two-people-check";
+import FollowupsTwoPeopleSimpleIcon from "@/components/icons/followups-two-people-simple";
 import ExpenseEntry from "@/components/expense-entry";
 import ChartsView from "@/components/charts-view";
 import CalendarView from "@/components/calendar-view";
@@ -564,7 +565,7 @@ export default function ExpenseTracker() {
                 className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-none"
               >
                 <div className="relative">
-                  <FollowupsTwoPeopleCheckIcon className="w-6 h-6" />
+                  <FollowupsTwoPeopleSimpleIcon className="w-8 h-8" />
                 </div>
                 <span className="sr-only">FollowUps</span>
               </TabsTrigger>
