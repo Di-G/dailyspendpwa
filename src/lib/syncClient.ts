@@ -78,6 +78,12 @@ export function useRealtimeSync() {
       lastUserId.current = currentUserId;
       sessionSynced.current = false;
 
+      // Clear any pending conflicts from the previous user
+      setConflictDialogOpen(false);
+      setPendingConflict(null);
+      setTripsConflictDialogOpen(false);
+      setPendingTripsConflict(null);
+
       // Tear down listeners/presence for previous user
       try { stopPresenceRef.current?.(); } catch {}
       stopPresenceRef.current = null;
@@ -435,6 +441,11 @@ export function useRealtimeSync() {
   };
 
   const performSync = async (conflict: DataConflict, resolution: ConflictResolution) => {
+    if (!user) {
+      console.error('Cannot perform sync: no user');
+      return;
+    }
+    
     try {
       // Suppress conflict detection briefly to avoid flicker while remote catches up
       suppressConflictsUntil.current = Date.now() + 2000;
@@ -450,7 +461,7 @@ export function useRealtimeSync() {
       
       // Upload resolved data to cloud (only expenses data, not trips)
       await uploadAllForUser(
-        user!.uid,
+        user.uid,
         {
           ...resolvedData as any,
           // Don't include trips data when resolving expenses conflicts
@@ -473,12 +484,17 @@ export function useRealtimeSync() {
   };
 
   const performTripsSync = async (conflict: TripsConflict, resolution: ConflictResolution) => {
+    if (!user) {
+      console.error('Cannot perform trips sync: no user');
+      return;
+    }
+    
     try {
       suppressConflictsUntil.current = Date.now() + 2000;
       const resolved = applyTripsConflictResolution(resolution, conflict.localData as any, conflict.onlineData as any);
       updateAllTripsData(resolved.trips as any, resolved.tripExpenses as any, resolved.tripRecurring as any);
       await uploadAllForUser(
-        user!.uid,
+        user.uid,
         {
           categories: getCategories(),
           expenses: getExpenses(),
@@ -501,7 +517,7 @@ export function useRealtimeSync() {
   };
 
   const handleConflictResolution = async (resolution: ConflictResolution) => {
-    if (!pendingConflict) return;
+    if (!pendingConflict || !user) return;
     
     try {
       await performSync(pendingConflict, resolution);
@@ -514,7 +530,7 @@ export function useRealtimeSync() {
   };
 
   const handleTripsConflictResolution = async (resolution: ConflictResolution) => {
-    if (!pendingTripsConflict) return;
+    if (!pendingTripsConflict || !user) return;
     try {
       await performTripsSync(pendingTripsConflict, resolution);
       setTripsConflictDialogOpen(false);
@@ -534,13 +550,14 @@ export function useRealtimeSync() {
     pendingConflict,
     onConflictResolve: handleConflictResolution,
     onConflictDialogClose: async () => {
-      try {
-        await signOutUser();
-      } catch {}
+      // Don't sign out the user - just close the dialog and let the new user's data load
+      // This prevents the blank screen issue when switching accounts
       setConflictDialogOpen(false);
       setPendingConflict(null);
+      
+      // Refresh the page to ensure clean state for the new user
       try {
-        window.dispatchEvent(new CustomEvent('dailyspend:open-profile'));
+        window.location.reload();
       } catch {}
     },
     tripsConflictDialogOpen,

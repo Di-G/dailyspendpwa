@@ -62,6 +62,7 @@ export default function ExpenseTracker() {
   });
   const isMobile = useIsMobile();
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
+  const [focusTripAmountTrigger, setFocusTripAmountTrigger] = useState<number | null>(null);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
   const [overlayTopPx, setOverlayTopPx] = useState<number>(0);
   const [hasPartner, setHasPartner] = useState<boolean>(false);
@@ -192,20 +193,26 @@ export default function ExpenseTracker() {
   const handleFabClick = () => {
     if (topTab === 'couple') {
       if (hasPartner && partnerData) {
-        // If viewing a specific date in partner view, use that as source
-        if (currentView === 'entry' && partnerData) {
-          // Use the currently selected date from partner view
-          setCopySourceDate(currentPartnerDate);
-          setCopyDestDate(getToday()); // Default destination to today
-          setCustomCopyOpen(true);
-          setSelectedCopyExpenseIds([]);
-          return;
-        }
-        // For other views, show the today confirmation
-        setConfirmCopyOpen(true);
+        // Always show the rich partner expense copying dialog regardless of bottom tab
+        // This gives users the same experience whether they're on entry, calendar, or recurring
+        setCopySourceDate(currentPartnerDate);
+        setCopyDestDate(getToday()); // Default destination to today
+        setCustomCopyOpen(true);
+        setSelectedCopyExpenseIds([]);
+        return;
       }
       return;
     }
+    
+    if (topTab === 'trips') {
+      // For trips tab, always go to entry view and focus the amount input
+      // This gives users the same experience as my expenses tab
+      setCurrentView("entry");
+      setFocusTripAmountTrigger((t) => (t ?? 0) + 1);
+      return;
+    }
+    
+    // Default behavior for my expenses tab
     setCurrentView("entry");
     setFocusAmountTrigger((t) => (t ?? 0) + 1);
   };
@@ -892,7 +899,7 @@ export default function ExpenseTracker() {
         ) : topTab === 'trips' ? (
           hasTrips ? (
             <>
-                              {currentView === 'entry' && <TripHome currency={tripsCurrency} />}
+                              {currentView === 'entry' && <TripHome currency={tripsCurrency} focusAmountTrigger={focusTripAmountTrigger} onFocusAmountConsumed={() => setFocusTripAmountTrigger(null)} />}
                 {currentView === 'calendar' && <TripCalendar currency={tripsCurrency} />}
                 {currentView === 'recurring' && <TripRecurring currency={tripsCurrency} />}
               {currentView === 'charts' && <TripInsights currency={tripsCurrency} />}
@@ -1067,7 +1074,13 @@ export default function ExpenseTracker() {
                 <Button
                   size={isMobile ? 'default' : 'lg'}
                   className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                  onClick={() => {/* TODO: Add user to follow */}}
+                  onClick={() => {
+                    toast({ 
+                      title: "🚀 Coming Soon!", 
+                      description: "The follow-ups feature is currently in development. Stay tuned for exciting updates!",
+                      duration: 4000
+                    });
+                  }}
                 >
                   Add a User to Follow
                 </Button>
@@ -1512,7 +1525,11 @@ export default function ExpenseTracker() {
 
 type Trip = { id: string; name: string; friends: { name: string }[] };
 
-function TripHome({ currency }: { currency: CurrencyCode }) {
+function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: { 
+  currency: CurrencyCode; 
+  focusAmountTrigger?: number | null;
+  onFocusAmountConsumed?: () => void;
+}) {
   const [trips, setTrips] = useState<Trip[]>(() => {
     try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
   });
@@ -1526,6 +1543,31 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
   const [showAddDetails, setShowAddDetails] = useState<boolean>(false);
   const { toast } = useToast();
   const [tripDataRev, setTripDataRev] = useState<number>(0);
+  
+  // Refs for focus mechanism
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
+  const addExpenseSectionRef = useRef<HTMLDivElement | null>(null);
+  const handledTriggerRef = useRef<number | null>(null);
+
+  // Focus effect for amount input when triggered
+  useEffect(() => {
+    if (
+      typeof focusAmountTrigger === "number" &&
+      focusAmountTrigger > 0 &&
+      focusAmountTrigger !== handledTriggerRef.current
+    ) {
+      addExpenseSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Focus immediately and once more after scrolling finishes
+      amountInputRef.current?.focus({ preventScroll: true });
+      const id = window.setTimeout(() => {
+        amountInputRef.current?.focus({ preventScroll: true });
+      }, 350);
+      handledTriggerRef.current = focusAmountTrigger;
+      // Inform parent to clear the trigger so it does not re-run on return to Home
+      onFocusAmountConsumed?.();
+      return () => window.clearTimeout(id);
+    }
+  }, [focusAmountTrigger, onFocusAmountConsumed]);
 
   // Edit dialog state for trip expenses (parity with My expenses)
   const [editing, setEditing] = useState<TripExpense | null>(null);
@@ -1757,7 +1799,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
       </Card>
 
       {/* Add Expense */}
-      <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
+      <Card ref={addExpenseSectionRef} className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
             <span className="text-emerald-600 dark:text-emerald-400 mr-2">+</span>
@@ -1767,7 +1809,14 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Amount ({symbol})</label>
-                <Input type="number" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <Input 
+                  ref={amountInputRef}
+                  type="number" 
+                  step="0.01" 
+                  placeholder="0.00" 
+                  value={amount} 
+                  onChange={(e) => setAmount(e.target.value)} 
+                />
               </div>
               <div>
                 <label className="text-sm font-medium">Expense Name</label>
