@@ -202,8 +202,46 @@ export default function Profile() {
                   </Button>
                 </div>
                 {!isVerified && (
-                  <div className="space-y-2">
-                    <p className="text-sm">To use pro features you need to verify your email address.</p>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground">🔒 Unlock Pro Features</p>
+                      <p className="text-sm text-muted-foreground">Verify your email to access these premium features:</p>
+                      
+                      <div className="space-y-3 mt-3">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">☁️ Cloud Sync</p>
+                            <p className="text-xs text-muted-foreground">Save expenses & trips online, access from any device</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start space-x-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">👥 Partner Sharing</p>
+                            <p className="text-xs text-muted-foreground">Add partners, share expenses, and manage finances together</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start space-x-3">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">💬 Real-time Chat</p>
+                            <p className="text-xs text-muted-foreground">Chat with your partner about expenses and finances</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start space-x-3">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">🔄 Auto Backup</p>
+                            <p className="text-xs text-muted-foreground">Automatic data backup and conflict resolution</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
                     {infoMessage && (
                       <Alert>
                         <MailCheck className="h-4 w-4" />
@@ -211,11 +249,12 @@ export default function Profile() {
                         <AlertDescription>{infoMessage}</AlertDescription>
                       </Alert>
                     )}
+                    
                     <div className="flex flex-col gap-2">
-                      <Button variant="outline" onClick={handleSendVerify}>
+                      <Button variant="outline" onClick={handleSendVerify} className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700">
                         <MailCheck className="w-4 h-4 mr-1" /> Send verification email
                       </Button>
-                      <Button variant="ghost" onClick={refreshUser}>I've verified, refresh</Button>
+                      <Button variant="ghost" onClick={refreshUser} className="text-sm">I've verified, refresh</Button>
                     </div>
                   </div>
                 )}
@@ -224,14 +263,55 @@ export default function Profile() {
           </div>
 
           {user && isVerified ? (
-            <Alert className="mt-2">
-              <MailCheck className="h-4 w-4" />
-              <AlertTitle>Status</AlertTitle>
-              <AlertDescription>
-                Your data is now syncing securely to our servers. Any entry you add or edit is uploaded instantly.
-                Sign in with this email on any device to access your data automatically.
-              </AlertDescription>
-            </Alert>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">✅ Pro Features Active</p>
+                <p className="text-sm text-muted-foreground">You're enjoying all premium features:</p>
+                
+                <div className="space-y-3 mt-3">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">☁️ Cloud Sync</p>
+                      <p className="text-xs text-muted-foreground">Your data syncs automatically across all devices</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">👥 Partner Sharing</p>
+                      <p className="text-xs text-muted-foreground">Add partners and share expenses together</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">💬 Real-time Chat</p>
+                      <p className="text-xs text-muted-foreground">Chat with partners about finances</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">🔄 Auto Backup</p>
+                      <p className="text-xs text-muted-foreground">Your data is safely backed up in the cloud</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <Alert className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800">
+                <MailCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertTitle className="text-green-800 dark:text-green-200">Pro Status Active</AlertTitle>
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  Your data syncs securely to our servers. Any entry you add or edit is uploaded instantly.
+                  Sign in with this email on any device to access your data automatically.
+                </AlertDescription>
+              </Alert>
+            </div>
           ) : null}
         </div>
       </SheetContent>

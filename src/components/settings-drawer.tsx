@@ -865,15 +865,18 @@ function ManageFriends({ onTripsChanged }: { onTripsChanged?: (hasTrips: boolean
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <label className="text-sm text-muted-foreground">Trip</label>
-        <select
-          className="border rounded-md h-8 px-2 bg-background"
-          value={activeTripId}
-          onChange={(e) => setActiveTripId(e.target.value)}
-        >
-          {trips.map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <Select value={activeTripId} onValueChange={(value) => setActiveTripId(value)}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a trip" />
+          </SelectTrigger>
+          <SelectContent className="z-[9999]">
+            {trips.map(t => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Add New Friend */}
