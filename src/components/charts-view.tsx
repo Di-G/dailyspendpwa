@@ -404,7 +404,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Charts Header with Date Selector */}
-      <Card>
+      <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Expense Analytics</h2>
@@ -429,7 +429,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       {/* Charts Container */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Pie Chart */}
-        <Card>
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Category Distribution</h3>
             <div className="relative h-48 sm:h-64">
@@ -468,7 +468,7 @@ export default function ChartsView({ currency }: ChartsViewProps) {
         </Card>
 
         {/* Bar Chart */}
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Weekly Comparison</h3>
             

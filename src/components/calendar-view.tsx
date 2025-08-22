@@ -152,25 +152,28 @@ export default function CalendarView({ currency }: CalendarViewProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Calendar Header */}
-      <Card>
+      <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Monthly Calendar</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0 flex items-center">
+              <span className="text-blue-600 dark:text-blue-400 mr-2">📅</span>
+              Monthly Calendar
+            </h2>
             <div className="flex items-center justify-center sm:justify-start space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={previousMonth}
-                className="p-2 text-muted-foreground hover:text-foreground"
+                className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-lg font-medium text-foreground">{monthInfo.monthName}</span>
+              <span className="text-lg font-medium text-blue-700 dark:text-blue-300">{monthInfo.monthName}</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={nextMonth}
-                className="p-2 text-muted-foreground hover:text-foreground"
+                className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30"
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -180,12 +183,12 @@ export default function CalendarView({ currency }: CalendarViewProps) {
       </Card>
 
       {/* Calendar Grid */}
-      <Card>
+      <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
         <CardContent className="p-4 sm:p-6">
           {/* Calendar Header Days */}
           <div className="grid grid-cols-7 gap-1 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2 sm:py-3">
+              <div key={day} className="text-center text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-300 py-2 sm:py-3">
                 {day}
               </div>
             ))}
@@ -211,11 +214,11 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                     const items = getRecurringItemsForDate(day.dateString).map(i => ({ name: i.name, amount: i.amount }));
                     setPreviewItems(items);
                   }}
-                  className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
+                  className={`aspect-square p-1 sm:p-2 rounded-lg transition-all duration-200 ${
                     day.isToday
-                      ? "bg-primary text-white"
+                      ? "bg-blue-600 text-white shadow-lg"
                       : day.isCurrentMonth
-                      ? "hover:bg-muted border-2 border-transparent hover:border-primary cursor-pointer"
+                      ? "hover:bg-blue-100 dark:hover:bg-blue-900/30 border-2 border-transparent hover:border-blue-400 cursor-pointer hover:shadow-md"
                       : "text-muted-foreground hover:bg-muted"
                   } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                   title={day.isCurrentMonth ? `View details for ${day.dateString}` : ''}
@@ -230,7 +233,7 @@ export default function CalendarView({ currency }: CalendarViewProps) {
                       )}
                       {hasRecurringExpense && (
                         <div className="flex items-center justify-center mt-1">
-                          <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />
+                          <Repeat className="w-3 h-3 text-blue-600 dark:text-blue-400" aria-label="Recurring" />
                         </div>
                       )}
                     </>

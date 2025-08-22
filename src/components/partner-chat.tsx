@@ -158,10 +158,13 @@ export default function PartnerChat({ peerUid, peerName }: PartnerChatProps) {
   }, [meta?.remindClearAtBy, user?.uid, peerUid, chatId, peerName, toast]);
 
   return (
-    <Card className="h-[65vh] sm:h-[70vh] flex flex-col rounded-2xl border shadow-sm overflow-hidden bg-card">
-      <div className="p-4 border-b">
+    <Card className="h-[65vh] sm:h-[70vh] flex flex-col rounded-2xl border shadow-sm overflow-hidden bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+      <div className="p-4 border-b border-rose-200 dark:border-rose-700 bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-lg font-semibold">Chat{peerName ? ` with ${peerName}` : ""}</div>
+          <div className="text-lg font-semibold flex items-center">
+            <span className="text-rose-600 dark:text-rose-400 mr-2">💬</span>
+            Chat{peerName ? ` with ${peerName}` : ""}
+          </div>
           <div className="flex items-center gap-2">
             {peerNeedsClear && (
               <Button
@@ -171,11 +174,19 @@ export default function PartnerChat({ peerUid, peerName }: PartnerChatProps) {
                 onClick={(e) => { void handleSendReminder(); try { (e.currentTarget as HTMLButtonElement).blur(); } catch {} }}
                 onMouseUp={(e) => { try { (e.currentTarget as HTMLButtonElement).blur(); } catch {} }}
                 onTouchEnd={(e) => { try { (e.currentTarget as HTMLButtonElement).blur(); } catch {} }}
+                className="border-rose-300 text-rose-600 hover:bg-rose-100 dark:border-rose-600 dark:text-rose-400 dark:hover:bg-rose-900/30"
               >
                 <Bell className="w-4 h-4" />
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={handleClearLocal}>Clear chat</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleClearLocal}
+              className="border-rose-300 text-rose-600 hover:bg-rose-100 dark:border-rose-600 dark:text-rose-400 dark:hover:bg-rose-900/30"
+            >
+              Clear chat
+            </Button>
           </div>
         </div>
       </div>

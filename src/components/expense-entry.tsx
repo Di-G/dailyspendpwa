@@ -323,7 +323,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Date and Summary Section */}
-      <Card>
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
@@ -336,7 +336,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                   onChange={setSelectedDate}
                   className="h-8 text-sm"
                 />
-                <span className="text-sm font-medium text-primary">
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                   {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}
                 </span>
               </div>
@@ -350,7 +350,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                   {selectedDate === today ? "Today" : "Selected Date"}
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-primary">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedDateTotal.total)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedDateTotal.total)}</p>
                 <p className={`mt-1 text-[10px] sm:text-xs font-medium ${changeColorClass.replace('text-gray-500','text-muted-foreground')}`}>
                   {changeText}
                 </p>
@@ -376,14 +376,14 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
               return totalsForDisplay.map((ct) => (
                 <div
                   key={ct.categoryId}
-                  className="border rounded-lg p-2 sm:p-3 text-center"
+                  className="border rounded-lg p-2 sm:p-3 text-center hover:shadow-md transition-all duration-200"
                   style={{
-                    backgroundColor: `${ct.category.color}10`,
-                    borderColor: `${ct.category.color}40`,
+                    backgroundColor: `${ct.category.color}15`,
+                    borderColor: `${ct.category.color}50`,
                   }}
                 >
                   <div
-                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2"
+                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2 shadow-sm"
                     style={{ backgroundColor: ct.category.color }}
                   ></div>
                   <p className="text-xs font-medium text-muted-foreground truncate">{ct.category.name}</p>
@@ -400,9 +400,12 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Add Expense Form */}
         <div className="lg:col-span-2" ref={addExpenseSectionRef}>
-          <Card>
+          <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
             <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Add New Expense</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                <span className="text-emerald-600 dark:text-emerald-400 mr-2">+</span>
+                Add New Expense
+              </h3>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -513,7 +516,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-primary hover:bg-blue-700 transition duration-200"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
                     disabled={addExpenseMutation.isPending}
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -529,34 +532,41 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       </div>
 
       {/* Selected Date Expenses List */}
-      <Card className="overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border">
-              <h3 className="text-lg font-semibold text-foreground">
+      <Card className="overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
+            <div className="p-4 sm:p-6 border-b border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30">
+              <h3 className="text-lg font-semibold text-foreground flex items-center">
+                <span className="text-blue-600 dark:text-blue-400 mr-2">📋</span>
                 Expense List
               </h3>
               <p className="text-xs mt-1">
                 <span className="text-muted-foreground mr-1">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                <span className="font-medium text-primary">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span className="font-medium text-blue-600 dark:text-blue-400">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </p>
             </div>
         <CardContent className="p-4 sm:p-6">
           {selectedDateExpenses.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No expenses added for this date. Start by adding your first expense above.</p>
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-6xl mb-4">📝</div>
+              <p className="text-lg font-medium mb-2">No expenses yet</p>
+              <p className="text-sm">Start by adding your first expense above to track your spending.</p>
             </div>
           ) : (
             <div>
               {selectedDateExpenses.map((expense) => (
                 <button
                   key={expense.id}
-                  className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors hover:bg-muted/30"
+                  className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:shadow-md rounded-lg"
                   onClick={() => openEdit(expense)}
                 >
-                  <div className="flex items-center justify-between p-3 sm:p-4">
+                  <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg border border-transparent hover:border-blue-200 dark:hover:border-blue-800">
                     <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                       <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 border"
-                        style={{ backgroundColor: expense.category?.color || "#9ca3af", borderColor: (expense.category?.color || "#9ca3af") + "55" }}
+                        className="w-4 h-4 rounded-full flex-shrink-0 border-2 shadow-md"
+                        style={{ 
+                          backgroundColor: expense.category?.color || "#9ca3af", 
+                          borderColor: (expense.category?.color || "#9ca3af") + "60",
+                          boxShadow: `0 0 0 3px ${(expense.category?.color || "#9ca3af")}20, 0 2px 4px rgba(0,0,0,0.1)`
+                        }}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-foreground truncate">{expense.name}</p>
@@ -567,7 +577,9 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                       </div>
                     </div>
                     <div className="flex-shrink-0 ml-3 sm:ml-4">
-                      <span className="font-semibold text-foreground text-sm sm:text-base">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</span>
+                      <span className="font-bold text-blue-700 dark:text-blue-300 text-sm sm:text-base bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+                        {CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}
+                      </span>
                     </div>
                   </div>
                 </button>

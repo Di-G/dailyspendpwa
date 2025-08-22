@@ -1622,7 +1622,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card>
+      <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col gap-3">
             <div className="min-w-0">
@@ -1630,7 +1630,8 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
                 <Select value={activeTrip?.id || ''} onValueChange={(value) => setActiveTripId(value)}>
                   <SelectTrigger className="h-auto p-0 border-none bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 [&>svg]:hidden">
                     <SelectValue>
-                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 cursor-pointer hover:text-foreground/60 transition-colors">
+                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 cursor-pointer hover:text-foreground/60 transition-colors flex items-center">
+                        <span className="text-emerald-600 dark:text-emerald-400 mr-2">✈️</span>
                         {activeTrip ? activeTrip.name : 'Trips'}
                         <ChevronDown className="inline-block w-4 h-4 ml-2 text-muted-foreground" />
                       </h2>
@@ -1645,11 +1646,14 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
                   </SelectContent>
                 </Select>
               ) : (
-                <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80">{activeTrip ? activeTrip.name : 'Trips'}</h2>
+                <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 flex items-center">
+                  <span className="text-emerald-600 dark:text-emerald-400 mr-2">✈️</span>
+                  {activeTrip ? activeTrip.name : 'Trips'}
+                </h2>
               )}
               <div className="flex items-center gap-2">
                 <DatePicker value={date} onChange={(v: string) => setDate(v)} className="h-8 text-sm" />
-                <span className="text-sm font-medium text-primary">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </div>
             </div>
           </div>
@@ -1673,9 +1677,12 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
       </Card>
 
       {/* Add Expense */}
-      <Card>
+      <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
         <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Add New Expense</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+            <span className="text-emerald-600 dark:text-emerald-400 mr-2">+</span>
+            Add New Expense
+          </h3>
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1734,23 +1741,34 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
       </Card>
 
       {/* Today's Expenses */}
-      <Card className="overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border">
-          <h3 className="text-lg font-semibold text-foreground">Expense List</h3>
+      <Card className="overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
+        <div className="p-4 sm:p-6 border-b border-emerald-200 dark:border-emerald-700 bg-gradient-to-r from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30">
+          <h3 className="text-lg font-semibold text-foreground flex items-center">
+            <span className="text-emerald-600 dark:text-emerald-400 mr-2">📋</span>
+            Expense List
+          </h3>
           <p className="text-xs mt-1">
             <span className="text-muted-foreground mr-1">{new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-            <span className="font-medium text-primary">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
           </p>
         </div>
         <CardContent className="p-4 sm:p-6">
           {expensesForDate.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">No expenses for today.</div>
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-6xl mb-4">✈️</div>
+              <p className="text-lg font-medium mb-2">No trip expenses yet</p>
+              <p className="text-sm">Start by adding your first trip expense above to track your group spending.</p>
+            </div>
           ) : (
             <div>
               {expensesForDate.map((e) => (
-                <div key={e.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-muted/30 cursor-pointer" onClick={() => openTripEdit(e)}>
+                <div key={e.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-all duration-200 hover:shadow-md rounded-lg border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800" onClick={() => openTripEdit(e)}>
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '55' }} />
+                    <div className="w-4 h-4 rounded-full flex-shrink-0 border-2 shadow-md" style={{ 
+                      backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], 
+                      borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '60',
+                      boxShadow: `0 0 0 3px ${(FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length])}20, 0 2px 4px rgba(0,0,0,0.1)`
+                    }} />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground truncate">{e.name}</p>
                       {e.details && (
@@ -1760,7 +1778,9 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
                     </div>
                   </div>
                   <div className="flex-shrink-0 ml-3 sm:ml-4">
-                    <span className="font-semibold text-foreground text-sm sm:text-base">{symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-300 text-sm sm:text-base bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1 rounded-full">
+                      {symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -2037,42 +2057,50 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          {trips.length > 1 ? (
-            <Select value={activeTripId} onValueChange={(value) => setActiveTripId(value)}>
-              <SelectTrigger className="h-auto p-0 border-none bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 [&>svg]:hidden">
-                <SelectValue>
-                  <h2 className="text-2xl font-bold text-foreground cursor-pointer hover:text-foreground/80 transition-colors">
-                    Recurring Expenses
-                    <ChevronDown className="inline-block w-4 h-4 ml-2 text-muted-foreground" />
-                  </h2>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="z-[9999]">
-                {trips.map(t => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
-          )}
-          <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
-        </div>
-        <Button
-          onClick={() => setIsAdding(true)}
-          aria-label="Add Recurring"
-          className="bg-emerald-600 hover:bg-emerald-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
-        >
-          <Plus className="w-5 h-5" />
-        </Button>
-      </div>
+      <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              {trips.length > 1 ? (
+                <Select value={activeTripId} onValueChange={(value) => setActiveTripId(value)}>
+                  <SelectTrigger className="h-auto p-0 border-none bg-transparent hover:bg-transparent focus:ring-0 focus:ring-offset-0 [&>svg]:hidden">
+                    <SelectValue>
+                      <h2 className="text-2xl font-bold text-foreground cursor-pointer hover:text-foreground/80 transition-colors flex items-center">
+                        <span className="text-emerald-600 dark:text-emerald-400 mr-2">🔄</span>
+                        Recurring Expenses
+                        <ChevronDown className="inline-block w-4 h-4 ml-2 text-muted-foreground" />
+                      </h2>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999]">
+                    {trips.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <h2 className="text-2xl font-bold text-foreground flex items-center">
+                  <span className="text-emerald-600 dark:text-emerald-400 mr-2">🔄</span>
+                  Recurring Expenses
+                </h2>
+              )}
+              <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
+            </div>
+            <Button
+              onClick={() => setIsAdding(true)}
+              aria-label="Add Recurring"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-200 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {isAdding && (
-        <Card>
+        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
           <CardContent className="p-4">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2177,57 +2205,72 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-foreground">Active Recurring Expenses</h3>
-        {recurring.filter(r => r.tripId === activeTripId).length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Repeat className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <h4 className="text-lg font-medium text-foreground mb-2">No Recurring Expenses</h4>
-              <p className="text-muted-foreground">Create your first recurring expense to get started.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {recurring.filter(r => r.tripId === activeTripId).map((r) => (
-              <Card key={r.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-2 min-w-0">
-                        <h4 className="font-medium text-foreground truncate">{r.name}</h4>
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0">
-                        <span className="font-medium text-gray-900">{symbol}{r.amount}</span>
-                        <span className="flex items-center">
-                          <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: ['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][r.friendIndex % 5] }} />
-                          {(activeTrip?.friends[r.friendIndex]?.name) || `Friend ${r.friendIndex+1}`}
-                        </span>
-                      </div>
-                      {r.details && <p className="text-sm text-muted-foreground mt-2 break-words">{r.details}</p>}
-                      <div className="mt-3 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={r.isActive ? 'default' : 'secondary'}>{r.isActive ? 'Active' : 'Inactive'}</Badge>
-                          <Badge variant="outline">{r.frequency === 'custom' ? `Every ${r.customDays} days` : r.frequency[0].toUpperCase()+r.frequency.slice(1)}</Badge>
+      <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-foreground flex items-center">
+              <span className="text-emerald-600 dark:text-emerald-400 mr-2">📋</span>
+              Active Recurring Expenses
+            </h3>
+            {recurring.filter(r => r.tripId === activeTripId).length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <div className="text-6xl mb-4">🔄</div>
+                <p className="text-lg font-medium mb-2">No Recurring Expenses</p>
+                <p className="text-sm">Create your first recurring expense to get started.</p>
+              </div>
+                    ) : (
+              <div className="grid gap-4">
+                {recurring.filter(r => r.tripId === activeTripId).map((r) => (
+                  <Card key={r.id} className="bg-gradient-to-br from-white to-emerald-50/50 dark:from-gray-900 dark:to-emerald-950/10 border-emerald-200 dark:border-emerald-800 hover:shadow-md transition-all duration-200">
+                    <CardContent className="p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-2 min-w-0">
+                            <h4 className="font-medium text-foreground truncate">{r.name}</h4>
+                          </div>
+                          <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0">
+                            <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full text-xs">
+                              {symbol}{r.amount}
+                            </span>
+                            <span className="flex items-center">
+                              <div className="w-4 h-4 rounded-full mr-2 border-2 shadow-sm" style={{ 
+                                backgroundColor: ['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][r.friendIndex % 5],
+                                borderColor: ['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][r.friendIndex % 5] + '60',
+                                boxShadow: `0 0 0 2px ${['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][r.friendIndex % 5]}20`
+                              }} />
+                              {(activeTrip?.friends[r.friendIndex]?.name) || `Friend ${r.friendIndex+1}`}
+                            </span>
+                          </div>
+                          {r.details && <p className="text-sm text-muted-foreground mt-2 break-words">{r.details}</p>}
+                          <div className="mt-3 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant={r.isActive ? 'default' : 'secondary'} className={r.isActive ? 'bg-emerald-600 hover:bg-emerald-700' : ''}>
+                                {r.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                              <Badge variant="outline" className="border-emerald-200 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300">
+                                {r.frequency === 'custom' ? `Every ${r.customDays} days` : r.frequency[0].toUpperCase()+r.frequency.slice(1)}
+                              </Badge>
+                            </div>
+                            {r.endDate && (
+                              <div className="text-sm text-muted-foreground">Ends: {r.endDate}</div>
+                            )}
+                          </div>
                         </div>
-                        {r.endDate && (
-                          <div className="text-sm text-muted-foreground">Ends: {r.endDate}</div>
-                        )}
+                        <div className="flex items-center space-x-2 ml-4 shrink-0">
+                          <Switch checked={r.isActive} onCheckedChange={() => handleToggle(r.id)} />
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(r)} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-900/30">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2 ml-4 shrink-0">
-                      <Switch checked={r.isActive} onCheckedChange={() => handleToggle(r.id)} />
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(r)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -2310,16 +2353,19 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card>
+      <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Monthly Calendar</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0 flex items-center">
+              <span className="text-emerald-600 dark:text-emerald-400 mr-2">📅</span>
+              Monthly Calendar
+            </h2>
             <div className="flex items-center justify-center sm:justify-start space-x-4">
-              <Button variant="ghost" size="sm" onClick={previousMonth} className="p-2 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="sm" onClick={previousMonth} className="p-2 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-lg font-medium text-foreground">{monthInfo.monthName}</span>
-              <Button variant="ghost" size="sm" onClick={nextMonth} className="p-2 text-muted-foreground hover:text-foreground">
+              <span className="text-lg font-medium text-emerald-700 dark:text-emerald-300">{monthInfo.monthName}</span>
+              <Button variant="ghost" size="sm" onClick={nextMonth} className="p-2 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30">
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -2327,11 +2373,11 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
         <CardContent className="p-4 sm:p-6">
           <div className="grid grid-cols-7 gap-1 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2 sm:py-3">{day}</div>
+              <div key={day} className="text-center text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-300 py-2 sm:py-3">{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -2353,11 +2399,11 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
                       .map((r, idx) => ({ key: `rec-${idx}-${r.name}-${r.amount}`, name: r.name, amount: r.amount, isRecurring: true }));
                     setPreviewItems(items);
                   }}
-                  className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
+                  className={`aspect-square p-1 sm:p-2 rounded-lg transition-all duration-200 ${
                     day.isToday
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-emerald-600 text-white shadow-lg"
                       : day.isCurrentMonth
-                      ? "hover:bg-muted border-2 border-transparent hover:border-emerald-600 cursor-pointer"
+                      ? "hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-2 border-transparent hover:border-emerald-400 cursor-pointer hover:shadow-md"
                       : "text-muted-foreground hover:bg-muted"
                   } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                 >
@@ -2369,7 +2415,7 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
                       )}
                       {hasRecurring && (
                         <div className="flex items-center justify-center mt-1">
-                          <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />
+                          <Repeat className="w-3 h-3 text-emerald-600 dark:text-emerald-400" aria-label="Recurring" />
                         </div>
                       )}
                     </>
@@ -2382,7 +2428,7 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
       </Card>
 
       {previewDate && (
-        <Card>
+        <Card className="bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border-slate-200 dark:border-slate-700">
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-2">
               {[...getTripExpenses().filter(e => e.tripId === activeTripId && e.date === previewDate).map(exp => ({
@@ -2391,9 +2437,9 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
                 amount: exp.amount,
                 isRecurring: false,
               })), ...previewItems].map((item) => (
-                <div key={item.key} className={`flex items-center justify-between ${!item.isRecurring ? 'p-2 rounded hover:bg-muted/50' : ''}`}>
+                <div key={item.key} className={`flex items-center justify-between ${!item.isRecurring ? 'p-2 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 hover:shadow-sm' : ''}`}>
                   <span className="text-sm text-foreground font-medium flex items-center gap-1">
-                    {item.isRecurring && <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />}
+                    {item.isRecurring && <Repeat className="w-3 h-3 text-emerald-600 dark:text-emerald-400" aria-label="Recurring" />}
                     {item.name}
                   </span>
                   <span className="text-sm text-foreground font-semibold">{symbol}{formatAmountDisplay(parseFloat(item.amount || '0'))}</span>
@@ -2506,19 +2552,22 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card>
+      <Card className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">{selectedDate === getToday() ? "Partner's Today's Expenses" : "Partner's Expenses"}</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1 flex items-center">
+                <span className="text-rose-600 dark:text-rose-400 mr-2">👥</span>
+                {selectedDate === getToday() ? "Partner's Today's Expenses" : "Partner's Expenses"}
+              </h2>
               <div className="flex items-center gap-2">
                 <DatePicker value={selectedDate} onChange={(v: string) => setSelectedDate(v)} className="h-8 text-sm" />
-                <span className="text-sm font-medium text-primary">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span className="text-sm font-medium text-rose-600 dark:text-rose-400">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </div>
             </div>
             <div className="text-center">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">{selectedDate === getToday() ? "Today" : "Selected Date"}</p>
-              <p className="text-xl sm:text-2xl font-bold text-primary">{symbol}{formatAmountDisplay(totalForDate)}</p>
+              <p className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">{symbol}{formatAmountDisplay(totalForDate)}</p>
             </div>
           </div>
           {categoryTotals.length > 0 && (
@@ -2535,9 +2584,12 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
         </CardContent>
       </Card>
 
-      <Card>
-        <div className="p-4 sm:p-6 border-b border">
-          <h3 className="text-lg font-semibold text-foreground/80">Partner's Expenses</h3>
+      <Card className="bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border-slate-200 dark:border-slate-700">
+        <div className="p-4 sm:p-6 border-b border-rose-200 dark:border-rose-700 bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30">
+          <h3 className="text-lg font-semibold text-foreground/80 flex items-center">
+            <span className="text-rose-600 dark:text-rose-400 mr-2">📋</span>
+            Partner's Expenses
+          </h3>
         </div>
         <CardContent className="p-0">
           {expensesForDate.length === 0 ? (
@@ -2547,11 +2599,15 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
               {expensesForDate.map((exp) => (
                 <div 
                   key={exp.id} 
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm rounded-lg"
                   onClick={() => handleExpenseClick(exp)}
                 >
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border" style={{ backgroundColor: (exp.categoryId && categoryById.get(exp.categoryId)?.color) || '#E5E7EB', borderColor: '#CBD5E1' }} />
+                    <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 shadow-sm" style={{ 
+                      backgroundColor: (exp.categoryId && categoryById.get(exp.categoryId)?.color) || '#E5E7EB', 
+                      borderColor: (exp.categoryId && categoryById.get(exp.categoryId)?.color) || '#E5E7EB' + '40',
+                      boxShadow: `0 0 0 2px ${(exp.categoryId && categoryById.get(exp.categoryId)?.color) || '#E5E7EB'}20`
+                    }} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium truncate">{exp.name}</div>
                       <div className="text-xs text-muted-foreground truncate">{categoryById.get(exp.categoryId || '')?.name || 'Uncategorized'}</div>
@@ -2827,16 +2883,19 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card>
+      <Card className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Monthly Calendar</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0 flex items-center">
+              <span className="text-rose-600 dark:text-rose-400 mr-2">📅</span>
+              Monthly Calendar
+            </h2>
             <div className="flex items-center justify-center sm:justify-start space-x-4">
-              <Button variant="ghost" size="sm" onClick={previousMonth} className="p-2 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="sm" onClick={previousMonth} className="p-2 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/30">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-lg font-medium text-foreground">{monthInfo.monthName}</span>
-              <Button variant="ghost" size="sm" onClick={nextMonth} className="p-2 text-muted-foreground hover:text-foreground">
+              <span className="text-lg font-medium text-rose-700 dark:text-rose-300">{monthInfo.monthName}</span>
+              <Button variant="ghost" size="sm" onClick={nextMonth} className="p-2 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/30">
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -2844,11 +2903,11 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
         <CardContent className="p-4 sm:p-6">
           <div className="grid grid-cols-7 gap-1 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2 sm:py-3">{day}</div>
+              <div key={day} className="text-center text-xs sm:text-sm font-medium text-rose-700 dark:text-rose-300 py-2 sm:py-3">{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -2869,11 +2928,11 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
                     const items = getRecurringItemsForDate(day.dateString).map(i => ({ name: i.name, amount: i.amount }));
                     setPreviewItems(items);
                   }}
-                  className={`aspect-square p-1 sm:p-2 rounded-lg transition duration-200 ${
+                  className={`aspect-square p-1 sm:p-2 rounded-lg transition-all duration-200 ${
                     day.isToday
-                      ? "bg-primary text-white"
+                      ? "bg-rose-600 text-white shadow-lg"
                       : day.isCurrentMonth
-                      ? "hover:bg-muted border-2 border-transparent hover:border-primary cursor-pointer"
+                      ? "hover:bg-rose-100 dark:hover:bg-rose-900/30 border-2 border-transparent hover:border-rose-400 cursor-pointer hover:shadow-md"
                       : "text-muted-foreground hover:bg-muted"
                   } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                   title={day.isCurrentMonth ? `View details for ${day.dateString}` : ''}
@@ -2886,7 +2945,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
                       )}
                       {hasRecurring && (
                         <div className="flex items-center justify-center mt-1">
-                          <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />
+                          <Repeat className="w-3 h-3 text-rose-600 dark:text-rose-400" aria-label="Recurring" />
                         </div>
                       )}
                     </>
@@ -2899,7 +2958,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
       </Card>
 
       {previewDate && (
-        <Card>
+        <Card className="bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border-slate-200 dark:border-slate-700">
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-2">
               {[...data.expenses.filter(e => e.date === previewDate).map(exp => ({
@@ -2910,7 +2969,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
               })), ...previewItems.map((item, idx) => ({ key: `rec-${idx}-${item.name}-${item.amount}`, ...item, isRecurring: true }))].map((item) => (
                 <div 
                   key={item.key} 
-                  className={`flex items-center justify-between ${!item.isRecurring ? 'cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors' : ''}`}
+                  className={`flex items-center justify-between ${!item.isRecurring ? 'cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 p-2 rounded transition-all duration-200 hover:shadow-sm' : ''}`}
                   onClick={() => {
                     if (!item.isRecurring) {
                       // Find the actual expense object to pass to the handler
@@ -2922,7 +2981,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
                   }}
                 >
                   <span className="text-sm text-foreground font-medium flex items-center gap-1">
-                    {item.isRecurring && <Repeat className="w-3 h-3 text-muted-foreground" aria-label="Recurring" />}
+                    {item.isRecurring && <Repeat className="w-3 h-3 text-rose-600 dark:text-rose-400" aria-label="Recurring" />}
                     {item.name}
                   </span>
                   <span className="text-sm text-foreground font-semibold">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(item.amount || '0'))}</span>
@@ -3023,24 +3082,57 @@ function PartnerRecurringReadOnly({ currency, data }: { currency: CurrencyCode; 
   const items = data.recurring;
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-lg font-semibold mb-4">Partner's Recurring Expenses</div>
-        {items.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No recurring items.</div>
-        ) : (
-          <div className="space-y-3">
-            {items.map((r) => (
-              <div key={r.id} className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{r.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{categoryById.get(r.categoryId || '')?.name || 'Uncategorized'} • {r.frequency}</div>
-                </div>
-                <div className="text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(r.amount || '0'))}</div>
-              </div>
-            ))}
-          </div>
-        )}
+    <Card className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+      <CardContent className="p-4 sm:p-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-foreground flex items-center">
+            <span className="text-rose-600 dark:text-rose-400 mr-2">🔄</span>
+            Partner's Recurring Expenses
+          </h3>
+          
+          {items.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-6xl mb-4">👥</div>
+              <p className="text-lg font-medium mb-2">No Recurring Expenses</p>
+              <p className="text-sm">Your partner hasn't added any recurring expenses yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {items.map((r) => (
+                <Card key={r.id} className="bg-gradient-to-br from-white to-rose-50/50 dark:from-gray-900 dark:to-rose-950/10 border-rose-200 dark:border-rose-800 hover:shadow-md transition-all duration-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate mb-1">{r.name}</div>
+                        <div className="flex items-center space-x-3 text-xs text-muted-foreground">
+                          <span className="flex items-center">
+                            <div
+                              className="w-4 h-4 rounded-full mr-2 border-2 shadow-sm"
+                              style={{ 
+                                backgroundColor: categoryById.get(r.categoryId || '')?.color || '#6B7280',
+                                borderColor: (categoryById.get(r.categoryId || '')?.color || '#6B7280') + '60',
+                                boxShadow: `0 0 0 2px ${(categoryById.get(r.categoryId || '')?.color || '#6B7280')}20`
+                              }}
+                            />
+                            {categoryById.get(r.categoryId || '')?.name || 'Uncategorized'}
+                          </span>
+                          <span className="text-rose-600 dark:text-rose-400 font-medium">
+                            {r.frequency}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="ml-4 shrink-0">
+                        <span className="font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/30 px-3 py-1 rounded-full text-sm">
+                          {symbol}{formatAmountDisplay(parseFloat(r.amount || '0'))}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

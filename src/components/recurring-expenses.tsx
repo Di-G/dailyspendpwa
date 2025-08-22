@@ -206,25 +206,33 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
   return (
     <div className="space-y-6 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Recurring Expenses</h2>
-          <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
-        </div>
-        <Button
-          onClick={() => setIsAddingNew(true)}
-          aria-label="Add Recurring"
-          className="bg-primary hover:bg-blue-700 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
-        >
-          <Plus className="w-5 h-5" />
-        </Button>
-      </div>
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground flex items-center">
+                <span className="text-blue-600 dark:text-blue-400 mr-2">🔄</span>
+                Recurring Expenses
+              </h2>
+              <p className="text-muted-foreground">Manage your recurring expenses and subscriptions</p>
+            </div>
+            <Button
+              onClick={() => setIsAddingNew(true)}
+              aria-label="Add Recurring"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base min-w-0"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Add/Edit Form */}
       {isAddingNew && (
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="flex items-center">
+              <span className="text-blue-600 dark:text-blue-400 mr-2">📝</span>
               {editingId ? "Edit Recurring Expense" : "Add New Recurring Expense"}
             </CardTitle>
           </CardHeader>
@@ -354,7 +362,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <Button type="submit" className="bg-primary hover:bg-blue-700">
+                <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200">
                   {editingId ? "Update" : "Create"}
                 </Button>
                 {editingId && (
@@ -401,21 +409,24 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
       </AlertDialog>
 
       {/* Recurring Expenses List */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-foreground">Active Recurring Expenses</h3>
-        
-        {recurringExpenses.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Repeat className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <h4 className="text-lg font-medium text-foreground mb-2">No Recurring Expenses</h4>
-              <p className="text-muted-foreground">Create your first recurring expense to get started.</p>
-            </CardContent>
-          </Card>
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-foreground flex items-center">
+              <span className="text-blue-600 dark:text-blue-400 mr-2">📋</span>
+              Active Recurring Expenses
+            </h3>
+            
+            {recurringExpenses.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <div className="text-6xl mb-4">🔄</div>
+                <p className="text-lg font-medium mb-2">No Recurring Expenses</p>
+                <p className="text-sm">Create your first recurring expense to get started.</p>
+              </div>
         ) : (
           <div className="grid gap-4">
             {recurringExpenses.map((expense) => (
-              <Card key={expense.id}>
+              <Card key={expense.id} className="bg-gradient-to-br from-white to-blue-50/50 dark:from-gray-900 dark:to-blue-950/10 border-blue-200 dark:border-blue-800 hover:shadow-md transition-all duration-200">
                 <CardContent className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -425,7 +436,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                       
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0">
                         <span className="flex items-center">
-                          <span className="font-medium text-gray-900">
+                          <span className="font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full text-xs">
                             {CURRENCIES[currency].symbol}{expense.amount}
                           </span>
                         </span>
@@ -433,8 +444,12 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                         {expense.category && (
                           <span className="flex items-center">
                             <div
-                              className="w-3 h-3 rounded-full mr-1"
-                              style={{ backgroundColor: expense.category.color }}
+                              className="w-4 h-4 rounded-full mr-2 border-2 shadow-sm"
+                              style={{ 
+                                backgroundColor: expense.category.color,
+                                borderColor: expense.category.color + '60',
+                                boxShadow: `0 0 0 2px ${expense.category.color}20`
+                              }}
                             />
                             {expense.category.name}
                           </span>
@@ -447,16 +462,16 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                       
                       <div className="mt-3 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={expense.isActive ? "default" : "secondary"}>
+                          <Badge variant={expense.isActive ? "default" : "secondary"} className={expense.isActive ? "bg-blue-600 hover:bg-blue-700" : ""}>
                             {expense.isActive ? "Active" : "Inactive"}
                           </Badge>
-                          <Badge variant="outline">
+                          <Badge variant="outline" className="border-blue-200 text-blue-700 dark:border-blue-700 dark:text-blue-300">
                             {getFrequencyLabel(expense.frequency, expense.customDays)}
                           </Badge>
                         </div>
                         {expense.endDate && (
                           <div className="flex items-center text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4 mr-1" />
+                            <Calendar className="w-4 h-4 mr-1 text-blue-600 dark:text-blue-400" />
                             Ends: {formatDate(new Date(expense.endDate))}
                           </div>
                         )}
@@ -476,6 +491,7 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEdit(expense)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/30"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -486,7 +502,9 @@ export default function RecurringExpenses({ currency }: RecurringExpensesProps) 
             ))}
           </div>
         )}
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

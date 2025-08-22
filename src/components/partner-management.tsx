@@ -128,13 +128,20 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, incomi
   return (
     <div className="space-y-4">
       {!hideHeader && (
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Manage Partners</h3>
-          <Button onClick={handleOpenAddPartner} size="sm" className="bg-rose-600 hover:bg-rose-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Partner
-          </Button>
-        </div>
+        <Card className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center">
+                <span className="text-rose-600 dark:text-rose-400 mr-2">👥</span>
+                Manage Partners
+              </h3>
+              <Button onClick={handleOpenAddPartner} size="sm" className="bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:shadow-lg transition-all duration-200">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Partner
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Add Partner Dialog */}
@@ -223,78 +230,86 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, incomi
 
       {/* Being Viewed As Partner Section */}
       {acceptedIncomingPartners.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-            <h4 className="text-base font-medium text-indigo-700 dark:text-indigo-300">Being Viewed As Partner</h4>
-          </div>
-          <div className="pl-4 space-y-2">
-            {acceptedIncomingPartners.map((request) => (
-              <div key={request.id} className="flex items-center justify-between p-3 border border-indigo-200 rounded-lg bg-indigo-50 dark:bg-indigo-950/30">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-4 h-4 text-indigo-600" />
-                  <div>
-                    <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
-                    <div className="text-xs text-indigo-600">Can view your expenses as partner</div>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveRequest(request)}
-                  disabled={removing}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
-                  title="Remove yourself from their partner list"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+        <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 border-indigo-200 dark:border-indigo-800">
+          <CardContent className="p-4">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-indigo-500 rounded-full shadow-sm"></div>
+                <h4 className="text-base font-medium text-indigo-700 dark:text-indigo-300">Being Viewed As Partner</h4>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="space-y-2">
+                {acceptedIncomingPartners.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between p-3 border border-indigo-200 rounded-lg bg-indigo-100/50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <div>
+                        <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
+                        <div className="text-xs text-indigo-600 dark:text-indigo-400">Can view your expenses as partner</div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveRequest(request)}
+                      disabled={removing}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 p-2 h-8 w-8"
+                      title="Remove yourself from their partner list"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Active Partners Section */}
-      <div className="space-y-2">
-        <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <h4 className="text-base font-medium text-green-700 dark:text-green-300">Active Partners</h4>
-        </div>
-        {acceptedRequests.length > 0 ? (
-          <div className="pl-4 space-y-2">
-            {acceptedRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between p-3 border border-green-200 rounded-lg bg-green-50 dark:bg-green-950/30">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  <div>
-                    <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
-                    <div className="text-xs text-green-600">You are viewing their expenses as a partner</div>
+      <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+        <CardContent className="p-4">
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm"></div>
+              <h4 className="text-base font-medium text-green-700 dark:text-green-300">Active Partners</h4>
+            </div>
+            {acceptedRequests.length > 0 ? (
+              <div className="space-y-2">
+                {acceptedRequests.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between p-3 border border-green-200 rounded-lg bg-green-100/50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <div>
+                        <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
+                        <div className="text-xs text-green-600 dark:text-green-400">You are viewing their expenses as a partner</div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveRequest(request)}
+                      disabled={removing}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 p-2 h-8 w-8"
+                      title="Remove partner"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveRequest(request)}
-                  disabled={removing}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
-                  title="Remove partner"
-                >
-                  <Trash2 className="w-4 h-4" />
+                ))}
+              </div>
+            ) : (
+              <div className="py-4 text-center">
+                <p className="text-sm font-medium text-foreground mb-1">None</p>
+                <p className="text-xs text-muted-foreground mb-3">Add a partner to share expenses and collaborate</p>
+                <Button onClick={handleOpenAddPartner} className="bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:shadow-lg transition-all duration-200">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add New Partner
                 </Button>
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          <div className="pl-4 py-4 text-muted-foreground">
-            <p className="text-sm font-medium text-foreground text-center">None</p>
-            <p className="text-xs text-muted-foreground mb-2">Add a partner to share expenses and collaborate</p>
-            <Button onClick={handleOpenAddPartner} className="w-full bg-rose-600 hover:bg-rose-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Add New Partner
-            </Button>
-          </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Rejected/Cancelled Requests Section */}
       {rejectedRequests.length > 0 && (
