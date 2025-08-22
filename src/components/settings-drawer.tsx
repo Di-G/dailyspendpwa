@@ -385,7 +385,7 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
                       {currency ? `${CURRENCIES[currency].symbol} ${currency}` : "Select currency"}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="max-h-60 overflow-y-auto z-[9999]">
+                  <SelectContent className={`${topTab === 'trips' ? 'max-h-[40vh]' : 'max-h-[60vh]'} overflow-y-auto z-[9999]`} style={{ maxHeight: topTab === 'trips' ? '40vh' : '60vh' }}>
                     {Object.entries(CURRENCIES).map(([code, curr]) => (
                       <SelectItem key={code} value={code}>
                         {curr.symbol} {code} - {curr.name}
