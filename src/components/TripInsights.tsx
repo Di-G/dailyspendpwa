@@ -143,10 +143,12 @@ export default function TripInsights({ currency }: TripInsightsProps) {
     
     const receivers = settlementData
       .filter(s => s.shouldReceive > 0)
+      .map(s => ({ ...s })) // Create a copy to avoid modifying original data
       .sort((a, b) => b.shouldReceive - a.shouldReceive);
     
     const payers = settlementData
       .filter(s => s.shouldPay > 0)
+      .map(s => ({ ...s })) // Create a copy to avoid modifying original data
       .sort((a, b) => b.shouldPay - a.shouldPay);
     
     const transfers: PaymentTransfer[] = [];
