@@ -416,7 +416,6 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
         <div>
           <div className="pt-2">
             <PartnerManagement 
-              hideHeader 
               outgoingRequests={outgoing} 
               incomingRequests={incoming}
               acceptedIncomingPartners={acceptedIncomingPartners}
