@@ -579,7 +579,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
 
       {/* Edit Expense Dialog */}
       <Dialog open={!!editingExpense} onOpenChange={(open) => { if (!open) closeEdit(); }}>
-        <DialogContent className="sm:max-w-md -mt-16 sm:mt-0">
+        <DialogContent className="sm:max-w-md -mt-16 sm:mt-0 z-[100]">
           <DialogHeader>
             <DialogTitle>Edit Expense</DialogTitle>
           </DialogHeader>
@@ -612,7 +612,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         <div className="flex items-center">

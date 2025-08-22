@@ -610,13 +610,16 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Trips</h3>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+        <div>
+          <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">Trips Management</h3>
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">Create and manage your trips</p>
+        </div>
         <Button 
           size="sm" 
           onClick={() => setAddTripOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm"
         >
           <Plus className="w-4 h-4 mr-1" />
           Add Trip
@@ -624,18 +627,41 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
       </div>
       
       {trips.length === 0 ? (
-        <div className="p-3 border rounded-md">
-          <div className="text-sm text-muted-foreground">No trips created yet.</div>
+        <div className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-900/50 dark:to-slate-900/50 text-center">
+          <div className="text-sm text-muted-foreground mb-2">No trips created yet.</div>
+          <div className="text-xs text-muted-foreground">Click "Add Trip" to get started</div>
         </div>
       ) : (
-        <div className="space-y-2">
-          {trips.map(trip => (
-            <div key={trip.id} className="flex items-center justify-between p-2 border rounded-md bg-card">
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{trip.name}</div>
-                <div className="text-xs text-muted-foreground truncate">{trip.friends.length} friend{trip.friends.length === 1 ? '' : 's'}</div>
+        <div className="space-y-3">
+          {trips.map((trip, index) => (
+            <div key={trip.id} className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/20 transition-all duration-200">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center space-x-3">
+                  <div 
+                    className="w-3 h-3 rounded-full shadow-sm" 
+                    style={{ 
+                      backgroundColor: [
+                        '#14B8A6', // teal
+                        '#6366F1', // indigo
+                        '#84CC16', // lime
+                        '#D946EF', // fuchsia
+                        '#F97316', // orange
+                      ][index % 5]
+                    }} 
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">{trip.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{trip.friends.length} friend{trip.friends.length === 1 ? '' : 's'}</div>
+                  </div>
+                </div>
               </div>
-              <Button variant="destructive" size="icon" title="Delete trip" onClick={() => promptDeleteTrip({ id: trip.id, name: trip.name })}>
+              <Button 
+                variant="destructive" 
+                size="icon" 
+                title="Delete trip" 
+                onClick={() => promptDeleteTrip({ id: trip.id, name: trip.name })}
+                className="ml-3 hover:scale-105 transition-transform"
+              >
                 <Trash className="w-4 h-4" />
               </Button>
             </div>
@@ -645,29 +671,30 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
 
       {/* Add Trip Dialog */}
       <Dialog open={addTripOpen} onOpenChange={(v) => { setAddTripOpen(v); if (!v) resetAddTripState(); }}>
-        <DialogContent>
+        <DialogContent className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Add a Trip</DialogTitle>
+            <DialogTitle className="text-emerald-800 dark:text-emerald-200">Add a Trip</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Trip name</label>
+            <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <label className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Trip name</label>
               <Input
                 value={tripNameInput}
                 onChange={(e) => setTripNameInput(e.target.value)}
                 placeholder={`e.g. ${getNextDefaultTripName()}`}
+                className="mt-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800"
               />
-              <p className="text-xs text-muted-foreground mt-1">Leave empty to use the next available default name.</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Leave empty to use the next available default name.</p>
             </div>
-            <div>
-              <label className="text-sm font-medium">Number of friends to add</label>
+            <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <label className="text-sm font-medium text-blue-800 dark:text-blue-200">Number of friends to add</label>
               <div className="mt-2 grid grid-cols-5 gap-2">
                 {Array.from({ length: 5 }, (_, i) => i + 1).map((n) => (
                   <Button
                     key={n}
                     type="button"
                     variant={selectedFriendsCount === n ? 'default' : 'outline'}
-                    className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                    className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm' : 'border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'}
                     onClick={() => {
                       setSelectedFriendsCount(n);
                       setFriendNames((prev) => {
@@ -682,30 +709,43 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
               </div>
             </div>
             {selectedFriendsCount != null && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Friend names</label>
-                {Array.from({ length: selectedFriendsCount }, (_, idx) => (
-                  <Input
-                    key={idx}
-                    value={friendNames[idx] || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFriendNames((prev) => {
-                        const copy = [...prev];
-                        copy[idx] = val;
-                        return copy;
-                      });
-                    }}
-                    placeholder={`Friend ${idx + 1}`}
-                  />
-                ))}
-                <p className="text-xs text-muted-foreground">Leave any blank to auto-name as Friend 1, Friend 2, ...</p>
+              <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <label className="text-sm font-medium text-purple-800 dark:text-purple-200">Friend names</label>
+                <div className="mt-2 space-y-2">
+                  {Array.from({ length: selectedFriendsCount }, (_, idx) => (
+                    <Input
+                      key={idx}
+                      value={friendNames[idx] || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFriendNames((prev) => {
+                          const copy = [...prev];
+                          copy[idx] = val;
+                          return copy;
+                        });
+                      }}
+                      placeholder={`Friend ${idx + 1}`}
+                      className="border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-800"
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">Leave any blank to auto-name as Friend 1, Friend 2, ...</p>
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setAddTripOpen(false); resetAddTripState(); }}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateTrip} disabled={selectedFriendsCount == null}>
+          <DialogFooter className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-t border-gray-200 dark:border-gray-700">
+            <Button 
+              variant="outline" 
+              onClick={() => { setAddTripOpen(false); resetAddTripState(); }}
+              className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm" 
+              onClick={handleCreateTrip} 
+              disabled={selectedFriendsCount == null}
+            >
               Create Trip
             </Button>
           </DialogFooter>
@@ -713,15 +753,20 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
       </Dialog>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent className="z-[100]">
+        <AlertDialogContent className="z-[100] bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Trip</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-red-800 dark:text-red-200">Delete Trip</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-700 dark:text-gray-300">
               {`Are you sure you want to delete "${tripToDelete?.name || 'this trip'}"? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setDeleteOpen(false); setTripToDelete(null); }}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-t border-gray-200 dark:border-gray-700">
+            <AlertDialogCancel 
+              onClick={() => { setDeleteOpen(false); setTripToDelete(null); }}
+              className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (tripToDelete) {
@@ -730,6 +775,7 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
                 setDeleteOpen(false);
                 setTripToDelete(null);
               }}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white shadow-sm"
             >
               Delete
             </AlertDialogAction>

@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
 import PartnerChat from "@/components/partner-chat";
 import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
+import TripInsights from "@/components/TripInsights";
 
 type ViewType = "entry" | "charts" | "calendar" | "recurring" | "chat";
 
@@ -891,9 +892,7 @@ export default function ExpenseTracker() {
                               {currentView === 'entry' && <TripHome currency={tripsCurrency} />}
                 {currentView === 'calendar' && <TripCalendar currency={tripsCurrency} />}
                 {currentView === 'recurring' && <TripRecurring currency={tripsCurrency} />}
-              {currentView === 'charts' && (
-                <div className="p-4 text-sm text-muted-foreground">Charts for trips will be available soon.</div>
-              )}
+              {currentView === 'charts' && <TripInsights currency={tripsCurrency} />}
             </>
           ) : tripsBlockedEffective ? (
             // Show conflict message when trips are blocked
@@ -1637,7 +1636,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
                       </h2>
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {trips.map(t => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
@@ -1695,7 +1694,7 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
                   <SelectTrigger>
                     <SelectValue placeholder="Select a friend" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {(activeTrip?.friends || []).map((f, idx) => (
                       <SelectItem key={idx} value={String(idx)}>
                         <div className="flex items-center">
@@ -1772,29 +1771,47 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
 
       {/* Edit Trip Expense Dialog (parity with My expenses) */}
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) closeTripEdit(); }}>
-        <DialogContent className="sm:max-w-md -mt-16 sm:mt-0">
+        <DialogContent className="sm:max-w-md -mt-16 sm:mt-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700 z-[100]">
           <DialogHeader>
-            <DialogTitle>Edit Trip Expense</DialogTitle>
+            <DialogTitle className="text-emerald-800 dark:text-emerald-200">Edit Trip Expense</DialogTitle>
           </DialogHeader>
           {editTripFields && (
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-foreground/80">Amount ({symbol})</label>
-                  <Input type="number" step="0.01" value={editTripFields.amount} onChange={(e) => setEditTripFields({ ...editTripFields, amount: e.target.value })} />
+                  <label className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Amount ({symbol})</label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={editTripFields.amount} 
+                    onChange={(e) => setEditTripFields({ ...editTripFields, amount: e.target.value })}
+                    className="border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800"
+                  />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground/80">Expense Name</label>
-                  <Input value={editTripFields.name} onChange={(e) => setEditTripFields({ ...editTripFields, name: e.target.value })} />
+                  <label className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Expense Name</label>
+                  <Input 
+                    value={editTripFields.name} 
+                    onChange={(e) => setEditTripFields({ ...editTripFields, name: e.target.value })}
+                    className="border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800"
+                  />
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground/80">Friend</label>
-                <Select value={String(editTripFields.friendIndex)} onValueChange={(v) => setEditTripFields({ ...editTripFields, friendIndex: parseInt(v) })}>
-                  <SelectTrigger>
+                <label className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Friend</label>
+                <Select 
+                  value={String(editTripFields.friendIndex)} 
+                  onValueChange={(v) => {
+                    const newFriendIndex = parseInt(v);
+                    if (!isNaN(newFriendIndex)) {
+                      setEditTripFields({ ...editTripFields, friendIndex: newFriendIndex });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                     <SelectValue placeholder="Select a friend" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     {(activeTrip?.friends || []).map((f, idx) => (
                       <SelectItem key={idx} value={String(idx)}>
                         <div className="flex items-center">
@@ -1805,20 +1822,46 @@ function TripHome({ currency }: { currency: CurrencyCode }) {
                     ))}
                   </SelectContent>
                 </Select>
+                {!activeTrip?.friends?.length && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">No friends available for this trip</p>
+                )}
               </div>
               <div className="space-y-3">
-                <Button type="button" variant="ghost" onClick={() => setShowEditTripDetails(!showEditTripDetails)} className="w-full justify-start text-gray-600 hover:text-gray-900 p-0 h-auto font-normal">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setShowEditTripDetails(!showEditTripDetails)} 
+                  className="w-full justify-start text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 p-0 h-auto font-normal"
+                >
                   <span className="text-sm">Additional Details</span>
                 </Button>
                 {showEditTripDetails && (
-                  <Textarea rows={3} value={editTripFields.details} onChange={(e) => setEditTripFields({ ...editTripFields, details: e.target.value })} className="transition-all duration-200 ease-in-out" />
+                  <Textarea 
+                    rows={3} 
+                    value={editTripFields.details} 
+                    onChange={(e) => setEditTripFields({ ...editTripFields, details: e.target.value })} 
+                    className="transition-all duration-200 ease-in-out border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800"
+                  />
                 )}
               </div>
             </div>
           )}
-          <DialogFooter className="flex flex-row justify-end gap-2">
-            <Button variant="destructive" size="sm" onClick={deleteTripExpense}>Delete</Button>
-            <Button size="sm" onClick={saveTripExpense} className="bg-emerald-600 hover:bg-emerald-700">Save Changes</Button>
+          <DialogFooter className="flex flex-row justify-end gap-2 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-t border-gray-200 dark:border-gray-700">
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={deleteTripExpense}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white shadow-sm"
+            >
+              Delete
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={saveTripExpense} 
+              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm"
+            >
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2006,7 +2049,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
                   </h2>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[9999]">
                 {trips.map(t => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.name}
@@ -2053,7 +2096,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
                     <SelectTrigger>
                       <SelectValue placeholder="Select friend" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[9999]">
                       {(activeTrip?.friends || []).map((f, idx) => (
                         <SelectItem key={idx} value={String(idx)}>
                           <div className="flex items-center">
@@ -2071,7 +2114,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[9999]">
                       <SelectItem value="daily">Daily</SelectItem>
                       <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
