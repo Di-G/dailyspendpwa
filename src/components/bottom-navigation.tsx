@@ -3,7 +3,7 @@ import { Home, Calendar, BarChart3, Repeat, Users } from "lucide-react";
 interface BottomNavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
-  colorVariant?: 'primary' | 'rose' | 'emerald';
+  colorVariant?: 'primary' | 'rose' | 'emerald' | 'yellow';
   isCoupleTab?: boolean;
   disabledIds?: string[];
 }
@@ -52,7 +52,7 @@ export default function BottomNavigation({ currentView, onViewChange, colorVaria
                 isDisabled
                   ? "opacity-50 cursor-not-allowed"
                   : item.active
-                  ? `${colorVariant === 'rose' ? 'bg-rose-600' : colorVariant === 'emerald' ? 'bg-emerald-600' : 'bg-primary'} text-white`
+                  ? `${colorVariant === 'rose' ? 'bg-rose-600' : colorVariant === 'emerald' ? 'bg-emerald-600' : colorVariant === 'yellow' ? 'bg-yellow-500' : 'bg-primary'} text-white`
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >

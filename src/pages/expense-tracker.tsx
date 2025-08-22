@@ -5,6 +5,8 @@ import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
  
 import FollowupsTwoPeopleIcon from "@/components/icons/followups-two-people";
+import FollowupsSeniorJuniorIcon from "@/components/icons/followups-senior-junior";
+import FollowupsTwoPeopleCheckIcon from "@/components/icons/followups-two-people-check";
 import ExpenseEntry from "@/components/expense-entry";
 import ChartsView from "@/components/charts-view";
 import CalendarView from "@/components/calendar-view";
@@ -559,10 +561,10 @@ export default function ExpenseTracker() {
               <TabsTrigger
                 value="followups"
                 aria-label="Follow ups"
-                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+                className="flex-1 h-16 flex items-center justify-center rounded-none px-0 transition-all duration-200 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:bg-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-none"
               >
                 <div className="relative">
-                  <Users className="w-6 h-6" />
+                  <FollowupsTwoPeopleCheckIcon className="w-6 h-6" />
                 </div>
                 <span className="sr-only">FollowUps</span>
               </TabsTrigger>
@@ -994,6 +996,83 @@ export default function ExpenseTracker() {
             )}
           </div>
           )
+        ) : topTab === 'followups' ? (
+          <div className="relative">
+            {/* Placeholder scaffold (optional minimal content behind blur) */}
+            <div className="space-y-4 sm:space-y-6 opacity-70 pointer-events-none select-none">
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">Followups</h2>
+                      <p className="text-sm text-muted-foreground">Monitor expenses of dependents and family members</p>
+                    </div>
+                    <div className="h-8 w-24 rounded bg-yellow-500/20" />
+                  </div>
+                  {(() => {
+                    const mockCategories = [
+                      { id: 'food', name: 'Food', color: '#EAB308' },    // yellow-500
+                      { id: 'travel', name: 'Travel', color: '#F59E0B' }, // amber-500
+                      { id: 'groceries', name: 'Groceries', color: '#FCD34D' }, // yellow-300
+                      { id: 'shopping', name: 'Shopping', color: '#FBBF24' }, // amber-400
+                      { id: 'entertain', name: 'Entertainment', color: '#FDE047' }, // yellow-200
+                    ];
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mt-4">
+                        {mockCategories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="border rounded-lg p-2 sm:p-3 text-center"
+                            style={{ backgroundColor: `${category.color}10`, borderColor: `${category.color}40` }}
+                          >
+                            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2" style={{ backgroundColor: category.color }} />
+                            <div className="h-3 w-16 mx-auto rounded-sm mb-1" style={{ backgroundColor: `${category.color}30` }} />
+                            <div className="h-4 w-20 mx-auto rounded-sm" style={{ backgroundColor: `${category.color}20` }} />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="h-40 rounded bg-muted" />
+                    </CardContent>
+                  </Card>
+                </div>
+                <div>
+                  <Card>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 rounded bg-muted" />
+                        <div className="h-4 w-24 rounded bg-muted" />
+                        <div className="h-4 w-28 rounded bg-muted" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+
+            {/* Full-screen blur overlay below the tabs */}
+            <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
+
+            {/* Centered CTA */}
+            <div className="fixed left-0 right-0 bottom-0 z-[80] flex items-center justify-center" style={{ top: overlayTopPx }}>
+              <div className="flex flex-col items-center gap-3">
+                <Button
+                  size={isMobile ? 'default' : 'lg'}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                  onClick={() => {/* TODO: Add user to follow */}}
+                >
+                  Add a User to Follow
+                </Button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div />
         )}
@@ -1039,18 +1118,18 @@ export default function ExpenseTracker() {
 
       {/* Floating Action Button - Mobile only (hidden while in chat to avoid intercepting input) */}
       {currentView !== 'chat' && (
-        <FloatingActionButton
-          onClick={handleFabClick}
-          colorVariant={topTab === 'couple' ? 'rose' : topTab === 'trips' ? 'emerald' : 'primary'}
-          disabled={topTab === 'couple' && !hasPartner}
-        />
+              <FloatingActionButton
+        onClick={handleFabClick}
+        colorVariant={topTab === 'couple' ? 'rose' : topTab === 'trips' ? 'emerald' : topTab === 'followups' ? 'yellow' : 'primary'}
+        disabled={topTab === 'couple' && !hasPartner}
+      />
       )}
 
       {/* Bottom Navigation - Mobile only */}
       <BottomNavigation
         currentView={hasAcceptedRequest && topTab === 'couple' && !hasPartner ? currentView : currentView}
         onViewChange={(v) => setCurrentView(v as ViewType)}
-        colorVariant={topTab === 'couple' ? 'rose' : topTab === 'trips' ? 'emerald' : 'primary'}
+        colorVariant={topTab === 'couple' ? 'rose' : topTab === 'trips' ? 'emerald' : topTab === 'followups' ? 'yellow' : 'primary'}
         isCoupleTab={topTab === 'couple'}
         disabledIds={topTab === 'couple' && hasAcceptedRequest && !hasPartner ? ['entry','calendar','recurring'] : []}
       />

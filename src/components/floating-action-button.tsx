@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 interface FloatingActionButtonProps {
   onClick: () => void;
-  colorVariant?: 'primary' | 'rose' | 'emerald';
+  colorVariant?: 'primary' | 'rose' | 'emerald' | 'yellow';
   disabled?: boolean;
 }
 
@@ -114,6 +114,8 @@ export default function FloatingActionButton({ onClick, colorVariant = 'primary'
             ? 'bg-rose-600 hover:bg-rose-700'
             : colorVariant === 'emerald'
             ? 'bg-emerald-600 hover:bg-emerald-700'
+            : colorVariant === 'yellow'
+            ? 'bg-yellow-500 hover:bg-yellow-600'
             : 'bg-primary hover:bg-blue-700'
         }`}
       >
