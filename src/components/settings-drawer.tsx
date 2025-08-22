@@ -611,7 +611,7 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+      <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
         <div>
           <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">Trips Management</h3>
           <p className="text-sm text-emerald-600 dark:text-emerald-400">Create and manage your trips</p>
@@ -619,7 +619,7 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
         <Button 
           size="sm" 
           onClick={() => setAddTripOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm"
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm mt-3 w-full"
         >
           <Plus className="w-4 h-4 mr-1" />
           Add Trip
