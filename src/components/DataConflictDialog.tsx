@@ -61,17 +61,68 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
   const getDataCounts = (data: any[], label: string) => {
     const count = data?.length || 0;
     
-    // Special handling for trips to show trip names
-    if (label === 'trips' && count > 0) {
-      const tripNames = data.map((trip: any) => trip.name || 'Unnamed Trip').join(', ');
-      if (count === 1) {
-        return `1 Trip (${tripNames})`;
-      } else {
-        return `${count} Trips (${tripNames})`;
+    // Check if this is trips data by examining the data structure
+    const isTripsData = data && data.length > 0 && data[0] && (
+      // Check if it's trips array (has name and friends properties)
+      (data[0].name && Array.isArray(data[0].friends)) ||
+      // Check if it's trip expenses (has tripId property)
+      (data[0].tripId && data[0].name && data[0].amount) ||
+      // Check if it's trip recurring (has tripId and frequency properties)
+      (data[0].tripId && data[0].frequency)
+    );
+    
+    // Special handling for trips data to show trip names
+    if (isTripsData && count > 0) {
+      if (data[0].name && Array.isArray(data[0].friends)) {
+        // This is trips array
+        const tripNames = data.map((trip: any) => trip.name || 'Unnamed Trip').join(', ');
+        if (count === 1) {
+          return `1 Trip (${tripNames})`;
+        } else {
+          return `${count} Trips (${tripNames})`;
+        }
+      } else if (data[0].tripId && data[0].name) {
+        // This is trip expenses or recurring
+        const uniqueTripIds = [...new Set(data.map((item: any) => item.tripId))];
+        if (uniqueTripIds.length === 1) {
+          return `${count} items for 1 trip`;
+        } else {
+          return `${count} items for ${uniqueTripIds.length} trips`;
+        }
       }
     }
     
+    // Default handling for regular data
     return count > 0 ? `${count} ${label}` : `No ${label}`;
+  };
+
+  const getTripsDetailedInfo = (data: any[]) => {
+    if (!data || data.length === 0) return null;
+    
+    // Check if this is trips data
+    const isTripsData = data[0] && (
+      (data[0].name && Array.isArray(data[0].friends)) ||
+      (data[0].tripId && data[0].name && data[0].amount) ||
+      (data[0].tripId && data[0].frequency)
+    );
+    
+    if (!isTripsData) return null;
+    
+    if (data[0].name && Array.isArray(data[0].friends)) {
+      // This is trips array - show trip names and friend counts
+      return (
+        <div className="mt-2 space-y-1">
+          {data.map((trip: any, index: number) => (
+            <div key={index} className="text-xs text-muted-foreground flex items-center gap-2">
+              <span>• {trip.name || 'Unnamed Trip'}</span>
+              <span className="text-xs opacity-70">({trip.friends?.length || 0} friends)</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    return null;
   };
 
   return (
@@ -119,6 +170,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
                     </Badge>
                   </div>
                 )}
+                {conflict.conflicts.categories && getTripsDetailedInfo(conflict.localData.categories)}
                 {conflict.conflicts.expenses && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{sectionsLabelOverride?.expenses || 'Expenses'}:</span>
@@ -127,6 +179,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
                     </Badge>
                   </div>
                 )}
+                {conflict.conflicts.expenses && getTripsDetailedInfo(conflict.localData.expenses)}
                 {conflict.conflicts.recurring && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{sectionsLabelOverride?.recurring || 'Recurring'}:</span>
@@ -135,6 +188,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
                     </Badge>
                   </div>
                 )}
+                {conflict.conflicts.recurring && getTripsDetailedInfo(conflict.localData.recurring)}
               </div>
             </div>
 
@@ -149,6 +203,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
                     </Badge>
                   </div>
                 )}
+                {conflict.conflicts.categories && getTripsDetailedInfo(conflict.onlineData.categories)}
                 {conflict.conflicts.expenses && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{sectionsLabelOverride?.expenses || 'Expenses'}:</span>
@@ -157,6 +212,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
                     </Badge>
                   </div>
                 )}
+                {conflict.conflicts.expenses && getTripsDetailedInfo(conflict.onlineData.expenses)}
                 {conflict.conflicts.recurring && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{sectionsLabelOverride?.recurring || 'Recurring'}:</span>
@@ -165,6 +221,7 @@ export default function DataConflictDialog({ open, onClose, conflict, onResolve,
                     </Badge>
                   </div>
                 )}
+                {conflict.conflicts.recurring && getTripsDetailedInfo(conflict.onlineData.recurring)}
               </div>
             </div>
           </div>

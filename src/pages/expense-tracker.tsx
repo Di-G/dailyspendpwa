@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { getToday, getMonthInfo, generateCalendarDays } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw } from "@/lib/localStorage";
+import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -150,6 +150,8 @@ export default function ExpenseTracker() {
   useEffect(() => {
     if (topTab === 'trips') {
       setHasTrips(getStoredTrips().length > 0);
+      // Clean up any orphaned trip data when trips view is loaded
+      cleanupOrphanedTripData();
     }
   }, [topTab]);
 
@@ -1586,9 +1588,11 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
   };
 
   useEffect(() => {
-    // Refresh trips when storage may have changed (renames, add/remove)
     try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
-  }, [localStorage.getItem('dailyspend_trips')]);
+    
+    // Clean up any orphaned trip data
+    cleanupOrphanedTripData();
+  }, []);
 
   useEffect(() => {
     if (!activeTrip && trips[0]) setActiveTripId(trips[0].id);
@@ -1726,6 +1730,9 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
 
   const deleteTripExpense = async () => {
     if (!editing) return;
+    
+    console.log(`[Trip Expense Delete] Deleting expense: ${editing.name} (${editing.amount})`);
+    
     const all = getTripExpenses();
     const next = all.filter((e) => e.id !== editing.id);
     setTripExpenses(next);
@@ -1733,11 +1740,13 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
     
     // Trigger immediate upload to Firebase
     try {
+      console.log('[Trip Expense Delete] Triggering Firebase sync for expense deletion...');
       window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
     } catch (error) {
-      console.error('Failed to trigger immediate upload:', error);
+      console.error('[Trip Expense Delete] Failed to trigger Firebase sync:', error);
     }
     
+    console.log(`[Trip Expense Delete] Successfully deleted expense: ${editing.name}`);
     toast({ title: 'Deleted', description: 'Expense deleted successfully' });
     closeTripEdit();
   };
@@ -2041,6 +2050,9 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
 
   useEffect(() => {
     try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
+    
+    // Clean up any orphaned trip data
+    cleanupOrphanedTripData();
   }, []);
 
   const persist = (items: typeof recurring) => {
@@ -2157,16 +2169,23 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     }
   };
   const handleDelete = async (id: string) => {
+    const itemToDelete = recurring.find(r => r.id === id);
+    if (!itemToDelete) return;
+    
+    console.log(`[Trip Recurring Delete] Deleting recurring item: ${itemToDelete.name} (${itemToDelete.amount})`);
+    
     const next = recurring.filter(r => r.id !== id);
     persist(next);
     
     // Trigger immediate upload to Firebase
     try {
+      console.log('[Trip Recurring Delete] Triggering Firebase sync for recurring deletion...');
       window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
     } catch (error) {
-      console.error('Failed to trigger immediate upload:', error);
+      console.error('[Trip Recurring Delete] Failed to trigger Firebase sync:', error);
     }
     
+    console.log(`[Trip Recurring Delete] Successfully deleted recurring item: ${itemToDelete.name}`);
     toast({ title: 'Deleted' });
   };
   const handleEdit = (r: typeof recurring[number]) => {
@@ -2422,6 +2441,11 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
   const getTripRecurring = () => getTripRecurringRaw();
 
   const symbol = CURRENCIES[currency].symbol;
+
+  // Clean up orphaned trip data when component mounts
+  useEffect(() => {
+    cleanupOrphanedTripData();
+  }, []);
 
   const monthlyTotals = useMemo(() => {
     const all = getTripExpenses();

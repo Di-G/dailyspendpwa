@@ -8,7 +8,7 @@ import AddToHomeScreen from "@/components/AddToHomeScreen";
 import DataConflictDialog from "@/components/DataConflictDialog";
 import { useEffect } from "react";
 import { useRealtimeSync } from "@/lib/syncClient";
-import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate, processTripRecurringForDate, getTripLastProcessedDate, setTripLastProcessedDate } from "./lib/localStorage";
+import { initializeDefaultCategories, processRecurringForDate, getLastProcessedDate, setLastProcessedDate, processTripRecurringForDate, getTripLastProcessedDate, setTripLastProcessedDate, cleanupOrphanedTripData } from "./lib/localStorage";
 import { formatDate } from "./lib/date-utils";
 
 function Router() {
@@ -43,6 +43,10 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       initializeDefaultCategories();
+      
+      // Clean up any orphaned trip data on app start
+      cleanupOrphanedTripData();
+      
       // Invalidate categories query to ensure fresh data is loaded
       await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
     };
@@ -53,6 +57,9 @@ function App() {
   // Global data-changed listener to refresh UI immediately after any local data updates or sync merges
   useEffect(() => {
     const onDataChanged = async () => {
+      // Clean up any orphaned trip data when data changes
+      cleanupOrphanedTripData();
+      
       await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/analytics/daily-total"] });

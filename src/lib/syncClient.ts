@@ -16,7 +16,8 @@ import {
   getTrips,
   getTripExpensesRaw,
   getTripRecurringRaw,
-  updateAllTripsData
+  updateAllTripsData,
+  cleanupOrphanedTripData
 } from "@/lib/localStorage";
 import { 
   analyzeDataConflicts, 
@@ -279,6 +280,10 @@ export function useRealtimeSync() {
       
       try {
         console.log('[Sync] Force uploading trips data');
+        
+        // Clean up any orphaned trip data before upload
+        cleanupOrphanedTripData();
+        
         // Check if there are pending trips conflicts before uploading
         const hasPendingTripsConflict = (() => {
           try { return localStorage.getItem('dailyspend_trips_conflict_pending') === 'true'; } catch { return false; }
@@ -394,6 +399,9 @@ export function useRealtimeSync() {
         suppressUploadsUntil.current = Date.now() + 2000;
         updateAllTripsData(tripsMerged.trips as any, tripsMerged.tripExpenses as any, tripsMerged.tripRecurring as any);
         try { localStorage.setItem('dailyspend_trips_conflict_pending', 'false'); } catch {}
+        
+        // Clean up any orphaned trip data after initial sync
+        cleanupOrphanedTripData();
       }
 
       console.log('[Sync] Proceeding with expenses sync');
@@ -474,6 +482,9 @@ export function useRealtimeSync() {
       // Emit change event to refresh UI immediately
       window.dispatchEvent(new CustomEvent('dailyspend:data-changed'));
 
+      // Clean up any orphaned trip data after expenses sync
+      cleanupOrphanedTripData();
+
       // Mark this session as in-sync so future local changes auto-upload without dialog
       sessionSynced.current = true;
       
@@ -493,6 +504,10 @@ export function useRealtimeSync() {
       suppressConflictsUntil.current = Date.now() + 2000;
       const resolved = applyTripsConflictResolution(resolution, conflict.localData as any, conflict.onlineData as any);
       updateAllTripsData(resolved.trips as any, resolved.tripExpenses as any, resolved.tripRecurring as any);
+      
+      // Clean up any orphaned trip data after sync
+      cleanupOrphanedTripData();
+      
       await uploadAllForUser(
         user.uid,
         {

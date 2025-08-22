@@ -622,3 +622,161 @@ export const updateAllTripsData = (
     throw e;
   }
 };
+
+// Clean up orphaned trip data - remove expenses and recurring items for non-existent trips
+export const cleanupOrphanedTripData = (): { removedExpenses: number; removedRecurring: number } => {
+  try {
+    const trips = getTrips();
+    const tripIds = new Set(trips.map(t => t.id));
+    
+    console.log('[Cleanup] Checking for orphaned trip data...');
+    console.log('[Cleanup] Current trips:', trips.length, trips.map(t => t.name));
+    
+    // Clean up orphaned trip expenses
+    const tripExpenses = getTripExpensesRaw();
+    const validTripExpenses = tripExpenses.filter(exp => tripIds.has(exp.tripId));
+    const orphanedExpenses = tripExpenses.filter(exp => !tripIds.has(exp.tripId));
+    const removedExpenses = tripExpenses.length - validTripExpenses.length;
+    
+    if (orphanedExpenses.length > 0) {
+      console.log('[Cleanup] Found orphaned expenses:', orphanedExpenses.map(exp => ({
+        name: exp.name,
+        amount: exp.amount,
+        date: exp.date,
+        tripId: exp.tripId
+      })));
+    }
+    
+    if (removedExpenses > 0) {
+      setTripExpensesRaw(validTripExpenses);
+      console.log(`[Cleanup] Removed ${removedExpenses} orphaned trip expenses`);
+    }
+    
+    // Clean up orphaned trip recurring
+    const tripRecurring = getTripRecurringRaw();
+    const validTripRecurring = tripRecurring.filter(rec => tripIds.has(rec.tripId));
+    const orphanedRecurring = tripRecurring.filter(rec => !tripIds.has(rec.tripId));
+    const removedRecurring = tripRecurring.length - validTripRecurring.length;
+    
+    if (orphanedRecurring.length > 0) {
+      console.log('[Cleanup] Found orphaned recurring:', orphanedRecurring.map(rec => ({
+        name: rec.name,
+        amount: rec.amount,
+        tripId: rec.tripId
+      })));
+    }
+    
+    if (removedRecurring > 0) {
+      setTripRecurringRaw(validTripRecurring);
+      console.log(`[Cleanup] Removed ${removedRecurring} orphaned trip recurring items`);
+    }
+    
+    if (removedExpenses > 0 || removedRecurring > 0) {
+      emitDataChanged();
+      console.log(`[Cleanup] Total cleanup: ${removedExpenses} expenses, ${removedRecurring} recurring items`);
+    } else {
+      console.log('[Cleanup] No orphaned data found');
+    }
+    
+    return { removedExpenses, removedRecurring };
+  } catch (e) {
+    console.error('Error cleaning up orphaned trip data:', e);
+    return { removedExpenses: 0, removedRecurring: 0 };
+  }
+};
+
+// Add manual cleanup function to window for debugging
+if (typeof window !== 'undefined') {
+  (window as any).cleanupTripsData = cleanupOrphanedTripData;
+  (window as any).debugTripsData = () => {
+    const trips = getTrips();
+    const tripExpenses = getTripExpensesRaw();
+    const tripRecurring = getTripRecurringRaw();
+    
+    console.log('=== TRIPS DATA DEBUG ===');
+    console.log('Trips:', trips.length, trips.map(t => ({ id: t.id, name: t.name })));
+    console.log('Trip Expenses:', tripExpenses.length);
+    console.log('Trip Recurring:', tripRecurring.length);
+    
+    // Check for orphaned data
+    const tripIds = new Set(trips.map(t => t.id));
+    const orphanedExpenses = tripExpenses.filter(exp => !tripIds.has(exp.tripId));
+    const orphanedRecurring = tripRecurring.filter(rec => !tripIds.has(rec.tripId));
+    
+    if (orphanedExpenses.length > 0) {
+      console.log('🚨 ORPHANED EXPENSES:', orphanedExpenses);
+    }
+    if (orphanedRecurring.length > 0) {
+      console.log('🚨 ORPHANED RECURRING:', orphanedRecurring);
+    }
+    
+    if (orphanedExpenses.length === 0 && orphanedRecurring.length === 0) {
+      console.log('✅ No orphaned data found');
+    }
+    
+    console.log('=== END DEBUG ===');
+    
+    return { trips, tripExpenses, tripRecurring, orphanedExpenses, orphanedRecurring };
+  };
+  
+  (window as any).forceCleanupTrips = () => {
+    console.log('🧹 Force cleaning up trips data...');
+    const result = cleanupOrphanedTripData();
+    console.log('🧹 Cleanup result:', result);
+    return result;
+  };
+  
+  (window as any).checkTripsSync = () => {
+    const trips = getTrips();
+    const tripExpenses = getTripExpensesRaw();
+    const tripRecurring = getTripRecurringRaw();
+    
+    console.log('=== TRIPS SYNC CHECK ===');
+    console.log('Local trips:', trips.length);
+    console.log('Local trip expenses:', tripExpenses.length);
+    console.log('Local trip recurring:', tripRecurring.length);
+    
+    // Group expenses by trip
+    const expensesByTrip: Record<string, typeof tripExpenses> = {};
+    tripExpenses.forEach(exp => {
+      if (!expensesByTrip[exp.tripId]) {
+        expensesByTrip[exp.tripId] = [];
+      }
+      expensesByTrip[exp.tripId].push(exp);
+    });
+    
+    console.log('Expenses by trip:');
+    Object.entries(expensesByTrip).forEach(([tripId, expenses]) => {
+      const trip = trips.find(t => t.id === tripId);
+      const tripName = trip ? trip.name : 'ORPHANED';
+      const status = trip ? 'VALID' : 'ORPHANED';
+      console.log(`  ${tripName} (${tripId}): ${expenses.length} expenses [${status}]`);
+    });
+    
+    console.log('=== END SYNC CHECK ===');
+  };
+  
+  (window as any).manualTripsSync = () => {
+    console.log('🔄 Manually syncing trips data...');
+    
+    // Clean up orphaned data first
+    const cleanupResult = cleanupOrphanedTripData();
+    console.log('🧹 Cleanup result:', cleanupResult);
+    
+    // Check current state
+    const trips = getTrips();
+    const tripExpenses = getTripExpensesRaw();
+    const tripRecurring = getTripRecurringRaw();
+    
+    console.log('📊 Current state after cleanup:');
+    console.log('  Trips:', trips.length);
+    console.log('  Trip Expenses:', tripExpenses.length);
+    console.log('  Trip Recurring:', tripRecurring.length);
+    
+    // Trigger data changed event to refresh UI
+    emitDataChanged();
+    
+    console.log('✅ Manual sync completed');
+    return { trips, tripExpenses, tripRecurring, cleanupResult };
+  };
+}

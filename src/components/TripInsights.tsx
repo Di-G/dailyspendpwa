@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUpRight, ArrowDownRight, Minus, Calculator, TrendingUp, Users } from "lucide-react";
 import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 import { formatAmountDisplay } from "@/lib/utils";
+import { getTrips, getTripExpenses, cleanupOrphanedTripData } from "@/lib/localStorage";
 
 interface TripInsightsProps {
   currency: CurrencyCode;
@@ -64,6 +65,9 @@ export default function TripInsights({ currency }: TripInsightsProps) {
     if (currentTrips.length > 0 && !activeTripId) {
       setActiveTripId(currentTrips[0].id);
     }
+    
+    // Clean up any orphaned trip data
+    cleanupOrphanedTripData();
   }, [tripDataRev, activeTripId]);
 
   const activeTrip = trips.find(t => t.id === activeTripId);

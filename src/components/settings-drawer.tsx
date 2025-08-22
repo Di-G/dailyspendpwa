@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
 import PartnerManagement from "@/components/partner-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw } from "@/lib/localStorage";
+import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
 import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest } from "@/lib/sync";
 import { Trash, Plus } from "lucide-react";
@@ -69,6 +69,14 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
     return { categories, expenses };
   }, []);
 
+  // Trips data for import/export/delete
+  const tripsData = useMemo(() => {
+    const trips = JSON.parse(localStorage.getItem('dailyspend_trips') || '[]');
+    const tripExpenses = getTripExpensesRaw();
+    const tripRecurring = getTripRecurringRaw();
+    return { trips, tripExpenses, tripRecurring };
+  }, []);
+
   const buildCsv = () => {
     const { categories, expenses } = data;
     const header = [
@@ -123,6 +131,101 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
     return lines.join("\n");
   };
 
+  const buildTripsCsv = () => {
+    const { trips, tripExpenses, tripRecurring } = tripsData;
+    const header = [
+      "type",
+      "id",
+      "tripId",
+      "name",
+      "friends",
+      "createdAt",
+      "expense_name",
+      "amount",
+      "details",
+      "friendIndex",
+      "date",
+      "expense_createdAt",
+      "frequency",
+      "customDays",
+      "startDate",
+      "endDate",
+      "isActive"
+    ];
+    const lines: string[] = [header.join(",")];
+    
+    // Add trips
+    trips.forEach((t) => {
+      lines.push([
+        "trip",
+        safeCsv(t.id),
+        safeCsv(t.id),
+        safeCsv(t.name),
+        safeCsv(JSON.stringify(t.friends)),
+        safeCsv(t.createdAt || new Date().toISOString()),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ].join(","));
+    });
+    
+    // Add trip expenses
+    tripExpenses.forEach((e) => {
+      lines.push([
+        "trip_expense",
+        safeCsv(e.id),
+        safeCsv(e.tripId),
+        "",
+        "",
+        "",
+        safeCsv(e.name),
+        safeCsv(e.amount),
+        safeCsv(e.details ?? ""),
+        safeCsv(e.friendIndex),
+        safeCsv(e.date),
+        safeCsv(e.createdAt),
+        "",
+        "",
+        "",
+        "",
+        ""
+      ].join(","));
+    });
+    
+    // Add trip recurring
+    tripRecurring.forEach((r) => {
+      lines.push([
+        "trip_recurring",
+        safeCsv(r.id),
+        safeCsv(r.tripId),
+        "",
+        "",
+        "",
+        safeCsv(r.name),
+        safeCsv(r.amount),
+        safeCsv(r.details ?? ""),
+        safeCsv(r.friendIndex),
+        "",
+        safeCsv(r.createdAt),
+        safeCsv(r.frequency),
+        safeCsv(r.customDays || ""),
+        safeCsv(r.startDate),
+        safeCsv(r.endDate || ""),
+        safeCsv(r.isActive)
+      ].join(","));
+    });
+    
+    return lines.join("\n");
+  };
+
   const safeCsv = (value: any) => {
     const str = String(value ?? "");
     if (str.includes(",") || str.includes("\n") || str.includes('"')) {
@@ -135,35 +238,67 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
     try {
       setExporting(true);
       if (format === "excel") {
-        const csv = buildCsv();
+        const csv = topTab === 'trips' ? buildTripsCsv() : buildCsv();
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `daily-spends-export-${new Date().toISOString().slice(0,10)}.csv`;
+        const filename = topTab === 'trips' 
+          ? `trips-export-${new Date().toISOString().slice(0,10)}.csv`
+          : `daily-spends-export-${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
-        toast({ title: "Exported", description: "Data exported as CSV (openable in Excel)" });
+        const description = topTab === 'trips' 
+          ? "Trips data exported as CSV (openable in Excel)"
+          : "Data exported as CSV (openable in Excel)";
+        toast({ title: "Exported", description });
       } else {
         // Minimal PDF generation: open formatted HTML in new tab and let user save as PDF
-        const html = `<!doctype html><html><head><meta charset='utf-8'><title>Daily Spends Export</title>
-          <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto; padding:24px} h1{font-size:20px} table{border-collapse:collapse;width:100%;margin-top:12px} th,td{border:1px solid #ddd;padding:6px;text-align:left} th{background:#f5f5f5}</style>
-        </head><body>
-        <h1>Daily Spends Export - ${new Date().toLocaleString()}</h1>
-        <h2>Categories</h2>
-        <table><thead><tr><th>Name</th><th>Color</th><th>Created</th></tr></thead><tbody>
-        ${data.categories.map(c => `<tr><td>${c.name}</td><td>${c.color}</td><td>${c.createdAt}</td></tr>`).join("")}
-        </tbody></table>
-        <h2 style='margin-top:16px'>Expenses</h2>
-        <table><thead><tr><th>Name</th><th>Amount</th><th>CategoryId</th><th>Date</th><th>Created</th></tr></thead><tbody>
-        ${data.expenses.map(e => `<tr><td>${e.name}</td><td>${e.amount}</td><td>${e.categoryId ?? ''}</td><td>${e.date}</td><td>${e.createdAt}</td></tr>`).join("")}
-        </tbody></table>
-        <script>window.print()</script>
-        </body></html>`;
-        const blob = new Blob([html], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
-        toast({ title: "PDF Export", description: "Print dialog opened; choose Save as PDF" });
+        if (topTab === 'trips') {
+          const { trips, tripExpenses, tripRecurring } = tripsData;
+          const html = `<!doctype html><html><head><meta charset='utf-8'><title>Trips Export</title>
+            <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto; padding:24px} h1{font-size:20px} table{border-collapse:collapse;width:100%;margin-top:12px} th,td{border:1px solid #ddd;padding:6px;text-align:left} th{background:#f5f5f5}</style>
+          </head><body>
+          <h1>Trips Export - ${new Date().toLocaleString()}</h1>
+          <h2>Trips</h2>
+          <table><thead><tr><th>Name</th><th>Friends</th><th>Created</th></tr></thead><tbody>
+          ${trips.map(t => `<tr><td>${t.name}</td><td>${t.friends.map(f => f.name).join(', ')}</td><td>${t.createdAt || 'N/A'}</td></tr>`).join("")}
+          </tbody></table>
+          <h2 style='margin-top:16px'>Trip Expenses</h2>
+          <table><thead><tr><th>Name</th><th>Amount</th><th>Friend</th><th>Date</th><th>Created</th></tr></thead><tbody>
+          ${tripExpenses.map(e => `<tr><td>${e.name}</td><td>${e.amount}</td><td>${e.friendIndex}</td><td>${e.date}</td><td>${e.createdAt}</td></tr>`).join("")}
+          </tbody></table>
+          <h2 style='margin-top:16px'>Trip Recurring</h2>
+          <table><thead><tr><th>Name</th><th>Amount</th><th>Friend</th><th>Frequency</th><th>Start Date</th></tr></thead><tbody>
+          ${tripRecurring.map(r => `<tr><td>${r.name}</td><td>${r.amount}</td><td>${r.friendIndex}</td><td>${r.frequency}</td><td>${r.startDate}</td></tr>`).join("")}
+          </tbody></table>
+          <script>window.print()</script>
+          </body></html>`;
+          const blob = new Blob([html], { type: "text/html" });
+          const url = URL.createObjectURL(blob);
+          window.open(url, "_blank");
+          toast({ title: "PDF Export", description: "Print dialog opened; choose Save as PDF" });
+        } else {
+          const html = `<!doctype html><html><head><meta charset='utf-8'><title>Daily Spends Export</title>
+            <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto; padding:24px} h1{font-size:20px} table{border-collapse:collapse;width:100%;margin-top:12px} th,td{border:1px solid #ddd;padding:6px;text-align:left} th{background:#f5f5f5}</style>
+          </head><body>
+          <h1>Daily Spends Export - ${new Date().toLocaleString()}</h1>
+          <h2>Categories</h2>
+          <table><thead><tr><th>Name</th><th>Color</th><th>Created</th></tr></thead><tbody>
+          ${data.categories.map(c => `<tr><td>${c.name}</td><td>${c.color}</td><td>${c.createdAt}</td></tr>`).join("")}
+          </tbody></table>
+          <h2 style='margin-top:16px'>Expenses</h2>
+          <table><thead><tr><th>Name</th><th>Amount</th><th>CategoryId</th><th>Date</th><th>Created</th></tr></thead><tbody>
+          ${data.expenses.map(e => `<tr><td>${e.name}</td><td>${e.amount}</td><td>${e.categoryId ?? ''}</td><td>${e.date}</td><td>${e.createdAt}</td></tr>`).join("")}
+          </tbody></table>
+          <script>window.print()</script>
+          </body></html>`;
+          const blob = new Blob([html], { type: "text/html" });
+          const url = URL.createObjectURL(blob);
+          window.open(url, "_blank");
+          toast({ title: "PDF Export", description: "Print dialog opened; choose Save as PDF" });
+        }
       }
     } finally {
       setExporting(false);
@@ -178,37 +313,95 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
       const rows = text.split(/\r?\n/).filter(Boolean);
       const header = rows.shift()?.split(",") || [];
       const idx = (name: string) => header.indexOf(name);
-      const categories: any[] = [];
-      const expenses: any[] = [];
-      for (const line of rows) {
-        const cols = parseCsvLine(line);
-        const type = cols[idx("type")];
-        if (type === "category") {
-          categories.push({
-            id: cols[idx("id")],
-            name: cols[idx("name")],
-            color: cols[idx("color")],
-            createdAt: cols[idx("createdAt")],
-          });
-        } else if (type === "expense") {
-          expenses.push({
-            id: cols[idx("id")],
-            name: cols[idx("expense_name")],
-            amount: cols[idx("amount")],
-            details: cols[idx("details")] || null,
-            categoryId: cols[idx("categoryId")] || null,
-            date: cols[idx("date")],
-            createdAt: cols[idx("expense_createdAt")],
-          });
+      
+      if (topTab === 'trips') {
+        // Import trips data
+        const trips: any[] = [];
+        const tripExpenses: any[] = [];
+        const tripRecurring: any[] = [];
+        
+        for (const line of rows) {
+          const cols = parseCsvLine(line);
+          const type = cols[idx("type")];
+          if (type === "trip") {
+            trips.push({
+              id: cols[idx("id")],
+              name: cols[idx("name")],
+              friends: JSON.parse(cols[idx("friends")] || '[]'),
+              createdAt: cols[idx("createdAt")],
+            });
+          } else if (type === "trip_expense") {
+            tripExpenses.push({
+              id: cols[idx("id")],
+              tripId: cols[idx("tripId")],
+              name: cols[idx("expense_name")],
+              amount: cols[idx("amount")],
+              details: cols[idx("details")] || null,
+              friendIndex: parseInt(cols[idx("friendIndex")]) || 0,
+              date: cols[idx("date")],
+              createdAt: cols[idx("expense_createdAt")],
+            });
+          } else if (type === "trip_recurring") {
+            tripRecurring.push({
+              id: cols[idx("id")],
+              tripId: cols[idx("tripId")],
+              name: cols[idx("expense_name")],
+              amount: cols[idx("amount")],
+              details: cols[idx("details")] || null,
+              friendIndex: parseInt(cols[idx("friendIndex")]) || 0,
+              frequency: cols[idx("frequency")] || 'monthly',
+              customDays: cols[idx("customDays")] ? parseInt(cols[idx("customDays")]) : undefined,
+              startDate: cols[idx("startDate")],
+              endDate: cols[idx("endDate")] || null,
+              isActive: cols[idx("isActive")] === 'true',
+            });
+          }
         }
+        
+        if (!trips.length && !tripExpenses.length && !tripRecurring.length) {
+          throw new Error("No trips data found in CSV");
+        }
+        
+        localStorage.setItem("dailyspend_trips", JSON.stringify(trips));
+        setTripExpensesRaw(tripExpenses);
+        setTripRecurringRaw(tripRecurring);
+        
+        toast({ title: "Trips Imported", description: "Trips data imported successfully. Refreshing..." });
+        setTimeout(() => window.location.reload(), 800);
+      } else {
+        // Import daily expenses data
+        const categories: any[] = [];
+        const expenses: any[] = [];
+        for (const line of rows) {
+          const cols = parseCsvLine(line);
+          const type = cols[idx("type")];
+          if (type === "category") {
+            categories.push({
+              id: cols[idx("id")],
+              name: cols[idx("name")],
+              color: cols[idx("color")],
+              createdAt: cols[idx("createdAt")],
+            });
+          } else if (type === "expense") {
+            expenses.push({
+              id: cols[idx("id")],
+              name: cols[idx("expense_name")],
+              amount: cols[idx("amount")],
+              details: cols[idx("details")] || null,
+              categoryId: cols[idx("categoryId")] || null,
+              date: cols[idx("date")],
+              createdAt: cols[idx("expense_createdAt")],
+            });
+          }
+        }
+        if (!categories.length && !expenses.length) {
+          throw new Error("No rows found in CSV");
+        }
+        localStorage.setItem("dailyspend_categories", JSON.stringify(categories));
+        localStorage.setItem("dailyspend_expenses", JSON.stringify(expenses));
+        toast({ title: "Imported", description: "Data imported. Refreshing..." });
+        setTimeout(() => window.location.reload(), 800);
       }
-      if (!categories.length && !expenses.length) {
-        throw new Error("No rows found in CSV");
-      }
-      localStorage.setItem("dailyspend_categories", JSON.stringify(categories));
-      localStorage.setItem("dailyspend_expenses", JSON.stringify(expenses));
-      toast({ title: "Imported", description: "Data imported. Refreshing..." });
-      setTimeout(() => window.location.reload(), 800);
     } catch (e: any) {
       toast({ title: "Import failed", description: e?.message || "Unsupported file", variant: "destructive" });
     } finally {
@@ -252,22 +445,65 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
 
   const handleDeleteLocalData = async () => {
     if (user) return; // Safety: should be disabled anyway
-    const confirmed = window.confirm("This will delete ALL local expenses and recurring items, and restore categories to defaults. This cannot be undone. Proceed?");
-    if (!confirmed) return;
-    try {
-      setDeleting(true);
-      // Clear all local datasets
-      updateAllData([], [], []);
-      // Clear any last processed date for recurring safety
-      try { localStorage.removeItem("dailyspend_last_processed_date"); } catch {}
-      // Restore default categories
-      initializeDefaultCategories();
-      toast({ title: "Local data cleared", description: "All local expenses removed and categories reset." });
-      setTimeout(() => window.location.reload(), 600);
-    } catch (e: any) {
-      toast({ title: "Delete failed", description: e?.message || "Unable to clear local data", variant: "destructive" });
-    } finally {
-      setDeleting(false);
+    
+    if (topTab === 'trips') {
+      const confirmed = window.confirm("This will delete ALL local trips data (trips, trip expenses, and trip recurring items). This will NOT affect your daily expenses data. This cannot be undone. Proceed?");
+      if (!confirmed) return;
+      try {
+        setDeleting(true);
+        console.log('[Delete All] Clearing all trips data...');
+        
+        // Get counts for logging
+        const tripsCount = JSON.parse(localStorage.getItem('dailyspend_trips') || '[]').length;
+        const expensesCount = getTripExpensesRaw().length;
+        const recurringCount = getTripRecurringRaw().length;
+        
+        // Clear all trips data
+        localStorage.setItem("dailyspend_trips", JSON.stringify([]));
+        setTripExpensesRaw([]);
+        setTripRecurringRaw([]);
+        
+        console.log(`[Delete All] Cleared ${tripsCount} trips, ${expensesCount} expenses, and ${recurringCount} recurring items`);
+        
+        // Trigger Firebase sync if user is signed in
+        if (user) {
+          try {
+            console.log('[Delete All] Triggering Firebase sync for bulk deletion...');
+            window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
+          } catch (error) {
+            console.error('[Delete All] Failed to trigger Firebase sync:', error);
+          }
+        }
+        
+        toast({ 
+          title: "Trips data cleared", 
+          description: `Removed ${tripsCount} trips, ${expensesCount} expenses, and ${recurringCount} recurring items. Your daily expenses remain untouched.` 
+        });
+        setTimeout(() => window.location.reload(), 600);
+      } catch (e: any) {
+        console.error('[Delete All] Failed to clear trips data:', e);
+        toast({ title: "Delete failed", description: e?.message || "Unable to clear trips data", variant: "destructive" });
+      } finally {
+        setDeleting(false);
+      }
+    } else {
+      const confirmed = window.confirm("This will delete ALL local expenses and recurring items, and restore categories to defaults. This cannot be undone. Proceed?");
+      if (!confirmed) return;
+      try {
+        setDeleting(true);
+        // Clear all local datasets
+        updateAllData([], [], []);
+        // Clear any last processed date for recurring safety
+        try { localStorage.removeItem("dailyspend_last_processed_date"); } catch {}
+        // Restore default categories
+        initializeDefaultCategories();
+        toast({ title: "Local data cleared", description: "All local expenses removed and categories reset." });
+        setTimeout(() => window.location.reload(), 600);
+      } catch (e: any) {
+        toast({ title: "Delete failed", description: e?.message || "Unable to clear local data", variant: "destructive" });
+      } finally {
+        setDeleting(false);
+      }
     }
   };
 
@@ -465,7 +701,7 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
                   onClick={() => document.getElementById("dailyspend-import-input")?.click()}
                   className="w-full sm:w-auto px-4"
                 >
-                  Import
+                  {topTab === 'trips' ? 'Import Trips' : 'Import'}
                 </Button>
                 <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -476,7 +712,7 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
                   onClick={() => handleExport("excel")}
                   className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
                 >
-                  Export (Excel)
+                  {topTab === 'trips' ? 'Export Trips (Excel)' : 'Export (Excel)'}
                 </Button>
                 <Button
                   disabled={exporting}
@@ -484,7 +720,7 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
                   onClick={() => handleExport("pdf")}
                   className="w-full sm:w-auto px-4"
                 >
-                  Export (PDF)
+                  {topTab === 'trips' ? 'Export Trips (PDF)' : 'Export (PDF)'}
                 </Button>
                 <Button
                   variant="destructive"
@@ -493,12 +729,24 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
                   title={user ? "Sign out to enable deleting local data" : undefined}
                   className="w-full sm:w-auto px-4"
                 >
-                  Delete All Local Data
+                  {topTab === 'trips' ? 'Delete All Trips Data' : 'Delete All Local Data'}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
-              {!!user && (
-                <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
+              {topTab === 'trips' ? (
+                <>
+                  <p className="text-xs text-muted-foreground">Export trips data to CSV (open in Excel) or print as PDF. Import accepts the exported trips CSV.</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">⚠️ This will only affect trips data and will NOT change your daily expenses data.</p>
+                  {!!user && (
+                    <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">Export to CSV (open in Excel) or print as PDF. Import accepts the exported CSV.</p>
+                  {!!user && (
+                    <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -528,6 +776,9 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
   useEffect(() => {
     // Refresh on open
     try { setTrips(JSON.parse(localStorage.getItem('dailyspend_trips') || '[]')); } catch {}
+    
+    // Clean up any orphaned trip data
+    cleanupOrphanedTripData();
   }, []);
 
   const getNextDefaultTripName = () => {
@@ -575,31 +826,56 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
 
   const handleDeleteTrip = async (id: string) => {
     try {
+      console.log(`[Trip Delete] Deleting trip with ID: ${id}`);
+      
+      // Get the trip name for logging
+      const tripToDelete = trips.find(t => t.id === id);
+      const tripName = tripToDelete?.name || 'Unknown Trip';
+      
       // Delete the trip
       const next = trips.filter(t => t.id !== id);
       localStorage.setItem('dailyspend_trips', JSON.stringify(next));
       setTrips(next);
+      console.log(`[Trip Delete] Removed trip: ${tripName}`);
       
       // Clean up associated trip expenses
       const tripExpenses = getTripExpensesRaw();
+      const expensesToRemove = tripExpenses.filter((expense) => expense.tripId === id);
       const filteredTripExpenses = tripExpenses.filter((expense) => expense.tripId !== id);
       setTripExpensesRaw(filteredTripExpenses);
+      console.log(`[Trip Delete] Removed ${expensesToRemove.length} trip expenses for trip: ${tripName}`);
       
       // Clean up associated trip recurring expenses
       const tripRecurring = getTripRecurringRaw();
+      const recurringToRemove = tripRecurring.filter((recurring) => recurring.tripId === id);
       const filteredTripRecurring = tripRecurring.filter((recurring) => recurring.tripId !== id);
       setTripRecurringRaw(filteredTripRecurring);
+      console.log(`[Trip Delete] Removed ${recurringToRemove.length} trip recurring items for trip: ${tripName}`);
       
-      // Trigger immediate upload to Firebase
+      // Trigger immediate upload to Firebase to sync the deletion
       try {
+        console.log(`[Trip Delete] Triggering Firebase sync for trip deletion: ${tripName}`);
         window.dispatchEvent(new CustomEvent('dailyspend:force-upload-trips'));
       } catch (error) {
-        console.error('Failed to trigger immediate upload:', error);
+        console.error('[Trip Delete] Failed to trigger Firebase sync:', error);
       }
       
       onTripsChanged?.(next.length > 0);
-      toast({ title: 'Trip deleted' });
+      
+      // Show detailed success message
+      const totalRemoved = expensesToRemove.length + recurringToRemove.length;
+      if (totalRemoved > 0) {
+        toast({ 
+          title: 'Trip deleted successfully', 
+          description: `Removed trip "${tripName}" and ${totalRemoved} associated items` 
+        });
+      } else {
+        toast({ title: 'Trip deleted successfully', description: `Removed trip "${tripName}"` });
+      }
+      
+      console.log(`[Trip Delete] Successfully deleted trip "${tripName}" with ${totalRemoved} associated items`);
     } catch (e) {
+      console.error('[Trip Delete] Failed to delete trip:', e);
       toast({ title: 'Delete failed', description: 'Could not delete trip', variant: 'destructive' });
     }
   };
@@ -616,14 +892,16 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
           <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">Trips Management</h3>
           <p className="text-sm text-emerald-600 dark:text-emerald-400">Create and manage your trips</p>
         </div>
-        <Button 
-          size="sm" 
-          onClick={() => setAddTripOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm mt-3 w-full"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add Trip
-        </Button>
+        <div className="flex gap-2 mt-3">
+          <Button 
+            size="sm" 
+            onClick={() => setAddTripOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm w-full"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Trip
+          </Button>
+        </div>
       </div>
       
       {trips.length === 0 ? (
