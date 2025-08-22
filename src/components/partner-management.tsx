@@ -128,13 +128,22 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, incomi
 
   return (
     <div className="space-y-4">
-      {/* Add Partner Button */}
-      <div className="w-full">
-        <Button onClick={handleOpenAddPartner} className="w-full bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:shadow-lg transition-all duration-200">
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Partner
-        </Button>
-      </div>
+      {!hideHeader && (
+        <Card className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center">
+                <span className="text-rose-600 dark:text-rose-400 mr-2">👥</span>
+                Manage Partners
+              </h3>
+              <Button onClick={handleOpenAddPartner} size="sm" className="bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:shadow-lg transition-all duration-200">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Partner
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Add Partner Dialog */}
       <Dialog open={addPartnerOpen} onOpenChange={setAddPartnerOpen}>
