@@ -228,7 +228,6 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, incomi
             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
             <h4 className="text-base font-medium text-indigo-700 dark:text-indigo-300">Being Viewed As Partner</h4>
           </div>
-          <p className="text-xs text-muted-foreground pl-4">These users can view your expenses. You can remove yourself from their partner list.</p>
           <div className="pl-4 space-y-2">
             {acceptedIncomingPartners.map((request) => (
               <div key={request.id} className="flex items-center justify-between p-3 border border-indigo-200 rounded-lg bg-indigo-50 dark:bg-indigo-950/30">
@@ -269,7 +268,7 @@ export default function PartnerManagement({ hideHeader, outgoingRequests, incomi
                   <Users className="w-4 h-4 text-green-600" />
                   <div>
                     <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
-                    <div className="text-xs text-green-600">Partner</div>
+                    <div className="text-xs text-green-600">You are viewing their expenses as a partner</div>
                   </div>
                 </div>
                 <Button
