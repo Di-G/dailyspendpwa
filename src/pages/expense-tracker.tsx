@@ -2733,7 +2733,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border-slate-200 dark:border-slate-700">
+      <Card className="overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
         <div className="p-4 sm:p-6 border-b border-rose-200 dark:border-rose-700 bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30">
           <h3 className="text-lg font-semibold text-foreground/80 flex items-center">
             <span className="text-rose-600 dark:text-rose-400 mr-2">📋</span>
