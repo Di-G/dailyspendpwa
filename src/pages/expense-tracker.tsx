@@ -2746,7 +2746,11 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
         </div>
         <CardContent className="p-0">
           {expensesForDate.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">No expenses for the selected date.</div>
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-6xl mb-4">👥</div>
+              <p className="text-lg font-medium mb-2">No expenses yet</p>
+              <p className="text-sm">{partnerName || 'Your partner'} hasn't added any expenses for this date yet.</p>
+            </div>
           ) : (
             <div className="divide-y">
               {expensesForDate.map((exp) => (
