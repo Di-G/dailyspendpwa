@@ -740,18 +740,18 @@ export default function ExpenseTracker() {
             {/* Partner read-only views when accepted */}
             {hasPartner && (
               <>
-                {!partnerData ? (
+                {!partnerData || !partnerNameResolved ? (
                   <div className="p-4 text-sm text-muted-foreground">Loading {partnerNameResolved ? `${partnerNameResolved}'s` : 'partner'} data…</div>
                 ) : (
                   <>
                     {currentView === 'entry' && (
-                      <PartnerHomeReadOnly currency={expensesCurrency} data={partnerData} setCurrentPartnerDate={setCurrentPartnerDate} />
+                      <PartnerHomeReadOnly currency={expensesCurrency} data={partnerData} setCurrentPartnerDate={setCurrentPartnerDate} partnerName={partnerNameResolved} />
                     )}
                     {currentView === 'calendar' && (
-                      <PartnerCalendarReadOnly currency={expensesCurrency} data={partnerData} />
+                      <PartnerCalendarReadOnly currency={expensesCurrency} data={partnerData} partnerName={partnerNameResolved} />
                     )}
                     {currentView === 'recurring' && (
-                      <PartnerRecurringReadOnly currency={expensesCurrency} data={partnerData} />
+                      <PartnerRecurringReadOnly currency={expensesCurrency} data={partnerData} partnerName={partnerNameResolved} />
                     )}
                     {currentView === 'charts' && (
                       <div className="p-4 text-sm text-muted-foreground">Charts for partner will be available soon.</div>
@@ -1176,7 +1176,7 @@ export default function ExpenseTracker() {
       <AlertDialog open={confirmCopyOpen} onOpenChange={setConfirmCopyOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Add partner's today's expenses?</AlertDialogTitle>
+                              <AlertDialogTitle>Add {partnerNameResolved || 'partner'}'s today's expenses?</AlertDialogTitle>
             <AlertDialogDescription>
               {`Copy all of ${partnerNameResolved || 'partner'}'s expenses for today into your today.`}
             </AlertDialogDescription>
@@ -1244,14 +1244,14 @@ export default function ExpenseTracker() {
       <Dialog open={customCopyOpen} onOpenChange={setCustomCopyOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Copy partner expenses</DialogTitle>
+                            <DialogTitle>Copy {partnerNameResolved || 'partner'} expenses</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <div>
-              <label className="text-sm font-medium">From partner date</label>
+              <label className="text-sm font-medium">From {partnerNameResolved || 'partner'} date</label>
               <div className="mt-1 rounded-md border bg-muted/20 p-2">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                  <Calendar className="w-3 h-3" /> Partner date
+                  <Calendar className="w-3 h-3" /> {partnerNameResolved || 'Partner'} date
                 </div>
                 <DatePicker value={copySourceDate} onChange={(v: string) => setCopySourceDate(v)} />
                 <div className="mt-2 text-[11px] text-muted-foreground">
@@ -1273,7 +1273,7 @@ export default function ExpenseTracker() {
                   return (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200">Partner Today</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200">{partnerNameResolved || 'Partner'} Today</span>
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">{partnerRemaining.length} item(s)</span>
                           {partnerRemaining.length > 0 && (
@@ -1295,7 +1295,7 @@ export default function ExpenseTracker() {
                         </div>
                       </div>
                       {partnerRemaining.length === 0 ? (
-                        <div className="text-xs text-muted-foreground">No expenses remaining on partner list.</div>
+                        <div className="text-xs text-muted-foreground">No expenses remaining on {partnerNameResolved || 'partner'} list.</div>
                       ) : (
                         <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                           {partnerRemaining.map(exp => {
@@ -1363,7 +1363,7 @@ export default function ExpenseTracker() {
                             <button
                               className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.35)] hover:shadow-[0_0_14px_rgba(14,165,233,0.55)] hover:from-sky-600 hover:to-blue-600 ring-1 ring-white/40 dark:ring-black/30 transition"
                               onClick={() => setSelectedCopyExpenseIds([])}
-                              title="Move all back to Partner list"
+                              title={`Move all back to ${partnerNameResolved || 'partner'} list`}
                             >
                               Move all back
                               <ArrowUp className="w-3 h-3" />
@@ -1386,9 +1386,9 @@ export default function ExpenseTracker() {
                                 <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: color }} />
                                 <button
                                   className="shrink-0 grid place-items-center rounded-full bg-sky-500/90 hover:bg-sky-600 text-white w-7 h-7 shadow-sm ring-1 ring-white/50 dark:ring-black/30"
-                                  aria-label="Send back up to partner list"
+                                  aria-label={`Send back up to ${partnerNameResolved || 'partner'} list`}
                                   onClick={() => setSelectedCopyExpenseIds(prev => prev.filter(id => id !== exp.id))}
-                                  title="Move back to Partner"
+                                  title={`Move back to ${partnerNameResolved || 'Partner'}`}
                                 >
                                   <ArrowUp className="w-4 h-4" />
                                 </button>
@@ -1439,7 +1439,7 @@ export default function ExpenseTracker() {
                   });
                   toast({
                     title: 'Expenses copied!',
-                    description: `Partner's expenses successfully copied to your ${new Date(copyDestDate).toLocaleDateString()} expenses.`,
+                    description: `${partnerNameResolved || 'Partner'}'s expenses successfully copied to your ${new Date(copyDestDate).toLocaleDateString()} expenses.`,
                   });
                 } finally {
                   setSelectedCopyExpenseIds([]);
@@ -1879,11 +1879,11 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       </Card>
 
       {/* Today's Expenses */}
-      <Card className="overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
+      <Card className="overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
         <div className="p-4 sm:p-6 border-b border-emerald-200 dark:border-emerald-700 bg-gradient-to-r from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30">
           <h3 className="text-lg font-semibold text-foreground flex items-center">
             <span className="text-emerald-600 dark:text-emerald-400 mr-2">📋</span>
-            Expense List
+            {date === getToday() ? "Today's Expense List" : "Expense List"}
           </h3>
           <p className="text-xs mt-1">
             <span className="text-muted-foreground mr-1">{new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
@@ -2602,7 +2602,7 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
   );
 }
 
-function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; setCurrentPartnerDate: (date: string) => void }) {
+function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; setCurrentPartnerDate: (date: string) => void; partnerName?: string }) {
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [copyExpenseDialogOpen, setCopyExpenseDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -2707,7 +2707,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1 flex items-center">
                 <span className="text-rose-600 dark:text-rose-400 mr-2">👥</span>
-                {selectedDate === getToday() ? "Partner's Today's Expenses" : "Partner's Expenses"}
+                {selectedDate === getToday() ? `${partnerName || 'Partner'}'s Today's Expenses` : `${partnerName || 'Partner'}'s Expenses`}
               </h2>
               <div className="flex items-center gap-2">
                 <DatePicker value={selectedDate} onChange={(v: string) => setSelectedDate(v)} className="h-8 text-sm" />
@@ -2737,8 +2737,12 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
         <div className="p-4 sm:p-6 border-b border-rose-200 dark:border-rose-700 bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30">
           <h3 className="text-lg font-semibold text-foreground/80 flex items-center">
             <span className="text-rose-600 dark:text-rose-400 mr-2">📋</span>
-            Partner's Expenses
+            {selectedDate === getToday() ? `${partnerName || 'Partner'}'s Today's Expenses` : `${partnerName || 'Partner'}'s Expenses`}
           </h3>
+          <p className="text-xs mt-1">
+            <span className="text-muted-foreground mr-1">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            <span className="font-medium text-rose-600 dark:text-rose-400">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+          </p>
         </div>
         <CardContent className="p-0">
           {expensesForDate.length === 0 ? (
@@ -2852,7 +2856,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
   );
 }
 
-function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } }) {
+function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; partnerName?: string }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previewItems, setPreviewItems] = useState<Array<{ name: string; amount: string }>>([]);
   const [previewDate, setPreviewDate] = useState<string | null>(getToday());
@@ -3223,7 +3227,7 @@ function PartnerCalendarReadOnly({ currency, data }: { currency: CurrencyCode; d
   );
 }
 
-function PartnerRecurringReadOnly({ currency, data }: { currency: CurrencyCode; data: { categories: Category[]; recurring: RecurringExpense[] } }) {
+function PartnerRecurringReadOnly({ currency, data, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; recurring: RecurringExpense[] }; partnerName?: string }) {
   const symbol = currency === 'INR' ? '₹' : '$';
   const categoryById = useMemo(() => {
     const map = new Map<string, Category>();
@@ -3239,14 +3243,14 @@ function PartnerRecurringReadOnly({ currency, data }: { currency: CurrencyCode; 
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground flex items-center">
             <span className="text-rose-600 dark:text-rose-400 mr-2">🔄</span>
-            Partner's Recurring Expenses
+            {partnerName || 'Partner'}'s Recurring Expenses
           </h3>
           
           {items.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <div className="text-6xl mb-4">👥</div>
               <p className="text-lg font-medium mb-2">No Recurring Expenses</p>
-              <p className="text-sm">Your partner hasn't added any recurring expenses yet.</p>
+              <p className="text-sm">{partnerName || 'Your partner'} hasn't added any recurring expenses yet.</p>
             </div>
           ) : (
             <div className="space-y-3">

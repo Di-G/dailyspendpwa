@@ -532,11 +532,11 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       </div>
 
       {/* Selected Date Expenses List */}
-      <Card className="overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
+      <Card className="overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
             <div className="p-4 sm:p-6 border-b border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30">
               <h3 className="text-lg font-semibold text-foreground flex items-center">
                 <span className="text-blue-600 dark:text-blue-400 mr-2">📋</span>
-                Expense List
+                {selectedDate === getToday() ? "Today's Expense List" : "Expense List"}
               </h3>
               <p className="text-xs mt-1">
                 <span className="text-muted-foreground mr-1">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
