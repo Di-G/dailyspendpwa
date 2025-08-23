@@ -54,11 +54,11 @@ export default function ExpenseTracker() {
   });
   const [expensesCurrency, setExpensesCurrency] = useState<CurrencyCode>(() => {
     const saved = localStorage.getItem("dailyspend_expenses_currency") as CurrencyCode | null;
-    return saved || "USD";
+    return saved || "INR";
   });
   const [tripsCurrency, setTripsCurrency] = useState<CurrencyCode>(() => {
     const saved = localStorage.getItem("dailyspend_trips_currency") as CurrencyCode | null;
-    return saved || "USD";
+    return saved || "INR";
   });
   const isMobile = useIsMobile();
   const [focusAmountTrigger, setFocusAmountTrigger] = useState<number | null>(null);
@@ -1890,7 +1890,7 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
             <span className="font-medium text-emerald-600 dark:text-emerald-400">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
           </p>
         </div>
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-0">
           {expensesForDate.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <div className="text-6xl mb-4">✈️</div>
@@ -1898,28 +1898,24 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
               <p className="text-sm">Start by adding your first trip expense above to track your group spending.</p>
             </div>
           ) : (
-            <div>
+            <div className="divide-y">
               {expensesForDate.map((e) => (
-                <div key={e.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer transition-all duration-200 hover:shadow-md rounded-lg border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800" onClick={() => openTripEdit(e)}>
+                <div key={e.id} className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm" onClick={() => openTripEdit(e)}>
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                    <div className="w-4 h-4 rounded-full flex-shrink-0 border-2 shadow-md" style={{ 
+                    <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 shadow-sm" style={{ 
                       backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], 
-                      borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '60',
-                      boxShadow: `0 0 0 3px ${(FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length])}20, 0 2px 4px rgba(0,0,0,0.1)`
+                      borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '40',
+                      boxShadow: `0 0 0 2px ${(FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length])}20`
                     }} />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-foreground truncate">{e.name}</p>
+                      <div className="text-sm font-medium truncate">{e.name}</div>
                       {e.details && (
-                        <p className="text-xs sm:text-sm text-muted-foreground whitespace-normal break-words">{e.details}</p>
+                        <div className="text-xs text-muted-foreground truncate">{e.details}</div>
                       )}
-                      <p className="text-[11px] sm:text-xs text-muted-foreground">{activeTrip?.friends[e.friendIndex]?.name || `Friend ${e.friendIndex+1}`} • {new Date(e.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
+                      <div className="text-xs text-muted-foreground">{activeTrip?.friends[e.friendIndex]?.name || `Friend ${e.friendIndex+1}`} • {new Date(e.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
                     </div>
                   </div>
-                  <div className="flex-shrink-0 ml-3 sm:ml-4">
-                    <span className="font-bold text-emerald-700 dark:text-emerald-300 text-sm sm:text-base bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1 rounded-full">
-                      {symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}
-                    </span>
-                  </div>
+                  <div className="flex-shrink-0 ml-3 sm:ml-4 text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}</div>
                 </div>
               ))}
             </div>
@@ -2590,9 +2586,9 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
                 amount: exp.amount,
                 isRecurring: false,
               })), ...previewItems].map((item) => (
-                <div key={item.key} className={`flex items-center justify-between ${!item.isRecurring ? 'p-2 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 hover:shadow-sm' : ''}`}>
+                <div key={item.key} className={`flex items-center justify-between ${!item.isRecurring ? 'p-2 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm' : ''}`}>
                   <span className="text-sm text-foreground font-medium flex items-center gap-1">
-                    {item.isRecurring && <Repeat className="w-3 h-3 text-emerald-600 dark:text-emerald-400" aria-label="Recurring" />}
+                    {item.isRecurring && <Repeat className="w-3 h-3 text-rose-600 dark:text-rose-400" aria-label="Recurring" />}
                     {item.name}
                   </span>
                   <span className="text-sm text-foreground font-semibold">{symbol}{formatAmountDisplay(parseFloat(item.amount || '0'))}</span>
@@ -2737,7 +2733,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
         </CardContent>
       </Card>
 
-      <Card className="bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border-slate-200 dark:border-slate-700">
+      <Card className="overflow-hidden bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border-slate-200 dark:border-slate-700">
         <div className="p-4 sm:p-6 border-b border-rose-200 dark:border-rose-700 bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30">
           <h3 className="text-lg font-semibold text-foreground/80 flex items-center">
             <span className="text-rose-600 dark:text-rose-400 mr-2">📋</span>
@@ -2752,7 +2748,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
               {expensesForDate.map((exp) => (
                 <div 
                   key={exp.id} 
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm rounded-lg"
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm"
                   onClick={() => handleExpenseClick(exp)}
                 >
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
@@ -2763,7 +2759,10 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate }: { curren
                     }} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium truncate">{exp.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{categoryById.get(exp.categoryId || '')?.name || 'Uncategorized'}</div>
+                      {exp.details && (
+                        <div className="text-xs text-muted-foreground truncate">{exp.details}</div>
+                      )}
+                      <div className="text-xs text-muted-foreground">{new Date(exp.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
                     </div>
                   </div>
                   <div className="flex-shrink-0 ml-3 sm:ml-4 text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(exp.amount || '0'))}</div>
@@ -3290,3 +3289,4 @@ function PartnerRecurringReadOnly({ currency, data }: { currency: CurrencyCode; 
     </Card>
   );
 }
+

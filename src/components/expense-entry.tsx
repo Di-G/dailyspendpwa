@@ -543,7 +543,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
                 <span className="font-medium text-blue-600 dark:text-blue-400">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </p>
             </div>
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-0">
           {selectedDateExpenses.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <div className="text-6xl mb-4">📝</div>
@@ -551,38 +551,29 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
               <p className="text-sm">Start by adding your first expense above to track your spending.</p>
             </div>
           ) : (
-            <div>
+            <div className="divide-y">
               {selectedDateExpenses.map((expense) => (
-                <button
-                  key={expense.id}
-                  className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:shadow-md rounded-lg"
+                <div 
+                  key={expense.id} 
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm"
                   onClick={() => openEdit(expense)}
                 >
-                  <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg border border-transparent hover:border-blue-200 dark:hover:border-blue-800">
-                    <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                      <div
-                        className="w-4 h-4 rounded-full flex-shrink-0 border-2 shadow-md"
-                        style={{ 
-                          backgroundColor: expense.category?.color || "#9ca3af", 
-                          borderColor: (expense.category?.color || "#9ca3af") + "60",
-                          boxShadow: `0 0 0 3px ${(expense.category?.color || "#9ca3af")}20, 0 2px 4px rgba(0,0,0,0.1)`
-                        }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground truncate">{expense.name}</p>
-                        {expense.details && (
-                          <p className="text-xs sm:text-sm text-muted-foreground whitespace-normal break-words">{expense.details}</p>
-                        )}
-                        <p className="text-[11px] sm:text-xs text-muted-foreground">{formatTime(expense.createdAt!.toString())}</p>
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0 ml-3 sm:ml-4">
-                      <span className="font-bold text-blue-700 dark:text-blue-300 text-sm sm:text-base bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
-                        {CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}
-                      </span>
+                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 shadow-sm" style={{ 
+                      backgroundColor: expense.category?.color || "#E5E7EB", 
+                      borderColor: (expense.category?.color || "#E5E7EB") + "40",
+                      boxShadow: `0 0 0 2px ${(expense.category?.color || "#E5E7EB")}20`
+                    }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{expense.name}</div>
+                      {expense.details && (
+                        <div className="text-xs text-muted-foreground truncate">{expense.details}</div>
+                      )}
+                      <div className="text-xs text-muted-foreground">{formatTime(expense.createdAt!.toString())}</div>
                     </div>
                   </div>
-                </button>
+                  <div className="flex-shrink-0 ml-3 sm:ml-4 text-sm font-semibold">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(expense.amount))}</div>
+                </div>
               ))}
             </div>
           )}
