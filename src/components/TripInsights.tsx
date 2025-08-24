@@ -6,14 +6,24 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUpRight, ArrowDownRight, Minus, Calculator, TrendingUp, Users } from "lucide-react";
 import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
 import { formatAmountDisplay } from "@/lib/utils";
-import { getTrips, getTripExpenses, cleanupOrphanedTripData } from "@/lib/localStorage";
+import { getTrips, getTripExpensesRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
 
 interface TripInsightsProps {
   currency: CurrencyCode;
 }
 
 type Trip = { id: string; name: string; friends: { name: string }[] };
-type TripExpense = { id: string; tripId: string; friendIndex: number; name: string; amount: string; details?: string | null; date: string; createdAt: string };
+type TripExpense = { 
+  id: string; 
+  tripId: string; 
+  friendIndex: number; 
+  name: string; 
+  amount: string; 
+  details?: string | null; 
+  date: string; 
+  createdAt: string;
+  splitWith: number[]; // Array of friend indices who should split this expense
+};
 
 interface SettlementSummary {
   friendIndex: number;
@@ -38,16 +48,6 @@ export default function TripInsights({ currency }: TripInsightsProps) {
   const [tripDataRev, setTripDataRev] = useState<number>(0);
 
   const symbol = CURRENCIES[currency].symbol;
-
-  // Get trips from localStorage
-  const getTrips = (): Trip[] => {
-    try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
-  };
-
-  // Get trip expenses from localStorage
-  const getTripExpenses = (): TripExpense[] => {
-    try { return JSON.parse(localStorage.getItem('dailyspend_trip_expenses') || '[]'); } catch { return []; }
-  };
 
   // Refresh data when storage changes
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function TripInsights({ currency }: TripInsightsProps) {
   const settlementData = useMemo((): SettlementSummary[] => {
     if (!activeTrip) return [];
 
-    const allExpenses = getTripExpenses();
+    const allExpenses = getTripExpensesRaw();
     const tripExpenses = allExpenses.filter(e => e.tripId === activeTrip.id);
     
     // Filter by date if specific date is selected
@@ -86,11 +86,23 @@ export default function TripInsights({ currency }: TripInsightsProps) {
 
     if (filteredExpenses.length === 0) return [];
 
-    // Calculate total expenses
-    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
+    // Calculate total expenses and fair share per person
+    let totalExpenses = 0;
+    const friendExpenseShares = new Map<number, number>(); // How much each friend owes for expenses they're part of
     
-    // Calculate fair share per person
-    const fairSharePerPerson = totalExpenses / activeTrip.friends.length;
+    filteredExpenses.forEach(expense => {
+      const amount = parseFloat(expense.amount || '0');
+      totalExpenses += amount;
+      
+      // Calculate how much each friend owes for this expense based on splitWith
+      const splitWith = expense.splitWith && expense.splitWith.length > 0 ? expense.splitWith : [expense.friendIndex];
+      const amountPerPerson = amount / splitWith.length;
+      
+      splitWith.forEach(friendIdx => {
+        const current = friendExpenseShares.get(friendIdx) || 0;
+        friendExpenseShares.set(friendIdx, current + amountPerPerson);
+      });
+    });
 
     // Calculate what each friend paid
     const friendPayments = new Map<number, number>();
@@ -102,13 +114,14 @@ export default function TripInsights({ currency }: TripInsightsProps) {
     // Calculate settlements for each friend
     return activeTrip.friends.map((friend, index) => {
       const totalPaid = friendPayments.get(index) || 0;
-      const netAmount = totalPaid - fairSharePerPerson;
+      const fairShare = friendExpenseShares.get(index) || 0; // What they owe based on expenses they participated in
+      const netAmount = totalPaid - fairShare;
       
       return {
         friendIndex: index,
         friendName: friend.name || `Friend ${index + 1}`,
         totalPaid,
-        fairShare: fairSharePerPerson,
+        fairShare,
         netAmount,
         shouldReceive: netAmount > 0 ? netAmount : 0,
         shouldPay: netAmount < 0 ? Math.abs(netAmount) : 0,
@@ -119,7 +132,7 @@ export default function TripInsights({ currency }: TripInsightsProps) {
   // Get unique dates for the trip
   const tripDates = useMemo(() => {
     if (!activeTrip) return [];
-    const allExpenses = getTripExpenses();
+    const allExpenses = getTripExpensesRaw();
     const tripExpenses = allExpenses.filter(e => e.tripId === activeTrip.id);
     const dates = [...new Set(tripExpenses.map(e => e.date))].sort();
     return dates;
@@ -128,7 +141,7 @@ export default function TripInsights({ currency }: TripInsightsProps) {
   // Calculate total trip expenses
   const totalTripExpenses = useMemo(() => {
     if (!activeTrip) return 0;
-    const allExpenses = getTripExpenses();
+    const allExpenses = getTripExpensesRaw();
     const tripExpenses = allExpenses.filter(e => e.tripId === activeTrip.id);
     return tripExpenses.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
   }, [activeTrip, tripDataRev]);
@@ -136,10 +149,21 @@ export default function TripInsights({ currency }: TripInsightsProps) {
   // Calculate total expenses for selected date
   const totalSelectedExpenses = useMemo(() => {
     if (!activeTrip || selectedDate === 'all') return totalTripExpenses;
-    const allExpenses = getTripExpenses();
+    const allExpenses = getTripExpensesRaw();
     const tripExpenses = allExpenses.filter(e => e.tripId === activeTrip.id && e.date === selectedDate);
     return tripExpenses.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
   }, [activeTrip, selectedDate, totalTripExpenses, tripDataRev]);
+
+  // Get expenses for current view (selected date or all)
+  const currentViewExpenses = useMemo(() => {
+    if (!activeTrip) return [];
+    const allExpenses = getTripExpensesRaw();
+    if (selectedDate === 'all') {
+      return allExpenses.filter(e => e.tripId === activeTrip.id);
+    } else {
+      return allExpenses.filter(e => e.tripId === activeTrip.id && e.date === selectedDate);
+    }
+  }, [activeTrip, selectedDate, tripDataRev]);
 
   // Calculate optimal payment transfers
   const paymentTransfers = useMemo((): PaymentTransfer[] => {
@@ -283,27 +307,128 @@ export default function TripInsights({ currency }: TripInsightsProps) {
               <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
             </div>
-            <p className="text-2xl font-bold text-foreground mt-2">
-              {symbol}{formatAmountDisplay(totalSelectedExpenses)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {selectedDate === 'all' ? 'Entire trip' : `On ${new Date(selectedDate).toLocaleDateString()}`}
-            </p>
+            {(() => {
+              // Check if there are any expenses with partial splitting
+              const hasPartialSplits = currentViewExpenses.some((expense: any) => {
+                const splitCount = (expense.splitWith && expense.splitWith.length > 0) ? expense.splitWith.length : 1;
+                return splitCount > 1 && splitCount < activeTrip.friends.length;
+              });
+              
+              if (hasPartialSplits) {
+                // Calculate expenses split between all people only
+                const allPeopleExpenses = currentViewExpenses.filter((expense: any) => {
+                  const splitCount = (expense.splitWith && expense.splitWith.length > 0) ? expense.splitWith.length : 1;
+                  return splitCount === activeTrip.friends.length;
+                });
+                
+                const allPeopleTotal = allPeopleExpenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount || '0'), 0);
+                
+                return (
+                  <div className="flex space-x-4 mt-2">
+                    {/* All people split expenses */}
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold text-foreground">
+                        {symbol}{formatAmountDisplay(allPeopleTotal)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        All people split
+                      </p>
+                    </div>
+                    
+                    {/* Vertical divider */}
+                    <div className="border-l border-blue-200 dark:border-blue-700"></div>
+                    
+                    {/* Total expenses */}
+                    <div className="flex-1">
+                      <p className="text-lg font-semibold text-foreground">
+                        {symbol}{formatAmountDisplay(totalSelectedExpenses)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Total expenses
+                      </p>
+                    </div>
+                  </div>
+                );
+              } else {
+                // Normal behavior when no partial splits
+                return (
+                  <>
+                    <p className="text-2xl font-bold text-foreground mt-2">
+                      {symbol}{formatAmountDisplay(totalSelectedExpenses)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedDate === 'all' ? 'Entire trip' : `On ${new Date(selectedDate).toLocaleDateString()}`}
+                    </p>
+                  </>
+                );
+              }
+            })()}
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:border-green-200 dark:border-green-800">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
               <span className="text-sm font-medium text-muted-foreground">Fair Share</span>
             </div>
-            <p className="text-2xl font-bold text-foreground mt-2">
-              {activeTrip ? `${symbol}${formatAmountDisplay(totalSelectedExpenses / activeTrip.friends.length)}` : '—'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Per person ({activeTrip?.friends.length || 0} friends)
-            </p>
+            {(() => {
+              // Check if there are any expenses with partial splitting
+              const hasPartialSplits = currentViewExpenses.some((expense: any) => {
+                const splitCount = (expense.splitWith && expense.splitWith.length > 0) ? expense.splitWith.length : 1;
+                return splitCount > 1 && splitCount < activeTrip.friends.length;
+              });
+              
+              if (hasPartialSplits) {
+                // Calculate expenses split between all people only
+                const allPeopleExpenses = currentViewExpenses.filter((expense: any) => {
+                  const splitCount = (expense.splitWith && expense.splitWith.length > 0) ? expense.splitWith.length : 1;
+                  return splitCount === activeTrip.friends.length;
+                });
+                
+                const allPeopleTotal = allPeopleExpenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount || '0'), 0);
+                const allPeopleFairShare = allPeopleTotal / activeTrip.friends.length;
+                
+                return (
+                  <div className="flex space-x-4 mt-2">
+                    {/* All people split fair share */}
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold text-foreground">
+                        {symbol}{formatAmountDisplay(allPeopleFairShare)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        All people split
+                      </p>
+                    </div>
+                    
+                    {/* Vertical divider */}
+                    <div className="border-l border-green-200 dark:border-green-700"></div>
+                    
+                    {/* Total fair share */}
+                    <div className="flex-1">
+                      <p className="text-lg font-semibold text-foreground">
+                        {symbol}{formatAmountDisplay(totalSelectedExpenses / activeTrip.friends.length)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Total per person
+                      </p>
+                    </div>
+                  </div>
+                );
+              } else {
+                // Normal behavior when no partial splits
+                return (
+                  <>
+                    <p className="text-2xl font-bold text-foreground mt-2">
+                      {symbol}{formatAmountDisplay(totalSelectedExpenses / activeTrip.friends.length)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Per person ({activeTrip.friends.length} friends)
+                    </p>
+                  </>
+                );
+              }
+            })()}
           </CardContent>
         </Card>
 

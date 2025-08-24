@@ -25,8 +25,32 @@ export type ConflictResolution = 'merge' | 'overwrite-local' | 'overwrite-online
 
 // Trips types (local only)
 export type Trip = { id: string; name: string; friends: { name: string }[] };
-export type TripExpense = { id: string; tripId: string; friendIndex: number; name: string; amount: string; details?: string | null; categoryId?: string | null; date: string; createdAt: string };
-export type TripRecurring = { id: string; tripId: string; name: string; amount: string; details?: string | null; friendIndex: number; frequency: 'daily'|'weekly'|'monthly'|'custom'; customDays?: number; startDate: string; endDate?: string | null; isActive: boolean };
+export type TripExpense = { 
+  id: string; 
+  tripId: string; 
+  friendIndex: number; 
+  name: string; 
+  amount: string; 
+  details?: string | null; 
+  categoryId?: string | null; 
+  date: string; 
+  createdAt: string;
+  splitWith?: number[]; // Array of friend indices who should split this expense
+};
+export type TripRecurring = { 
+  id: string; 
+  tripId: string; 
+  name: string; 
+  amount: string; 
+  details?: string | null; 
+  friendIndex: number; 
+  frequency: 'daily'|'weekly'|'monthly'|'custom'; 
+  customDays?: number; 
+  startDate: string; 
+  endDate?: string | null; 
+  isActive: boolean;
+  splitWith?: number[]; // Array of friend indices who should split this expense
+};
 
 /**
  * Analyzes data conflicts between local and online storage

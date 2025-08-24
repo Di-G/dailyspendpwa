@@ -123,6 +123,8 @@ export default function ExpenseTracker() {
     setSelectedFriendsCount(null);
     setFriendNames([]);
   };
+  
+
   const handleCreateTrip = async () => {
     const finalName = (tripNameInput.trim()) || getNextDefaultTripName();
     const count = selectedFriendsCount || 0;
@@ -1538,11 +1540,26 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
   const [activeTripId, setActiveTripId] = useState<string>(() => (trips[0]?.id || ''));
   const activeTrip = trips.find(t => t.id === activeTripId) || trips[0] || null;
   const [selectedFriendIndex, setSelectedFriendIndex] = useState<number>(0);
+  
+  // Update split friends when selected friend changes
+  const handleFriendIndexChange = (newIndex: number) => {
+    setSelectedFriendIndex(newIndex);
+    // If split options haven't been customized, default to all friends
+    if (selectedSplitFriends.length === 0 || selectedSplitFriends.length === activeTrip?.friends.length) {
+      setSelectedSplitFriends(activeTrip?.friends.map((_, idx) => idx) || []);
+    }
+    // Note: We no longer automatically add the paying friend to the split
+    // Users can manually decide who should split the expense
+  };
+  
+
   const [date, setDate] = useState<string>(getToday());
   const [name, setName] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [details, setDetails] = useState<string>('');
   const [showAddDetails, setShowAddDetails] = useState<boolean>(false);
+  const [selectedSplitFriends, setSelectedSplitFriends] = useState<number[]>([]); // Will be populated with all friends by default
+  const [showSplitOptions, setShowSplitOptions] = useState<boolean>(false);
   const { toast } = useToast();
   const [tripDataRev, setTripDataRev] = useState<number>(0);
   
@@ -1579,7 +1596,17 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
   const symbol = CURRENCIES[currency].symbol;
 
   // Storage helpers for trip expenses
-  type TripExpense = { id: string; tripId: string; friendIndex: number; name: string; amount: string; details?: string | null; date: string; createdAt: string };
+  type TripExpense = { 
+    id: string; 
+    tripId: string; 
+    friendIndex: number; 
+    name: string; 
+    amount: string; 
+    details?: string | null; 
+    date: string; 
+    createdAt: string;
+    splitWith: number[]; // Array of friend indices who should split this expense
+  };
   const getTripExpenses = (): TripExpense[] => {
     try { return JSON.parse(localStorage.getItem('dailyspend_trip_expenses') || '[]'); } catch { return []; }
   };
@@ -1597,6 +1624,31 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
   useEffect(() => {
     if (!activeTrip && trips[0]) setActiveTripId(trips[0].id);
   }, [trips, activeTrip]);
+  
+  // Reset split friends when active trip changes
+  useEffect(() => {
+    if (activeTrip) {
+      setSelectedFriendIndex(0);
+      // Default to all friends splitting the expense
+      setSelectedSplitFriends(activeTrip.friends.map((_, idx) => idx));
+      setShowSplitOptions(false);
+      setShowAddDetails(false);
+    }
+  }, [activeTrip?.id]);
+  
+  // Update split friends when selected friend index changes
+  useEffect(() => {
+    if (selectedFriendIndex >= 0 && activeTrip) {
+      // If split options haven't been customized, default to all friends
+      if (selectedSplitFriends.length === 0 || selectedSplitFriends.length === activeTrip.friends.length) {
+        setSelectedSplitFriends(activeTrip.friends.map((_, idx) => idx));
+      }
+      // Note: We no longer automatically add the paying friend to the split
+      // Users have full control over who splits the expense
+    }
+  }, [selectedFriendIndex, activeTrip, selectedSplitFriends.length]);
+  
+
 
   const expensesForDate = useMemo(() => {
     const all = getTripExpenses();
@@ -1632,7 +1684,7 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
   const FRIEND_COLORS = [
     '#14B8A6', // teal
     '#6366F1', // indigo
-    '#84CC16', // lime
+    '#FF6B35', // vibrant orange-red
     '#D946EF', // fuchsia
     '#F97316', // orange
   ];
@@ -1656,6 +1708,12 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       toast({ title: 'Enter valid name and amount', variant: 'destructive' });
       return;
     }
+    
+    if (selectedSplitFriends.length === 0) {
+      toast({ title: 'Select friends to split with', description: 'At least one friend must be selected to split the expense (can be different from who paid)', variant: 'destructive' });
+      return;
+    }
+    
     const newItem: TripExpense = {
       id: `${Date.now()}-${Math.floor(Math.random()*1e6)}`,
       tripId: activeTrip.id,
@@ -1665,6 +1723,7 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       details: details.trim() || undefined,
       date,
       createdAt: new Date().toISOString(),
+      splitWith: selectedSplitFriends,
     };
     const all = getTripExpenses();
     all.push(newItem);
@@ -1678,8 +1737,40 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       console.error('Failed to trigger immediate upload:', error);
     }
     
-    setName(''); setAmount(''); setDetails('');
+    resetTripExpenseState();
     toast({ title: 'Added', description: `${trimmedName} added for ${activeTrip.friends[selectedFriendIndex]?.name || 'Friend ' + (selectedFriendIndex+1)}` });
+  };
+
+  const toggleSplitFriend = (friendIndex: number) => {
+    setSelectedSplitFriends(prev => {
+      if (prev.includes(friendIndex)) {
+        // Check if this is the last selected friend
+        if (prev.length === 1) {
+          // Show a nice popup message
+          toast({
+            title: "Oops! 🤔",
+            description: "At least one friend needs to split the expense. Who's going to pay for it otherwise?",
+            variant: "default",
+          });
+          return prev; // Don't change the selection
+        }
+        // Remove friend if already selected and not the last one
+        return prev.filter(idx => idx !== friendIndex);
+      } else {
+        // Add friend if not selected
+        return [...prev, friendIndex];
+      }
+    });
+  };
+  
+  const resetTripExpenseState = () => {
+    setName('');
+    setAmount('');
+    setDetails('');
+    // Default to all friends splitting the expense
+    setSelectedSplitFriends(activeTrip?.friends.map((_, idx) => idx) || []);
+    setShowAddDetails(false);
+    setShowSplitOptions(false);
   };
 
   const openTripEdit = (expense: TripExpense) => {
@@ -1691,12 +1782,15 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       friendIndex: expense.friendIndex,
     });
     setShowEditTripDetails(!!expense.details);
+    setSelectedSplitFriends(expense.splitWith || [expense.friendIndex]);
+    setShowSplitOptions(true);
   };
 
   const closeTripEdit = () => {
     setEditing(null);
     setEditTripFields(null);
     setShowEditTripDetails(false);
+    setShowSplitOptions(false);
   };
 
   const saveTripExpense = async () => {
@@ -1706,6 +1800,12 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       toast({ title: 'Error', description: 'Please enter a valid amount', variant: 'destructive' });
       return;
     }
+    
+    if (selectedSplitFriends.length === 0) {
+      toast({ title: 'Select friends to split with', description: 'At least one friend must be selected to split the expense (can be different from who paid)', variant: 'destructive' });
+      return;
+    }
+    
     const all = getTripExpenses();
     const next = all.map((e) => e.id === editing.id ? {
       ...e,
@@ -1713,6 +1813,7 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
       amount: amountNum.toString(),
       details: editTripFields.details.trim() === '' ? undefined : editTripFields.details,
       friendIndex: editTripFields.friendIndex,
+      splitWith: selectedSplitFriends,
     } : e);
     setTripExpenses(next);
     setTripDataRev((v) => v + 1);
@@ -1793,7 +1894,7 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
               {activeTrip.friends.map((f, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedFriendIndex(idx)}
+                  onClick={() => handleFriendIndexChange(idx)}
                   className={`border rounded-lg p-2 sm:p-3 text-center transition ${idx === selectedFriendIndex ? 'ring-2 ring-emerald-500' : ''}`}
                   style={{ backgroundColor: `${FRIEND_COLORS[idx % FRIEND_COLORS.length]}10`, borderColor: `${FRIEND_COLORS[idx % FRIEND_COLORS.length]}40` }}
                 >
@@ -1835,7 +1936,7 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
             <div>
               <label className="text-sm font-medium">Friend</label>
               <div className="mt-2">
-                <Select value={String(selectedFriendIndex)} onValueChange={(v) => setSelectedFriendIndex(parseInt(v))}>
+                <Select value={String(selectedFriendIndex)} onValueChange={(v) => handleFriendIndexChange(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a friend" />
                   </SelectTrigger>
@@ -1871,6 +1972,53 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
                 />
               )}
             </div>
+            
+            {/* Split Options */}
+                          <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowSplitOptions(!showSplitOptions)}
+                  className="w-full justify-start text-emerald-600 hover:text-emerald-700 p-0 h-auto font-normal"
+                >
+                  <span className="text-sm">Split Options</span>
+                  <Badge variant="secondary" className="ml-2 bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700">
+                    {selectedSplitFriends.length === (activeTrip?.friends.length || 0) ? 'All friends' : `${selectedSplitFriends.length} friend${selectedSplitFriends.length !== 1 ? 's' : ''} selected`}
+                  </Badge>
+                </Button>
+                {showSplitOptions && (
+                  <div className="space-y-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-700">
+                    <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium">
+                      Select friends who should split this expense:
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(activeTrip?.friends || []).map((friend, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => toggleSplitFriend(idx)}
+                          className={`flex items-center space-x-2 p-3 rounded-lg border transition-all ${
+                            selectedSplitFriends.includes(idx)
+                              ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-800 dark:border-emerald-600'
+                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 ${
+                            selectedSplitFriends.includes(idx)
+                              ? 'bg-emerald-600 border-emerald-600'
+                              : 'border-gray-300 dark:border-gray-500'
+                          }`} />
+                          <div className="text-sm font-medium truncate">{friend.name || `Friend ${idx + 1}`}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                      💡 Tip: Select who should split the expense. The person paying can be different from who splits the cost.
+                    </p>
+                  </div>
+                )}
+              </div>
+            
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 transition duration-200" onClick={handleAddExpense}>
               Add Expense
             </Button>
@@ -1898,26 +2046,112 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
               <p className="text-sm">Start by adding your first trip expense above to track your group spending.</p>
             </div>
           ) : (
-            <div className="divide-y">
-              {expensesForDate.map((e) => (
-                <div key={e.id} className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm" onClick={() => openTripEdit(e)}>
-                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 shadow-sm" style={{ 
-                      backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], 
-                      borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '40',
-                      boxShadow: `0 0 0 2px ${(FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length])}20`
-                    }} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">{e.name}</div>
-                      {e.details && (
-                        <div className="text-xs text-muted-foreground truncate">{e.details}</div>
-                      )}
-                      <div className="text-xs text-muted-foreground">{activeTrip?.friends[e.friendIndex]?.name || `Friend ${e.friendIndex+1}`} • {new Date(e.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
+            <div className="space-y-4">
+              {(() => {
+                // Group expenses by split category
+                const groupedExpenses = new Map<string, typeof expensesForDate>();
+                
+                expensesForDate.forEach(expense => {
+                  const splitCount = (expense.splitWith || [expense.friendIndex]).length;
+                  const totalFriends = activeTrip?.friends.length || 0;
+                  
+                  let category: string;
+                  if (splitCount === totalFriends) {
+                    category = 'Split between all friends';
+                  } else if (splitCount === 1) {
+                    category = 'Individual expenses';
+                  } else {
+                    category = `Split between ${splitCount} friends`;
+                  }
+                  
+                  if (!groupedExpenses.has(category)) {
+                    groupedExpenses.set(category, []);
+                  }
+                  groupedExpenses.get(category)!.push(expense);
+                });
+                
+                // Convert to array and sort by category priority
+                const sortedCategories = Array.from(groupedExpenses.entries()).sort(([a], [b]) => {
+                  const priority = { 'Split between all friends': 1, 'Individual expenses': 3 };
+                  return (priority[a as keyof typeof priority] || 2) - (priority[b as keyof typeof priority] || 2);
+                });
+                
+                return sortedCategories.map(([category, expenses]) => (
+                  <div key={category} className="space-y-2">
+                    <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                        {category === 'Split between all friends' && (
+                          <span className="text-emerald-600 dark:text-emerald-400 mr-2">👥</span>
+                        )}
+                        {category === 'Individual expenses' && (
+                          <span className="text-blue-600 dark:text-blue-400 mr-2">👤</span>
+                        )}
+                        {category.startsWith('Split between') && category !== 'Split between all friends' && (
+                          <span className="text-purple-600 dark:text-purple-400 mr-2">👥</span>
+                        )}
+                        {category}
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          ({expenses.length} expense{expenses.length !== 1 ? 's' : ''})
+                        </span>
+                      </h4>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {expenses.map((e) => (
+                        <div key={e.id} className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm" onClick={() => openTripEdit(e)}>
+                          <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                            <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 shadow-sm" style={{ 
+                              backgroundColor: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length], 
+                              borderColor: (FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length]) + '40',
+                              boxShadow: `0 0 0 2px ${(FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length])}20`
+                            }} />
+                                                         <div className="min-w-0 flex-1">
+                               <div className="text-sm font-medium truncate">{e.name}</div>
+                               {e.details && (
+                                 <div className="text-xs text-muted-foreground truncate">{e.details}</div>
+                               )}
+                               <div className="text-xs text-muted-foreground">
+                                 <span 
+                                   className="font-medium"
+                                   style={{ color: FRIEND_COLORS[e.friendIndex % FRIEND_COLORS.length] }}
+                                 >
+                                   {activeTrip?.friends[e.friendIndex]?.name || `Friend ${e.friendIndex+1}`}
+                                 </span>
+                                 <span className="text-muted-foreground"> • {new Date(e.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                               </div>
+                               {/* Show split information for partial splits */}
+                               {(() => {
+                                 const splitCount = (e.splitWith || [e.friendIndex]).length;
+                                 const totalFriends = activeTrip?.friends.length || 0;
+                                 
+                                 if (splitCount > 1 && splitCount < totalFriends) {
+                                   const splitFriends = (e.splitWith || [e.friendIndex]).map(friendIdx => 
+                                     activeTrip?.friends[friendIdx]?.name || `Friend ${friendIdx + 1}`
+                                   );
+                                   
+                                   return (
+                                     <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                                       Split between: {splitFriends.join(', ')}
+                                     </div>
+                                   );
+                                 }
+                                 return null;
+                               })()}
+                             </div>
+                          </div>
+                          <div className="flex-shrink-0 ml-3 sm:ml-4 text-right">
+                            <div className="text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}</div>
+                            {(e.splitWith || [e.friendIndex]).length > 1 && (
+                              <div className="text-xs text-emerald-600 dark:text-emerald-400">
+                                {symbol}{formatAmountDisplay(parseFloat(e.amount || '0') / (e.splitWith || [e.friendIndex]).length)} each
+                              </div>
+                              )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex-shrink-0 ml-3 sm:ml-4 text-sm font-semibold">{symbol}{formatAmountDisplay(parseFloat(e.amount || '0'))}</div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           )}
         </CardContent>
@@ -1959,6 +2193,12 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
                     const newFriendIndex = parseInt(v);
                     if (!isNaN(newFriendIndex)) {
                       setEditTripFields({ ...editTripFields, friendIndex: newFriendIndex });
+                      // If split options haven't been customized, default to all friends
+                      if (selectedSplitFriends.length === 0 || selectedSplitFriends.length === activeTrip?.friends.length) {
+                        setSelectedSplitFriends(activeTrip?.friends.map((_, idx) => idx) || []);
+                      }
+                      // Note: We no longer automatically add the paying friend to the split
+                      // Users have full control over who splits the expense
                     }
                   }}
                 >
@@ -1998,6 +2238,52 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
                   />
                 )}
               </div>
+              
+              {/* Split Options in Edit Dialog */}
+              <div className="space-y-3">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setShowSplitOptions(!showSplitOptions)} 
+                  className="w-full justify-start text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 p-0 h-auto font-normal"
+                >
+                  <span className="text-sm">Split Options</span>
+                  <Badge variant="secondary" className="ml-2 bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700">
+                    {selectedSplitFriends.length === (activeTrip?.friends.length || 0) ? 'All friends' : `${selectedSplitFriends.length} friend${selectedSplitFriends.length !== 1 ? 's' : ''} selected`}
+                  </Badge>
+                </Button>
+                {showSplitOptions && (
+                  <div className="space-y-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-700">
+                    <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium">
+                      Select friends who should split this expense:
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(activeTrip?.friends || []).map((friend, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => toggleSplitFriend(idx)}
+                          className={`flex items-center space-x-2 p-3 rounded-lg border transition-all ${
+                            selectedSplitFriends.includes(idx)
+                              ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-800 dark:border-emerald-600'
+                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 ${
+                            selectedSplitFriends.includes(idx)
+                              ? 'bg-emerald-600 border-emerald-600'
+                              : 'border-gray-300 dark:border-gray-500'
+                          }`} />
+                          <div className="text-sm font-medium truncate">{friend.name || `Friend ${idx + 1}`}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                      💡 Tip: Select who should split the expense. The person paying can be different from who splits the cost.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter className="flex flex-row justify-end gap-2 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-t border-gray-200 dark:border-gray-700">
@@ -2028,16 +2314,47 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     try { return JSON.parse(localStorage.getItem('dailyspend_trips') || '[]'); } catch { return []; }
   });
   const [activeTripId, setActiveTripId] = useState<string>(() => (trips[0]?.id || ''));
-  const activeTrip = trips.find(t => t.id === activeTripId) || null;
-  const [recurring, setRecurring] = useState<Array<{ id: string; tripId: string; name: string; amount: string; details?: string; friendIndex: number; frequency: 'daily'|'weekly'|'monthly'|'custom'; customDays?: number; startDate: string; endDate?: string | null; isActive: boolean }>>(() => {
+  const activeTrip = trips.find(t => t.id === activeTripId) || trips[0] || null;
+  const [recurring, setRecurring] = useState<Array<{ 
+    id: string; 
+    tripId: string; 
+    name: string; 
+    amount: string; 
+    details?: string; 
+    friendIndex: number; 
+    frequency: 'daily'|'weekly'|'monthly'|'custom'; 
+    customDays?: number; 
+    startDate: string; 
+    endDate?: string | null; 
+    isActive: boolean;
+    splitWith?: number[]; // Array of friend indices who should split this expense
+  }>>(() => {
     try { return JSON.parse(localStorage.getItem('dailyspend_trip_recurring') || '[]'); } catch { return []; }
   });
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ name: string; amount: string; details: string; friendIndex: number; frequency: 'daily'|'weekly'|'monthly'|'custom'; customDays?: number; startDate: string; endDate: string }>({
-    name: '', amount: '', details: '', friendIndex: 0, frequency: 'monthly', customDays: undefined, startDate: getToday(), endDate: ''
+  const [form, setForm] = useState<{ 
+    name: string; 
+    amount: string; 
+    details: string; 
+    friendIndex: number; 
+    frequency: 'daily'|'weekly'|'monthly'|'custom'; 
+    customDays?: number; 
+    startDate: string; 
+    endDate: string;
+    splitWith: number[]; // Array of friend indices who should split this expense
+  }>({
+    name: '', 
+    amount: '', 
+    details: '', 
+    friendIndex: 0, 
+    frequency: 'monthly', 
+    customDays: undefined, 
+    startDate: getToday(), 
+    endDate: '',
+    splitWith: [], // Will be populated with all friends by default
   });
   const { toast } = useToast();
 
@@ -2050,6 +2367,16 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     // Clean up any orphaned trip data
     cleanupOrphanedTripData();
   }, []);
+  
+  // Set default split friends when active trip changes
+  useEffect(() => {
+    if (activeTrip && form.splitWith.length === 0) {
+      setForm(prev => ({
+        ...prev,
+        splitWith: activeTrip.friends.map((_, idx) => idx)
+      }));
+    }
+  }, [activeTrip?.id, form.splitWith.length]);
 
   const persist = (items: typeof recurring) => {
     try { localStorage.setItem('dailyspend_trip_recurring', JSON.stringify(items)); } catch {}
@@ -2093,6 +2420,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
         customDays: form.customDays,
         startDate: form.startDate,
         endDate: form.endDate || null,
+        splitWith: form.splitWith,
       } : r);
       persist(next);
       
@@ -2117,6 +2445,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
         startDate: form.startDate,
         endDate: form.endDate || null,
         isActive: true,
+        splitWith: form.splitWith,
       } as typeof recurring[number];
       persist([...recurring, item]);
       
@@ -2143,6 +2472,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
             categoryId: null,
             date: getToday(),
             createdAt: new Date().toISOString(),
+            splitWith: form.splitWith,
           });
           localStorage.setItem(key, JSON.stringify(current));
         } catch {}
@@ -2150,7 +2480,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
     }
     setEditingId(null);
     setIsAdding(false);
-    setForm({ name: '', amount: '', details: '', friendIndex: 0, frequency: 'monthly', customDays: undefined, startDate: getToday(), endDate: '' });
+    setForm({ name: '', amount: '', details: '', friendIndex: 0, frequency: 'monthly', customDays: undefined, startDate: getToday(), endDate: '', splitWith: [] });
   };
 
   const handleToggle = async (id: string) => {
@@ -2196,6 +2526,7 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
       customDays: r.customDays,
       startDate: r.startDate,
       endDate: r.endDate || '',
+      splitWith: r.splitWith || (activeTrip?.friends.map((_, idx) => idx) || [r.friendIndex]),
     });
   };
 
@@ -2311,6 +2642,57 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
                   <Input type="date" value={form.endDate} min={form.startDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
                 </div>
               </div>
+              
+              {/* Split Options */}
+              <div className="space-y-3">
+                <Label>Split Options</Label>
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-700">
+                  <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium mb-3">
+                    Select friends who should split this recurring expense:
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {(activeTrip?.friends || []).map((friend, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          if (form.splitWith.includes(idx)) {
+                            // Check if this is the last selected friend
+                            if (form.splitWith.length === 1) {
+                              // Show a nice popup message
+                              toast({
+                                title: "Oops! 🤔",
+                                description: "At least one friend needs to split the expense. Who's going to pay for it otherwise?",
+                                variant: "default",
+                              });
+                              return; // Don't change the selection
+                            }
+                            setForm({ ...form, splitWith: form.splitWith.filter(i => i !== idx) });
+                          } else {
+                            setForm({ ...form, splitWith: [...form.splitWith, idx] });
+                          }
+                        }}
+                        className={`flex items-center space-x-2 p-3 rounded-lg border transition-all ${
+                          form.splitWith.includes(idx)
+                            ? 'bg-emerald-100 border-emerald-300 dark:bg-emerald-800 dark:border-emerald-600'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full border-2 ${
+                          form.splitWith.includes(idx)
+                            ? 'bg-emerald-600 border-emerald-600'
+                            : 'border-gray-300 dark:border-gray-500'
+                        }`} />
+                        <div className="text-sm font-medium truncate">{friend.name || `Friend ${idx + 1}`}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                    💡 Tip: By default, all friends split the expense. Only uncheck friends who shouldn't participate.
+                  </p>
+                </div>
+              </div>
+              
               <div className="flex items-center gap-2 flex-wrap">
                 <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">{editingId ? 'Update' : 'Create'}</Button>
                 {editingId && <Button type="button" variant="destructive" onClick={() => { if (editingId) { setPendingDeleteId(editingId); setShowDeleteDialog(true); } }}>Delete</Button>}
@@ -2386,6 +2768,33 @@ function TripRecurring({ currency }: { currency: CurrencyCode }) {
                             </span>
                           </div>
                           {r.details && <p className="text-sm text-muted-foreground mt-2 break-words">{r.details}</p>}
+                          
+                          {/* Split Information */}
+                          {(r.splitWith || [r.friendIndex]).length > 0 && (
+                            <div className="mt-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Split with:</span>
+                                <div className="flex items-center space-x-1">
+                                  {(r.splitWith || [r.friendIndex]).map((friendIdx, idx) => (
+                                    <div key={friendIdx} className="flex items-center space-x-1">
+                                      <div 
+                                        className="w-2 h-2 rounded-full" 
+                                        style={{ backgroundColor: ['#14B8A6','#6366F1','#84CC16','#D946EF','#F97316'][friendIdx % 5] }} 
+                                      />
+                                      <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                                        {(activeTrip?.friends[friendIdx]?.name) || `Friend ${friendIdx + 1}`}
+                                      </span>
+                                      {idx < (r.splitWith || [r.friendIndex]).length - 1 && <span className="text-xs text-muted-foreground">,</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                                  ({symbol}{formatAmountDisplay(parseFloat(r.amount) / (r.splitWith || [r.friendIndex]).length)} each)
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          
                           <div className="mt-3 space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge variant={r.isActive ? 'default' : 'secondary'} className={r.isActive ? 'bg-emerald-600 hover:bg-emerald-700' : ''}>
@@ -3163,10 +3572,10 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
               <div className="p-3 border rounded-lg bg-muted/50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: (selectedExpense.categoryId && data.categories.find(c => c.id === selectedExpense.categoryId)?.color) || '#E5E7EB', borderColor: '#CBD5E1' }} />
+                    <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: (selectedExpense.categoryId && categoryById.get(selectedExpense.categoryId)?.color) || '#E5E7EB', borderColor: '#CBD5E1' }} />
                     <div>
                       <div className="font-medium">{selectedExpense.name}</div>
-                      <div className="text-sm text-muted-foreground">{data.categories.find(c => c.id === selectedExpense.categoryId)?.name || 'Uncategorized'}</div>
+                      <div className="text-sm text-muted-foreground">{categoryById.get(selectedExpense.categoryId || '')?.name || 'Uncategorized'}</div>
                     </div>
                   </div>
                   <div className="font-semibold">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(selectedExpense.amount || '0'))}</div>

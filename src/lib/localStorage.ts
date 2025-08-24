@@ -504,7 +504,11 @@ export const updateAllData = (
 };
 
 // Trips helpers (for recurring auto-generation)
-type TripExpense = Expense & { tripId: string; friendIndex: number };
+type TripExpense = Expense & { 
+  tripId: string; 
+  friendIndex: number;
+  splitWith?: number[]; // Array of friend indices who should split this expense
+};
 type TripRecurring = {
   id: string;
   tripId: string;
@@ -517,6 +521,7 @@ type TripRecurring = {
   startDate: string;
   endDate?: string | null;
   isActive: boolean;
+  splitWith?: number[]; // Array of friend indices who should split this expense
 };
 
 export type Trip = { id: string; name: string; friends: { name: string }[] };
@@ -581,6 +586,7 @@ export const generateTripExpensesFromRecurring = (date: string): TripExpense[] =
         categoryId: null,
         date,
         createdAt: new Date().toISOString(),
+        splitWith: [r.friendIndex], // Default to only the friend who created the recurring expense
       } as TripExpense;
       generated.push(generatedExpense);
     }
