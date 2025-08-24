@@ -442,6 +442,10 @@ export function useRealtimeSync() {
         );
       }
       
+      // Mark session as synced after a successful initial merge/upload
+      // This ensures the first subsequent local change auto-uploads without showing the conflict dialog
+      sessionSynced.current = true;
+      
     } catch (e) {
       console.error('[Sync] Initial sync failed:', e);
       // Non-blocking; user can continue offline
