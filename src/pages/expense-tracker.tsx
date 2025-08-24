@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, ArrowDown, ArrowUp, Plus, Edit, ChevronDown } from "lucide-react";
+import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, TrendingUp, Calculator, ArrowDown, ArrowUp, Plus, Edit, ChevronDown } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
  
@@ -429,6 +429,7 @@ export default function ExpenseTracker() {
         if (!data) {
           setFollowupData({ categories: [], expenses: [], recurring: [] });
           setFollowupLastUpdatedMs(null);
+          try { (window as any).dailyspend_followupData = { categories: [], expenses: [], recurring: [] }; } catch {}
           return;
         }
         setFollowupData({
@@ -436,6 +437,13 @@ export default function ExpenseTracker() {
           expenses: (data.expenses as any[]) || [],
           recurring: (data.recurring as any[]) || [],
         });
+        try {
+          (window as any).dailyspend_followupData = {
+            categories: (data.categories as any[]) || [],
+            expenses: (data.expenses as any[]) || [],
+            recurring: (data.recurring as any[]) || [],
+          };
+        } catch {}
         const ts: any = (data as any).updatedAt;
         const ms = ts?.toDate ? ts.toDate().getTime() : (typeof ts === 'number' ? ts : null);
         setFollowupLastUpdatedMs(ms);
@@ -1164,6 +1172,8 @@ export default function ExpenseTracker() {
                     data={followupData}
                     setCurrentPartnerDate={setCurrentPartnerDate}
                     partnerName={followupViewer.name}
+                    disableInteractions
+                    theme="yellow"
                   />
                 )}
                 {currentView === "calendar" && (
@@ -1171,6 +1181,8 @@ export default function ExpenseTracker() {
                     currency={expensesCurrency}
                     data={followupData}
                     partnerName={followupViewer.name}
+                    disableInteractions
+                    theme="yellow"
                   />
                 )}
                 {currentView === "recurring" && (
@@ -1178,6 +1190,7 @@ export default function ExpenseTracker() {
                     currency={expensesCurrency}
                     data={{ categories: followupData.categories, recurring: followupData.recurring }}
                     partnerName={followupViewer.name}
+                    theme="yellow"
                   />
                 )}
                 {currentView === "charts" && (
@@ -3154,7 +3167,7 @@ function TripCalendar({ currency }: { currency: CurrencyCode }) {
   );
 }
 
-function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; setCurrentPartnerDate: (date: string) => void; partnerName?: string }) {
+function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerName, disableInteractions = false, theme = 'rose' }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; setCurrentPartnerDate: (date: string) => void; partnerName?: string; disableInteractions?: boolean; theme?: 'rose' | 'yellow' }) {
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [copyExpenseDialogOpen, setCopyExpenseDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -3169,6 +3182,7 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
   }, [selectedDate, setCurrentPartnerDate]);
 
   const handleExpenseClick = (expense: Expense) => {
+    if (disableInteractions) return;
     setSelectedExpense(expense);
     setCopyExpenseDialogOpen(true);
     setShowMoreOptions(false);
@@ -3251,24 +3265,30 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
 
 
 
+  const headerCardClasses = theme === 'yellow'
+    ? 'bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800'
+    : 'bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800';
+  const accentText = theme === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' : 'text-rose-600 dark:text-rose-400';
+  const listHoverClass = theme === 'yellow' ? 'hover:bg-yellow-50 dark:hover:bg-yellow-950/30' : 'hover:bg-rose-50 dark:hover:bg-rose-950/30';
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+      <Card className={headerCardClasses}>
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1 flex items-center">
-                <span className="text-rose-600 dark:text-rose-400 mr-2">👥</span>
+                <span className={`${accentText} mr-2`}>👥</span>
                 {selectedDate === getToday() ? `${partnerName || 'Partner'}'s Today's Expenses` : `${partnerName || 'Partner'}'s Expenses`}
               </h2>
               <div className="flex items-center gap-2">
                 <DatePicker value={selectedDate} onChange={(v: string) => setSelectedDate(v)} className="h-8 text-sm" />
-                <span className="text-sm font-medium text-rose-600 dark:text-rose-400">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                <span className={`text-sm font-medium ${accentText}`}>{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
               </div>
             </div>
             <div className="text-center">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">{selectedDate === getToday() ? "Today" : "Selected Date"}</p>
-              <p className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">{symbol}{formatAmountDisplay(totalForDate)}</p>
+              <p className={`text-xl sm:text-2xl font-bold ${accentText}`}>{symbol}{formatAmountDisplay(totalForDate)}</p>
             </div>
           </div>
           {categoryTotals.length > 0 && (
@@ -3286,14 +3306,14 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
       </Card>
 
       <Card className="overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-        <div className="p-4 sm:p-6 border-b border-rose-200 dark:border-rose-700 bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30">
+        <div className={`p-4 sm:p-6 border-b bg-gradient-to-r ${theme === 'yellow' ? 'border-yellow-200 dark:border-yellow-700 from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30' : 'border-rose-200 dark:border-rose-700 from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30'}` }>
           <h3 className="text-lg font-semibold text-foreground/80 flex items-center">
-            <span className="text-rose-600 dark:text-rose-400 mr-2">📋</span>
+            <span className={`${accentText} mr-2`}>📋</span>
             {selectedDate === getToday() ? `${partnerName || 'Partner'}'s Today's Expenses` : `${partnerName || 'Partner'}'s Expenses`}
           </h3>
           <p className="text-xs mt-1">
             <span className="text-muted-foreground mr-1">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-            <span className="font-medium text-rose-600 dark:text-rose-400">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+            <span className={`font-medium ${accentText}`}>{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short' })}</span>
           </p>
         </div>
         <CardContent className="p-0">
@@ -3308,8 +3328,8 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
               {expensesForDate.map((exp) => (
                 <div 
                   key={exp.id} 
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all duration-200 hover:shadow-sm"
-                  onClick={() => handleExpenseClick(exp)}
+                  className={`flex items-center justify-between p-4 ${disableInteractions ? '' : 'cursor-pointer'} ${listHoverClass} transition-all duration-200 hover:shadow-sm`}
+                  onClick={() => { if (!disableInteractions) handleExpenseClick(exp); }}
                 >
                   <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                     <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 shadow-sm" style={{ 
@@ -3333,7 +3353,8 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
         </CardContent>
       </Card>
 
-      {/* Copy Expense Confirmation Dialog */}
+      {/* Copy Expense Confirmation Dialog (hidden when disabled) */}
+      {!disableInteractions && (
       <Dialog open={copyExpenseDialogOpen} onOpenChange={setCopyExpenseDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -3408,11 +3429,12 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }
 
-function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; partnerName?: string }) {
+function PartnerCalendarReadOnly({ currency, data, partnerName, disableInteractions = false, theme = 'rose' }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] }; partnerName?: string; disableInteractions?: boolean; theme?: 'rose' | 'yellow' }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [previewItems, setPreviewItems] = useState<Array<{ name: string; amount: string }>>([]);
   const [previewDate, setPreviewDate] = useState<string | null>(getToday());
@@ -3593,21 +3615,33 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
     }
   };
 
+  const headerCardClasses = theme === 'yellow'
+    ? 'bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800'
+    : 'bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800';
+  const accentText = theme === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' : 'text-rose-600 dark:text-rose-400';
+  const dayTodayClass = theme === 'yellow' ? 'bg-yellow-600 text-white shadow-lg' : 'bg-rose-600 text-white shadow-lg';
+  const dayHoverClass = theme === 'yellow' ? 'hover:bg-yellow-100 dark:hover:bg-yellow-900/30 border-2 border-transparent hover:border-yellow-400' : 'hover:bg-rose-100 dark:hover:bg-rose-900/30 border-2 border-transparent hover:border-rose-400';
+  const listHoverClass = theme === 'yellow' ? 'hover:bg-yellow-50 dark:hover:bg-yellow-950/30' : 'hover:bg-rose-50 dark:hover:bg-rose-950/30';
+  const chipIconClass = theme === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' : 'text-rose-600 dark:text-rose-400';
+  const navBtnClass = theme === 'yellow' ? 'p-2 text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/30' : 'p-2 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/30';
+  const weekdayTextClass = theme === 'yellow' ? 'text-yellow-700 dark:text-yellow-300' : 'text-rose-700 dark:text-rose-300';
+  const gridCardClasses = theme === 'yellow' ? 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800' : 'bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800';
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+      <Card className={headerCardClasses}>
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0 flex items-center">
-              <span className="text-rose-600 dark:text-rose-400 mr-2">📅</span>
+              <span className={`${accentText} mr-2`}>📅</span>
               Monthly Calendar
             </h2>
             <div className="flex items-center justify-center sm:justify-start space-x-4">
-              <Button variant="ghost" size="sm" onClick={previousMonth} className="p-2 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/30">
+              <Button variant="ghost" size="sm" onClick={previousMonth} className={navBtnClass}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-lg font-medium text-rose-700 dark:text-rose-300">{monthInfo.monthName}</span>
-              <Button variant="ghost" size="sm" onClick={nextMonth} className="p-2 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/30">
+              <span className={`text-lg font-medium ${weekdayTextClass}`}>{monthInfo.monthName}</span>
+              <Button variant="ghost" size="sm" onClick={nextMonth} className={navBtnClass}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -3615,11 +3649,11 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
         </CardContent>
       </Card>
 
-      <Card className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+      <Card className={gridCardClasses}>
         <CardContent className="p-4 sm:p-6">
           <div className="grid grid-cols-7 gap-1 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-xs sm:text-sm font-medium text-rose-700 dark:text-rose-300 py-2 sm:py-3">{day}</div>
+              <div key={day} className={`text-center text-xs sm:text-sm font-medium ${weekdayTextClass} py-2 sm:py-3`}>{day}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -3642,9 +3676,9 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
                   }}
                   className={`aspect-square p-1 sm:p-2 rounded-lg transition-all duration-200 ${
                     day.isToday
-                      ? "bg-rose-600 text-white shadow-lg"
+                      ? dayTodayClass
                       : day.isCurrentMonth
-                      ? "hover:bg-rose-100 dark:hover:bg-rose-900/30 border-2 border-transparent hover:border-rose-400 cursor-pointer hover:shadow-md"
+                      ? `${dayHoverClass} cursor-pointer hover:shadow-md`
                       : "text-muted-foreground hover:bg-muted"
                   } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                   title={day.isCurrentMonth ? `View details for ${day.dateString}` : ''}
@@ -3657,7 +3691,7 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
                       )}
                       {hasRecurring && (
                         <div className="flex items-center justify-center mt-1">
-                          <Repeat className="w-3 h-3 text-rose-600 dark:text-rose-400" aria-label="Recurring" />
+                          <Repeat className={`w-3 h-3 ${chipIconClass}`} aria-label="Recurring" />
                         </div>
                       )}
                     </>
@@ -3681,19 +3715,16 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
               })), ...previewItems.map((item, idx) => ({ key: `rec-${idx}-${item.name}-${item.amount}`, ...item, isRecurring: true }))].map((item) => (
                 <div 
                   key={item.key} 
-                  className={`flex items-center justify-between ${!item.isRecurring ? 'cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/30 p-2 rounded transition-all duration-200 hover:shadow-sm' : ''}`}
+                  className={`flex items-center justify-between ${!item.isRecurring ? `${disableInteractions ? '' : 'cursor-pointer'} ${listHoverClass} p-2 rounded transition-all duration-200 hover:shadow-sm` : ''}`}
                   onClick={() => {
-                    if (!item.isRecurring) {
-                      // Find the actual expense object to pass to the handler
+                    if (!item.isRecurring && !disableInteractions) {
                       const expense = data.expenses.find(e => e.id === item.key);
-                      if (expense) {
-                        handleExpenseClick(expense);
-                      }
+                      if (expense) handleExpenseClick(expense);
                     }
                   }}
                 >
                   <span className="text-sm text-foreground font-medium flex items-center gap-1">
-                    {item.isRecurring && <Repeat className="w-3 h-3 text-rose-600 dark:text-rose-400" aria-label="Recurring" />}
+                    {item.isRecurring && <Repeat className={`w-3 h-3 ${chipIconClass}`} aria-label="Recurring" />}
                     {item.name}
                   </span>
                   <span className="text-sm text-foreground font-semibold">{CURRENCIES[currency].symbol}{formatAmountDisplay(parseFloat(item.amount || '0'))}</span>
@@ -3783,7 +3814,7 @@ function PartnerCalendarReadOnly({ currency, data, partnerName }: { currency: Cu
   );
 }
 
-function PartnerRecurringReadOnly({ currency, data, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; recurring: RecurringExpense[] }; partnerName?: string }) {
+function PartnerRecurringReadOnly({ currency, data, partnerName, theme = 'rose' }: { currency: CurrencyCode; data: { categories: Category[]; recurring: RecurringExpense[] }; partnerName?: string; theme?: 'rose' | 'yellow' }) {
   const symbol = currency === 'INR' ? '₹' : '$';
   const categoryById = useMemo(() => {
     const map = new Map<string, Category>();
@@ -3792,13 +3823,16 @@ function PartnerRecurringReadOnly({ currency, data, partnerName }: { currency: C
   }, [data.categories]);
 
   const items = data.recurring;
+  const containerCardClasses = theme === 'yellow' ? 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800' : 'bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800';
+  const chipText = theme === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' : 'text-rose-700 dark:text-rose-300';
+  const chipBg = theme === 'yellow' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-rose-100 dark:bg-rose-900/30';
 
   return (
-    <Card className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 border-rose-200 dark:border-rose-800">
+    <Card className={containerCardClasses}>
       <CardContent className="p-4 sm:p-6">
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground flex items-center">
-            <span className="text-rose-600 dark:text-rose-400 mr-2">🔄</span>
+            <span className={`${theme === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' : 'text-rose-600 dark:text-rose-400'} mr-2`}>🔄</span>
             {partnerName || 'Partner'}'s Recurring Expenses
           </h3>
           
@@ -3828,13 +3862,13 @@ function PartnerRecurringReadOnly({ currency, data, partnerName }: { currency: C
                             />
                             {categoryById.get(r.categoryId || '')?.name || 'Uncategorized'}
                           </span>
-                          <span className="text-rose-600 dark:text-rose-400 font-medium">
+                          <span className={`${chipText} font-medium`}>
                             {r.frequency}
                           </span>
                         </div>
                       </div>
                       <div className="ml-4 shrink-0">
-                        <span className="font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/30 px-3 py-1 rounded-full text-sm">
+                        <span className={`font-bold ${chipText} ${chipBg} px-3 py-1 rounded-full text-sm`}>
                           {symbol}{formatAmountDisplay(parseFloat(r.amount || '0'))}
                         </span>
                       </div>
@@ -3850,9 +3884,13 @@ function PartnerRecurringReadOnly({ currency, data, partnerName }: { currency: C
   );
 }
 
-// Followups charts matching the same UI as ChartsView but fed from read-only data
+// Followups charts using the exact ChartsView UI and Chart.js, computed from followed data
 function FollowupChartsView({ currency, data, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring?: RecurringExpense[] }; partnerName?: string }) {
   const [selectedDate, setSelectedDate] = useState(getToday());
+  const pieChartRef = useRef<HTMLCanvasElement>(null);
+  const barChartRef = useRef<HTMLCanvasElement>(null);
+  const pieChartInstance = useRef<any>(null);
+  const barChartInstance = useRef<any>(null);
   const symbol = CURRENCIES[currency].symbol;
 
   const categoryById = useMemo(() => {
@@ -3861,121 +3899,253 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
     return map;
   }, [data.categories]);
 
+  // Category totals for the selected date (matching ChartsView data shape)
   const categoryTotals = useMemo(() => {
-    const totals = new Map<string, { total: number; category: Category }>();
+    const totals = new Map<string, { categoryId: string; total: number; category: Category }>();
     (data.expenses || []).filter(e => e.date === selectedDate).forEach(e => {
       const cat = e.categoryId ? categoryById.get(e.categoryId) : undefined;
-      const key = cat ? cat.id : 'uncategorized';
+      const id = cat?.id || 'uncategorized';
       const category: Category = cat || { id: 'uncategorized', name: 'Uncategorized', color: '#94A3B8', createdAt: '' } as any;
-      const prev = totals.get(key);
+      const prev = totals.get(id);
       const nextTotal = (prev?.total || 0) + parseFloat(e.amount || '0');
-      totals.set(key, { total: nextTotal, category });
+      totals.set(id, { categoryId: id, total: nextTotal, category });
     });
     return Array.from(totals.values());
   }, [data.expenses, selectedDate, categoryById]);
 
-  const weekly = useMemo(() => {
-    const start = new Date(selectedDate);
-    const days: { date: string; total: number }[] = [];
+  // Weekly totals for last 7 days from selected date
+  const weeklyDays = useMemo(() => {
+    const days: { date: string; label: string; fullDate: string }[] = [];
+    const currentDate = new Date(selectedDate);
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(start);
-      d.setDate(start.getDate() - i);
-      const dateStr = formatDate(d);
-      const total = (data.expenses || []).filter(e => e.date === dateStr).reduce((s, e) => s + parseFloat(e.amount || '0'), 0);
-      days.push({ date: dateStr, total });
+      const day = new Date(currentDate);
+      day.setDate(currentDate.getDate() - i);
+      days.push({
+        date: formatDate(day),
+        label: day.toLocaleDateString('en-US', { weekday: 'short' }),
+        fullDate: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      });
     }
     return days;
-  }, [data.expenses, selectedDate]);
+  }, [selectedDate]);
 
+  const weeklyData = useMemo(() => {
+    const totalsByDate = new Map<string, number>();
+    (data.expenses || []).forEach(e => {
+      totalsByDate.set(e.date, (totalsByDate.get(e.date) || 0) + parseFloat(e.amount || '0'));
+    });
+    return weeklyDays.map(d => totalsByDate.get(d.date) || 0);
+  }, [data.expenses, weeklyDays]);
+
+  // Monthly totals for the selected month
   const monthlyTotals = useMemo(() => {
-    const d = new Date(selectedDate);
-    const year = d.getFullYear();
-    const month = d.getMonth();
+    const selected = new Date(selectedDate);
+    const y = selected.getFullYear();
+    const m = selected.getMonth();
     const map = new Map<string, number>();
     (data.expenses || []).forEach(e => {
-      const ed = new Date(e.date);
-      if (ed.getFullYear() === year && ed.getMonth() === month) {
+      const d = new Date(e.date);
+      if (d.getFullYear() === y && d.getMonth() === m) {
         map.set(e.date, (map.get(e.date) || 0) + parseFloat(e.amount || '0'));
       }
     });
     return Array.from(map.entries()).map(([date, total]) => ({ date, total }));
   }, [data.expenses, selectedDate]);
 
+  // Chart.js setup (same as ChartsView)
+  const initializeCharts = useCallback(() => {
+    if (!(window as any).Chart) return;
+
+    // Destroy existing charts
+    if (pieChartInstance.current) pieChartInstance.current.destroy();
+    if (barChartInstance.current) barChartInstance.current.destroy();
+
+    // Resolve theme colors from CSS variables
+    const css = getComputedStyle(document.documentElement);
+    const colorPrimary = css.getPropertyValue('--primary').trim() || '#1976D2';
+    const colorBorder = css.getPropertyValue('--border').trim() || 'rgba(0,0,0,0.1)';
+    const colorMutedForeground = css.getPropertyValue('--muted-foreground').trim() || '#6b7280';
+
+    // Pie Chart
+    if (pieChartRef.current && categoryTotals.length > 0) {
+      const ctx = pieChartRef.current.getContext('2d');
+      pieChartInstance.current = new (window as any).Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: categoryTotals.map(ct => ct.category.name),
+          datasets: [{
+            data: categoryTotals.map(ct => ct.total),
+            backgroundColor: categoryTotals.map(ct => ct.category.color),
+            borderWidth: 0,
+            borderColor: 'transparent'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // Bar Chart
+    if (barChartRef.current) {
+      const ctx = barChartRef.current.getContext('2d');
+      if (!ctx) return;
+      const labels = weeklyDays.map(d => d.label);
+      barChartInstance.current = new (window as any).Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Daily Expenses',
+            data: weeklyData,
+            backgroundColor: colorPrimary,
+            borderColor: colorPrimary,
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300, easing: 'easeInOutQuart' },
+          transitions: { active: { animation: { duration: 300, easing: 'easeInOutQuart' } } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: (context: any) => {
+                  const index = context[0].dataIndex;
+                  const day = weeklyDays[index];
+                  return `${day.label} - ${day.fullDate}`;
+                },
+                label: (context: any) => `Amount: ${symbol}${formatAmountDisplay(context.parsed.y)}`,
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { display: true, color: colorBorder }, ticks: { display: true, color: colorMutedForeground } },
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 7, maxRotation: 0, display: true, color: colorMutedForeground } }
+          },
+          elements: { bar: { borderWidth: 1, borderColor: colorPrimary } }
+        }
+      });
+    }
+  }, [categoryTotals, weeklyData, weeklyDays, symbol]);
+
+  useEffect(() => {
+    const t = setTimeout(initializeCharts, 100);
+    return () => clearTimeout(t);
+  }, [initializeCharts]);
+
+  useEffect(() => {
+    return () => {
+      try { pieChartInstance.current?.destroy?.(); } catch {}
+      try { barChartInstance.current?.destroy?.(); } catch {}
+    };
+  }, []);
+
   const totalExpense = categoryTotals.reduce((sum, ct) => sum + ct.total, 0);
+  const selectedMonth = new Date(selectedDate);
   const monthlyHighest = monthlyTotals.length > 0 ? Math.max(...monthlyTotals.map(mt => mt.total)) : 0;
   const monthlyAverage = monthlyTotals.length > 0 ? monthlyTotals.reduce((sum, mt) => sum + mt.total, 0) / monthlyTotals.length : 0;
   const highestDayData = monthlyTotals.find(mt => mt.total === monthlyHighest);
+  const highestDayName = highestDayData ? new Date(highestDayData.date).toLocaleDateString('en-US', { weekday: 'long' }) : '';
+  const highestDayDate = highestDayData ? new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
-  // Match ChartsView visual structure
   return (
     <div className="space-y-4 sm:space-y-6">
       <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Expense Analytics</h2>
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-foreground/80">Select Date:</label>
-              <DatePicker value={selectedDate} onChange={setSelectedDate} className="h-9" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                <label className="text-sm font-medium text-foreground/80">Select Date:</label>
+                <DatePicker value={selectedDate} onChange={setSelectedDate} className="h-9" />
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Pie Chart */}
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Category Distribution</h3>
-            {categoryTotals.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">No category data available</div>
-            ) : (
-              <div className="space-y-2">
-                {categoryTotals.map((ct) => (
-                  <div key={ct.category.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center min-w-0 flex-1">
-                      <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: ct.category.color }} />
-                      <span className="truncate">{ct.category.name}</span>
-                    </div>
-                    <span className="font-medium">{symbol}{formatAmountDisplay(ct.total)}</span>
+            <div className="relative h-48 sm:h-64">
+              {categoryTotals.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="text-center">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No category data available</p>
+                    <p className="text-xs text-muted-foreground">Select a date to view category distribution</p>
                   </div>
-                ))}
+                </div>
+              ) : (
+                <canvas ref={pieChartRef} className="w-full h-full"></canvas>
+              )}
+            </div>
+            {categoryTotals.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {categoryTotals.map((ct) => {
+                  const percentage = totalExpense > 0 ? Math.round((ct.total / totalExpense) * 100) : 0;
+                  return (
+                    <div key={ct.categoryId} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center min-w-0 flex-1">
+                        <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: ct.category.color }} />
+                        <span className="truncate">{ct.category.name}</span>
+                      </div>
+                      <span className="font-medium text-sm sm:text-base flex-shrink-0">{symbol}{formatAmountDisplay(ct.total)} ({percentage}%)</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Bar Chart */}
         <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Weekly Comparison</h3>
-            <div className="grid grid-cols-7 gap-2">
-              {weekly.map((d, idx) => (
-                <div key={idx} className="text-center">
-                  <div className="text-xs text-muted-foreground">{new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                  <div className="font-semibold">{symbol}{formatAmountDisplay(d.total)}</div>
-                </div>
-              ))}
+            <div className="relative h-48 sm:h-64">
+              <canvas ref={barChartRef} className="w-full h-full" />
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground text-center">
+              Showing: {weeklyDays[6]?.fullDate} - {weeklyDays[0]?.fullDate}
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground text-center space-y-1">
+              💡 Weekly comparison showing last 7 days
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Monthly Overview */}
       <Card>
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Overview</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="text-center p-4 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
-              <div className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</div>
-              <div className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyHighest)}</div>
-              <div className="text-xs text-muted-foreground">{highestDayData ? new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'This month'}</div>
+              <TrendingUp className="text-red-500 dark:text-red-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyHighest)}</p>
+              <p className="text-xs text-muted-foreground">{highestDayData ? `${new Date(highestDayData.date).toLocaleDateString('en-US', { weekday: 'long' })}, ${new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'This month'}</p>
             </div>
             <div className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-              <div className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</div>
-              <div className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyAverage)}</div>
-              <div className="text-xs text-muted-foreground">This month</div>
+              <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyAverage)}</p>
+              <p className="text-xs text-muted-foreground">This month</p>
             </div>
             <div className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-              <div className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</div>
-              <div className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</div>
-              <div className="text-xs text-muted-foreground">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
+              <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
+              <p className="text-xs text-muted-foreground">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
             </div>
           </div>
         </CardContent>

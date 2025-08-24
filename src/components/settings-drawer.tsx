@@ -614,8 +614,8 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
         <TripsManagement onTripsChanged={onTripsChanged} />
       )}
 
-      {/* Currency */}
-      {topTab !== 'couple' && (
+      {/* Currency (hidden on followups) */}
+      {topTab !== 'couple' && topTab !== 'followups' && (
         <div>
           <button
             className="w-full text-left text-sm font-medium text-foreground py-2"
@@ -714,54 +714,90 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
 
       <Separator />
 
-      {/* Import / Export / Delete */}
+      {/* Import / Export / Delete (Followups: Export only, exporting followed user's data) */}
       {topTab !== 'couple' && (
         <div>
           <button
             className="w-full text-left text-sm font-medium text-foreground py-2"
             onClick={() => toggle("export")}
           >
-            Import / Export / Delete
+            {topTab === 'followups' ? 'Export' : 'Import / Export / Delete'}
           </button>
           <div className={`overflow-hidden transition-[max-height] duration-300 ${open.export ? 'max-h-96' : 'max-h-0'}`}>
             <div className="pt-2 space-y-3">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <Button
-                  variant="outline"
-                  disabled={importing}
-                  onClick={() => document.getElementById("dailyspend-import-input")?.click()}
-                  className="w-full sm:w-auto px-4"
-                >
-                  {topTab === 'trips' ? 'Import Trips' : 'Import'}
-                </Button>
-                <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImportFile(file);
-                }} />
-                <Button
-                  disabled={exporting}
-                  onClick={() => handleExport("excel")}
-                  className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
-                >
-                  {topTab === 'trips' ? 'Export Trips (Excel)' : 'Export (Excel)'}
-                </Button>
-                <Button
-                  disabled={exporting}
-                  variant="secondary"
-                  onClick={() => handleExport("pdf")}
-                  className="w-full sm:w-auto px-4"
-                >
-                  {topTab === 'trips' ? 'Export Trips (PDF)' : 'Export (PDF)'}
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={!!user || deleting}
-                  onClick={handleDeleteLocalData}
-                  title={user ? "Sign out to enable deleting local data" : undefined}
-                  className="w-full sm:w-auto px-4"
-                >
-                  {topTab === 'trips' ? 'Delete All Trips Data' : 'Delete All Local Data'}
-                </Button>
+                {topTab !== 'followups' && (
+                  <>
+                    <Button
+                      variant="outline"
+                      disabled={importing}
+                      onClick={() => document.getElementById("dailyspend-import-input")?.click()}
+                      className="w-full sm:w-auto px-4"
+                    >
+                      {topTab === 'trips' ? 'Import Trips' : 'Import'}
+                    </Button>
+                    <input id="dailyspend-import-input" type="file" accept="text/csv,.csv" className="hidden" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImportFile(file);
+                    }} />
+                    <Button
+                      disabled={exporting}
+                      onClick={() => handleExport("excel")}
+                      className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
+                    >
+                      {topTab === 'trips' ? 'Export Trips (Excel)' : 'Export (Excel)'}
+                    </Button>
+                    <Button
+                      disabled={exporting}
+                      variant="secondary"
+                      onClick={() => handleExport("pdf")}
+                      className="w-full sm:w-auto px-4"
+                    >
+                      {topTab === 'trips' ? 'Export Trips (PDF)' : 'Export (PDF)'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={!!user || deleting}
+                      onClick={handleDeleteLocalData}
+                      title={user ? "Sign out to enable deleting local data" : undefined}
+                      className="w-full sm:w-auto px-4"
+                    >
+                      {topTab === 'trips' ? 'Delete All Trips Data' : 'Delete All Local Data'}
+                    </Button>
+                  </>
+                )}
+                {topTab === 'followups' && (
+                  <>
+                    <Button
+                      disabled={exporting}
+                      onClick={() => {
+                        try {
+                          const fd = (window as any).dailyspend_followupData || { categories: [], expenses: [], recurring: [] };
+                          // Temporarily override data for export routines
+                          (window as any).dailyspend_export_override = fd;
+                        } catch {}
+                        handleExport("excel");
+                      }}
+                      className="w-full sm:w-auto bg-primary hover:bg-blue-700 px-4"
+                    >
+                      Export (Excel)
+                    </Button>
+                    <Button
+                      disabled={exporting}
+                      variant="secondary"
+                      onClick={() => {
+                        try {
+                          const fd = (window as any).dailyspend_followupData || { categories: [], expenses: [], recurring: [] };
+                          (window as any).dailyspend_export_override = fd;
+                        } catch {}
+                        handleExport("pdf");
+                      }}
+                      className="w-full sm:w-auto px-4"
+                    >
+                      Export (PDF)
+                    </Button>
+                  </>
+                )}
               </div>
               {topTab === 'trips' ? (
                 <>
@@ -770,6 +806,10 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
                   {!!user && (
                     <p className="text-xs text-muted-foreground">Delete is only available when no user is signed in.</p>
                   )}
+                </>
+              ) : topTab === 'followups' ? (
+                <>
+                  <p className="text-xs text-muted-foreground">Export the followed user's expenses. Data is read-only and matches the junior's own export.</p>
                 </>
               ) : (
                 <>
