@@ -659,6 +659,13 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
         </div>
       )}
 
+      {/* Manage Follow-ups Heading for Followups Tab */}
+      {topTab === 'followups' && (
+        <div className="pt-2">
+          <h3 className="text-lg font-semibold">Manage Follow-ups</h3>
+        </div>
+      )}
+
       <Separator />
 
       {/* Manage section based on top tab */}

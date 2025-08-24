@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,6 +9,10 @@ import { findVerifiedUserByEmail, createFollowupRequest, type FollowupRequest, u
 import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, Trash2, Check, X } from "lucide-react";
 
+export interface FollowupsManagementHandle {
+  openAdd: () => void;
+}
+
 interface FollowupsManagementProps {
   hideHeader?: boolean;
   outgoingRequests: FollowupRequest[];
@@ -18,7 +22,7 @@ interface FollowupsManagementProps {
   onStatusUpdated?: (requestId: string, status: FollowupRequest["status"]) => void;
 }
 
-export default function FollowupsManagement({ hideHeader, outgoingRequests, incomingRequests = [], acceptedIncoming = [], onRemoved, onStatusUpdated }: FollowupsManagementProps) {
+export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(function FollowupsManagement({ hideHeader, outgoingRequests, incomingRequests = [], acceptedIncoming = [], onRemoved, onStatusUpdated }: FollowupsManagementProps, ref) {
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -110,6 +114,10 @@ export default function FollowupsManagement({ hideHeader, outgoingRequests, inco
     }
   };
 
+  useImperativeHandle(ref, () => ({
+    openAdd: () => setAddOpen(true),
+  }), []);
+
   const pending = outgoingRequests.filter(r => r.status === 'pending');
   const accepted = outgoingRequests.filter(r => r.status === 'accepted');
   const rejected = outgoingRequests.filter(r => r.status === 'rejected' || r.status === 'cancelled');
@@ -168,97 +176,21 @@ export default function FollowupsManagement({ hideHeader, outgoingRequests, inco
         </DialogContent>
       </Dialog>
 
-      {pending.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="text-sm font-medium mb-2">Pending Requests</h4>
-            <div className="space-y-2">
-              {pending.map(r => (
-                <div key={r.id} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-yellow-600" />
-                    <div>
-                      <div className="text-sm font-medium">{r.toName || r.toEmail}</div>
-                      <div className="text-xs text-muted-foreground">Awaiting approval</div>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => removeRequest(r.id)} disabled={removing} className="text-red-600 hover:text-red-700">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {accepted.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="text-sm font-medium mb-2">Accepted</h4>
-            <div className="space-y-2">
-              {accepted.map(r => (
-                <div key={r.id} className="flex items-center justify-between p-3 border rounded bg-yellow-50 dark:bg-yellow-950/20">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600" />
-                    <div>
-                      <div className="text-sm font-medium">{r.toName || r.toEmail}</div>
-                      <div className="text-xs text-muted-foreground">You can view their expenses</div>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => removeRequest(r.id)} disabled={removing} className="text-red-600 hover:text-red-700">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {incomingRequests.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="text-sm font-medium mb-2">Incoming Requests</h4>
-            <div className="space-y-2">
-              {incomingRequests.map(r => (
-                <div key={r.id} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-yellow-600" />
-                    <div>
-                      <div className="text-sm font-medium">{r.fromName || r.fromEmail}</div>
-                      <div className="text-xs text-muted-foreground">Wants to follow your expenses</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => rejectIncoming(r)}>
-                      <X className="w-4 h-4 mr-1" /> Reject
-                    </Button>
-                    <Button size="sm" onClick={() => acceptIncoming(r)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
-                      <Check className="w-4 h-4 mr-1" /> Accept
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Your expenses are being tracked by */}
       {acceptedIncoming.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-            <h4 className="text-base font-medium text-indigo-700 dark:text-indigo-300">People Following You</h4>
+            <h4 className="text-base font-medium text-indigo-700 dark:text-indigo-300">Your expenses are being tracked by</h4>
           </div>
-          <div className="pl-4 space-y-2">
+          <div className="pl-4 space-y-3">
             {acceptedIncoming.map((request) => (
-              <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg bg-indigo-50 dark:bg-indigo-950/30">
+              <div key={request.id} className="flex items-center justify-between p-3 border border-indigo-200 rounded-lg bg-indigo-50 dark:bg-indigo-950/30">
                 <div className="flex items-center space-x-2">
                   <Users className="w-4 h-4 text-indigo-600" />
                   <div>
                     <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
-                    <div className="text-xs text-indigo-600 dark:text-indigo-400">Can view your expenses (follow-ups)</div>
+                    <div className="text-xs text-indigo-600 dark:text-indigo-400">Can view your expenses</div>
                   </div>
                 </div>
                 <Button
@@ -276,8 +208,172 @@ export default function FollowupsManagement({ hideHeader, outgoingRequests, inco
           </div>
         </div>
       )}
+
+      {/* Tracking daily expenses of */}
+      <div className="space-y-3">
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <h4 className="text-base font-medium text-green-700 dark:text-green-300">Tracking daily expenses of</h4>
+        </div>
+        {accepted.length > 0 ? (
+          <div className="pl-4 space-y-3">
+            {accepted.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 border border-green-200 rounded-lg bg-green-50 dark:bg-green-950/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-green-600" />
+                  <div>
+                    <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
+                    <div className="text-xs text-green-600 dark:text-green-400">You are viewing their expenses</div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeRequest(request.id)}
+                  disabled={removing}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                  title="Remove"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+            <div className="pt-3">
+              <p className="text-xs text-muted-foreground mb-2">Add a user to track their expenses</p>
+              <Button onClick={handleOpenAdd} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white shadow-md">
+                <Plus className="w-4 h-4 mr-2" />
+                Add a follow-up
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="pl-4 py-4 text-center">
+            <p className="text-sm font-medium text-foreground mb-1">None</p>
+            <p className="text-xs text-muted-foreground mb-3">Add a user to track their expenses</p>
+            <Button onClick={handleOpenAdd} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white shadow-md">
+              <Plus className="w-4 h-4 mr-2" />
+              Add a follow-up
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Rejected/Cancelled Requests */}
+      {rejected.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <h4 className="text-base font-medium text-red-700 dark:text-red-300">Rejected/Cancelled Requests</h4>
+          </div>
+          <div className="pl-4 space-y-3">
+            {rejected.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-red-50 dark:bg-red-950/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-red-600" />
+                  <div>
+                    <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
+                    <div className="text-xs text-red-600 dark:text-red-400">
+                      {request.status === 'rejected' ? 'Request rejected' : 'Request cancelled'}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeRequest(request.id)}
+                  disabled={removing}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                  title="Remove from list"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Follow-up Requests */}
+      <div className="space-y-3">
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          <h4 className="text-base font-medium text-blue-700 dark:text-blue-300">Follow-up Requests</h4>
+        </div>
+        {/* Incoming Requests */}
+        {incomingRequests.length > 0 && (
+          <div className="pl-4 space-y-3">
+            <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Incoming</div>
+            {incomingRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">Wants to follow your expenses</div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => rejectIncoming(request)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                    title="Reject request"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => acceptIncoming(request)}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-100 p-2 h-8 w-8"
+                    title="Accept request"
+                  >
+                    <Check className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Outgoing Requests */}
+        {pending.length > 0 && (
+          <div className="pl-4 space-y-3">
+            <div className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-2">Outgoing</div>
+            {pending.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 border border-orange-200 rounded-lg bg-orange-50 dark:bg-orange-950/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-orange-600" />
+                  <div>
+                    <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
+                    <div className="text-xs text-orange-600 dark:text-orange-400">Waiting for approval</div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeRequest(request.id)}
+                  disabled={removing}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8"
+                  title="Cancel request"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* No Requests Message */}
+        {incomingRequests.length === 0 && pending.length === 0 && (
+          <div className="pl-4 text-center py-4 text-muted-foreground">
+            <p className="text-sm">No pending incoming or outgoing requests</p>
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+});
 
 

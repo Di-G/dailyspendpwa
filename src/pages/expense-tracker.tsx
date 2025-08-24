@@ -37,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
-import { findVerifiedUserByEmail, createPartnerRequest, createFollowupRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest, subscribeToAcceptedFollowups, subscribeToIncomingFollowups, subscribeToOutgoingFollowups, type FollowupRequest } from "@/lib/sync";
+import { findVerifiedUserByEmail, createPartnerRequest, createFollowupRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest, subscribeToAcceptedFollowups, subscribeToIncomingFollowups, subscribeToOutgoingFollowups, type FollowupRequest, updateFollowupRequestStatus } from "@/lib/sync";
 import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
 import PartnerChat from "@/components/partner-chat";
@@ -87,6 +87,7 @@ export default function ExpenseTracker() {
   const [ackRejectedIds, setAckRejectedIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('dailyspend_ack_rejected_outgoing') || '[]'); } catch { return []; }
   });
+  const [dismissedIncomingFollowupPopup, setDismissedIncomingFollowupPopup] = useState<boolean>(false);
   const [partnerUid, setPartnerUid] = useState<string | null>(null);
   const [partnerNameResolved, setPartnerNameResolved] = useState<string>("");
   const [acceptedPeerUid, setAcceptedPeerUid] = useState<string | null>(null);
@@ -590,6 +591,10 @@ export default function ExpenseTracker() {
 
   const handleIncomingAction = async (req: PartnerRequest, action: 'accept' | 'reject') => {
     await updatePartnerRequestStatus(req.id, action === 'accept' ? 'accepted' : 'rejected');
+  };
+
+  const handleIncomingFollowupAction = async (req: FollowupRequest, action: 'accept' | 'reject') => {
+    await updateFollowupRequestStatus(req.id, action === 'accept' ? 'accepted' : 'rejected');
   };
 
 
@@ -1285,6 +1290,25 @@ export default function ExpenseTracker() {
                   <Button variant="outline" onClick={() => setDismissedIncomingPopup(true)}>Close</Button>
                   <Button variant="destructive" onClick={() => handleIncomingAction(r, 'reject')}>Reject</Button>
                   <Button onClick={() => handleIncomingAction(r, 'accept')}>Accept</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Incoming follow-up request popup when user opens app */}
+      {isVerified && !dismissedIncomingFollowupPopup && incomingFollowups.some(r => r.status === 'pending') && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40">
+          <div className="bg-card border rounded-lg p-4 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-2">Follow-up Request</h3>
+            {incomingFollowups.filter(r => r.status === 'pending').slice(0,1).map(r => (
+              <div key={r.id} className="space-y-2">
+                <p className="text-sm">{r.fromName || r.fromEmail} wants to follow your daily expenses.</p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setDismissedIncomingFollowupPopup(true)}>Close</Button>
+                  <Button variant="destructive" onClick={() => handleIncomingFollowupAction(r, 'reject')}>Reject</Button>
+                  <Button onClick={() => handleIncomingFollowupAction(r, 'accept')}>Accept</Button>
                 </div>
               </div>
             ))}
