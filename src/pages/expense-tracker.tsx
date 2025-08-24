@@ -409,53 +409,87 @@ export default function ExpenseTracker() {
   const [followupData, setFollowupData] = useState<{ categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } | null>(null);
   const stopFollowupDocRef = useRef<null | (() => void)>(null);
   const [followupLastUpdatedMs, setFollowupLastUpdatedMs] = useState<number | null>(null);
+  const [acceptedFollowupsOutgoing, setAcceptedFollowupsOutgoing] = useState<FollowupRequest[]>([]);
+  const [selectedFollowupUid, setSelectedFollowupUid] = useState<string | null>(() => {
+    try { return localStorage.getItem('dailyspend_selected_followup_uid'); } catch { return null; }
+  });
   useEffect(() => {
     if (!user || !isVerified) return;
     let stop: null | (() => void) = null;
     stop = subscribeToAcceptedFollowups(user.uid, (accepted) => {
       // We care only about requests where current user is sender (outgoing accepted) → they can view the other user
       const outgoingAccepted = accepted.filter(r => r.fromUid === user.uid);
+      setAcceptedFollowupsOutgoing(outgoingAccepted);
       if (outgoingAccepted.length === 0) {
+        setSelectedFollowupUid(null);
         setFollowupViewer(null);
         setFollowupData(null);
         try { stopFollowupDocRef.current?.(); } catch {}
         stopFollowupDocRef.current = null;
         return;
       }
-      const first = outgoingAccepted[0];
-      const otherUid = first.toUid;
-      setFollowupViewer({ uid: otherUid, name: first.toName || first.toEmail });
-      try { stopFollowupDocRef.current?.(); } catch {}
-      stopFollowupDocRef.current = subscribeToUserDoc(otherUid, (data) => {
-        if (!data) {
-          setFollowupData({ categories: [], expenses: [], recurring: [] });
-          setFollowupLastUpdatedMs(null);
-          try { (window as any).dailyspend_followupData = { categories: [], expenses: [], recurring: [] }; } catch {}
-          return;
-        }
-        setFollowupData({
-          categories: (data.categories as any[]) || [],
-          expenses: (data.expenses as any[]) || [],
-          recurring: (data.recurring as any[]) || [],
-        });
-        try {
-          (window as any).dailyspend_followupData = {
-            categories: (data.categories as any[]) || [],
-            expenses: (data.expenses as any[]) || [],
-            recurring: (data.recurring as any[]) || [],
-          };
-        } catch {}
-        const ts: any = (data as any).updatedAt;
-        const ms = ts?.toDate ? ts.toDate().getTime() : (typeof ts === 'number' ? ts : null);
-        setFollowupLastUpdatedMs(ms);
-      });
+      // Keep current selection if still valid; otherwise select first
+      const stillValid = selectedFollowupUid && outgoingAccepted.some(r => r.toUid === selectedFollowupUid);
+      if (!stillValid) {
+        setSelectedFollowupUid(outgoingAccepted[0].toUid);
+      }
     });
     return () => {
       try { stop?.(); } catch {}
       try { stopFollowupDocRef.current?.(); } catch {}
       stopFollowupDocRef.current = null;
     };
-  }, [user?.uid, isVerified]);
+  }, [user?.uid, isVerified, selectedFollowupUid]);
+
+  // Listen for selection requests coming from Settings (click on a user)
+  useEffect(() => {
+    const handler = (e: any) => {
+      const uid = e?.detail?.uid as string | undefined;
+      if (!uid) return;
+      setTopTab('followups');
+      setSelectedFollowupUid(uid);
+      try { localStorage.setItem('dailyspend_selected_followup_uid', uid); } catch {}
+    };
+    window.addEventListener('dailyspend:switch-followup', handler as EventListener);
+    return () => window.removeEventListener('dailyspend:switch-followup', handler as EventListener);
+  }, []);
+
+  // Subscribe to the selected followed user's data
+  useEffect(() => {
+    if (!user || !isVerified) return;
+    const selected = acceptedFollowupsOutgoing.find(r => r.toUid === selectedFollowupUid) || acceptedFollowupsOutgoing[0];
+    if (!selected) return;
+    const otherUid = selected.toUid;
+    setFollowupViewer({ uid: otherUid, name: selected.toName || selected.toEmail });
+    try { stopFollowupDocRef.current?.(); } catch {}
+    stopFollowupDocRef.current = subscribeToUserDoc(otherUid, (data) => {
+      if (!data) {
+        setFollowupData({ categories: [], expenses: [], recurring: [] });
+        setFollowupLastUpdatedMs(null);
+        try { (window as any).dailyspend_followupData = { categories: [], expenses: [], recurring: [] }; } catch {}
+        return;
+      }
+      setFollowupData({
+        categories: (data.categories as any[]) || [],
+        expenses: (data.expenses as any[]) || [],
+        recurring: (data.recurring as any[]) || [],
+      });
+      try {
+        (window as any).dailyspend_followupData = {
+          categories: (data.categories as any[]) || [],
+          expenses: (data.expenses as any[]) || [],
+          recurring: (data.recurring as any[]) || [],
+        };
+      } catch {}
+      const ts: any = (data as any).updatedAt;
+      const ms = ts?.toDate ? ts.toDate().getTime() : (typeof ts === 'number' ? ts : null);
+      setFollowupLastUpdatedMs(ms);
+    });
+    return () => {
+      try { stopFollowupDocRef.current?.(); } catch {}
+      stopFollowupDocRef.current = null;
+    };
+  }, [acceptedFollowupsOutgoing, selectedFollowupUid, user?.uid, isVerified]);
 
   const hasPendingIncoming = useMemo(() => incomingRequests.some(r => r.status === 'pending'), [incomingRequests]);
   const pendingOutgoing = useMemo(() => outgoingRequests.filter(r => r.status === 'pending'), [outgoingRequests]);

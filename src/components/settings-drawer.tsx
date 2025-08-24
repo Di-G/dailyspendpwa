@@ -696,6 +696,10 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
               onStatusUpdated={async (id, status) => {
                 try { await updateFollowupRequestStatus(id, status); } catch {}
               }}
+              onSelectFollowup={(uid) => {
+                try { localStorage.setItem('dailyspend_selected_followup_uid', uid); } catch {}
+                try { window.dispatchEvent(new CustomEvent('dailyspend:switch-followup', { detail: { uid } })); } catch {}
+              }}
             />
           </div>
         </div>

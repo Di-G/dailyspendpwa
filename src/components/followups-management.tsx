@@ -1,5 +1,6 @@
 import { useState, forwardRef, useImperativeHandle } from "react";
 import { Button } from "@/components/ui/button";
+import { SheetClose } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,9 +21,10 @@ interface FollowupsManagementProps {
   acceptedIncoming?: FollowupRequest[];
   onRemoved?: (requestId: string) => void;
   onStatusUpdated?: (requestId: string, status: FollowupRequest["status"]) => void;
+  onSelectFollowup?: (uid: string) => void;
 }
 
-export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(function FollowupsManagement({ hideHeader, outgoingRequests, incomingRequests = [], acceptedIncoming = [], onRemoved, onStatusUpdated }: FollowupsManagementProps, ref) {
+export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(function FollowupsManagement({ hideHeader, outgoingRequests, incomingRequests = [], acceptedIncoming = [], onRemoved, onStatusUpdated, onSelectFollowup }: FollowupsManagementProps, ref) {
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -219,13 +221,20 @@ export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(f
           <div className="pl-4 space-y-3">
             {accepted.map((request) => (
               <div key={request.id} className="flex items-center justify-between p-3 border border-green-200 rounded-lg bg-green-50 dark:bg-green-950/30">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  <div>
-                    <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
-                    <div className="text-xs text-green-600 dark:text-green-400">You are viewing their expenses</div>
-                  </div>
-                </div>
+                <SheetClose asChild>
+                  <button
+                    type="button"
+                    className="flex items-center space-x-2 text-left"
+                    onClick={() => onSelectFollowup?.(request.toUid)}
+                    title="Open this user's expenses"
+                  >
+                    <Users className="w-4 h-4 text-green-600" />
+                    <div>
+                      <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
+                      <div className="text-xs text-green-600 dark:text-green-400">Tap to open their expenses</div>
+                    </div>
+                  </button>
+                </SheetClose>
                 <Button
                   variant="ghost"
                   size="sm"
