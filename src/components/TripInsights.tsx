@@ -308,10 +308,10 @@ export default function TripInsights({ currency }: TripInsightsProps) {
               <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
             </div>
             {(() => {
-              // Check if there are any expenses with partial splitting
+              // Check if there are any expenses with partial splitting (including individual expenses)
               const hasPartialSplits = currentViewExpenses.some((expense: any) => {
                 const splitCount = (expense.splitWith && expense.splitWith.length > 0) ? expense.splitWith.length : 1;
-                return splitCount > 1 && splitCount < activeTrip.friends.length;
+                return splitCount !== activeTrip.friends.length;
               });
               
               if (hasPartialSplits) {
@@ -373,10 +373,10 @@ export default function TripInsights({ currency }: TripInsightsProps) {
               <span className="text-sm font-medium text-muted-foreground">Fair Share</span>
             </div>
             {(() => {
-              // Check if there are any expenses with partial splitting
+              // Check if there are any expenses with partial splitting (including individual expenses)
               const hasPartialSplits = currentViewExpenses.some((expense: any) => {
                 const splitCount = (expense.splitWith && expense.splitWith.length > 0) ? expense.splitWith.length : 1;
-                return splitCount > 1 && splitCount < activeTrip.friends.length;
+                return splitCount !== activeTrip.friends.length;
               });
               
               if (hasPartialSplits) {
