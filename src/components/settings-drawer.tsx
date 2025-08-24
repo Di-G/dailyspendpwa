@@ -4,10 +4,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import CategoryManagement from "@/components/category-management";
 import PartnerManagement from "@/components/partner-management";
+import FollowupsManagement from "@/components/followups-management";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
-import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest } from "@/lib/sync";
+import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest, subscribeToIncomingFollowups, subscribeToOutgoingFollowups, subscribeToAcceptedIncomingFollowups, updateFollowupRequestStatus, deleteFollowupRequest, type FollowupRequest } from "@/lib/sync";
 import { Trash, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -36,20 +37,33 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
   const [outgoing, setOutgoing] = useState<PartnerRequest[]>([]);
   const [incoming, setIncoming] = useState<PartnerRequest[]>([]);
   const [acceptedIncomingPartners, setAcceptedIncomingPartners] = useState<PartnerRequest[]>([]);
+  const [outgoingFollowups, setOutgoingFollowups] = useState<FollowupRequest[]>([]);
+  const [incomingFollowups, setIncomingFollowups] = useState<FollowupRequest[]>([]);
+  const [acceptedIncomingFollowups, setAcceptedIncomingFollowups] = useState<FollowupRequest[]>([]);
 
   useEffect(() => {
     let stopOut: null | (() => void) = null;
     let stopIn: null | (() => void) = null;
     let stopAcceptedIncoming: null | (() => void) = null;
+    let stopFUOut: null | (() => void) = null;
+    let stopFUIn: null | (() => void) = null;
+    let stopFUAcceptedIn: null | (() => void) = null;
     if (user) {
       stopOut = subscribeToOutgoingRequests(user.uid, setOutgoing);
       stopIn = subscribeToIncomingRequests(user.uid, setIncoming);
       stopAcceptedIncoming = subscribeToAcceptedIncomingPartners(user.uid, setAcceptedIncomingPartners);
+      // Follow-ups
+      stopFUOut = subscribeToOutgoingFollowups(user.uid, setOutgoingFollowups);
+      stopFUIn = subscribeToIncomingFollowups(user.uid, setIncomingFollowups);
+      stopFUAcceptedIn = subscribeToAcceptedIncomingFollowups(user.uid, setAcceptedIncomingFollowups);
     }
     return () => {
       try { stopOut?.(); } catch {}
       try { stopIn?.(); } catch {}
       try { stopAcceptedIncoming?.(); } catch {}
+      try { stopFUOut?.(); } catch {}
+      try { stopFUIn?.(); } catch {}
+      try { stopFUAcceptedIn?.(); } catch {}
     };
   }, [user?.uid]);
 
@@ -647,7 +661,7 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
 
       <Separator />
 
-      {/* Manage Friends (Trips) or Categories based on top tab */}
+      {/* Manage section based on top tab */}
       {topTab === 'couple' ? (
         <div>
           <div className="pt-2">
@@ -658,6 +672,23 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
               acceptedIncomingPartners={acceptedIncomingPartners}
               onPartnerRemoved={handlePartnerRemoved}
               onPartnerRequestStatusUpdated={handlePartnerRequestStatusUpdated}
+            />
+          </div>
+        </div>
+      ) : topTab === 'followups' ? (
+        <div>
+          <div className="pt-2">
+            <FollowupsManagement
+              hideHeader
+              outgoingRequests={outgoingFollowups}
+              incomingRequests={incomingFollowups}
+              acceptedIncoming={acceptedIncomingFollowups}
+              onRemoved={async (id) => {
+                try { await deleteFollowupRequest(id); } catch {}
+              }}
+              onStatusUpdated={async (id, status) => {
+                try { await updateFollowupRequestStatus(id, status); } catch {}
+              }}
             />
           </div>
         </div>

@@ -28,7 +28,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { getToday, getMonthInfo, generateCalendarDays } from "@/lib/date-utils";
+import { getToday, getMonthInfo, generateCalendarDays, formatDate } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -37,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
-import { findVerifiedUserByEmail, createPartnerRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest } from "@/lib/sync";
+import { findVerifiedUserByEmail, createPartnerRequest, createFollowupRequest, subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, subscribeToAcceptedPartners, subscribeToUserDoc, type PartnerRequest, subscribeToAcceptedFollowups, subscribeToIncomingFollowups, subscribeToOutgoingFollowups, type FollowupRequest } from "@/lib/sync";
 import { useToast } from "@/hooks/use-toast";
 import type { Category, Expense, RecurringExpense } from "@shared/schema";
 import PartnerChat from "@/components/partner-chat";
@@ -71,8 +71,16 @@ export default function ExpenseTracker() {
   const [partnerEmail, setPartnerEmail] = useState<string>("");
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [submitMessage, setSubmitMessage] = useState<string>("");
+  // Followups Add dialog state
+  const [addFollowupOpen, setAddFollowupOpen] = useState<boolean>(false);
+  const [followupName, setFollowupName] = useState<string>("");
+  const [followupEmail, setFollowupEmail] = useState<string>("");
+  const [followupSubmitLoading, setFollowupSubmitLoading] = useState<boolean>(false);
+  const [followupSubmitMessage, setFollowupSubmitMessage] = useState<string>("");
   const [incomingRequests, setIncomingRequests] = useState<PartnerRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<PartnerRequest[]>([]);
+  const [incomingFollowups, setIncomingFollowups] = useState<FollowupRequest[]>([]);
+  const [outgoingFollowups, setOutgoingFollowups] = useState<FollowupRequest[]>([]);
   const { user, isVerified } = useAuth();
   const tripsBlockedEffective = isVerified && tripsBlocked;
   const [dismissedIncomingPopup, setDismissedIncomingPopup] = useState<boolean>(false);
@@ -221,6 +229,55 @@ export default function ExpenseTracker() {
     setFocusAmountTrigger((t) => (t ?? 0) + 1);
   };
 
+  const handleOpenAddFollowup = () => {
+    if (!isVerified) {
+      setFollowupSubmitMessage("This functionality is only available to verified users. Please verify your email in Profile.");
+      setAddFollowupOpen(true);
+      return;
+    }
+    setFollowupSubmitMessage("Enter the user's name and email. The user must be verified for you to follow them.");
+    setAddFollowupOpen(true);
+  };
+
+  const handleSubmitFollowup = async () => {
+    if (!user) return;
+    setFollowupSubmitMessage("");
+    const name = followupName.trim();
+    const email = followupEmail.trim();
+    if (!name || !email) {
+      setFollowupSubmitMessage("Please enter both name and email address.");
+      return;
+    }
+    if (email.toLowerCase() === (user.email || "").toLowerCase()) {
+      setFollowupSubmitMessage("You cannot add yourself.");
+      return;
+    }
+    setFollowupSubmitLoading(true);
+    try {
+      const found = await findVerifiedUserByEmail(email);
+      if (!found) {
+        setFollowupSubmitMessage("No verified user found with that email.");
+        return;
+      }
+      await createFollowupRequest({
+        fromUid: user.uid,
+        fromEmail: user.email || "",
+        fromName: user.displayName || "",
+        toUid: found.uid,
+        toEmail: found.email,
+        toName: name,
+      });
+      setFollowupName("");
+      setFollowupEmail("");
+      setAddFollowupOpen(false);
+      toast({ title: "Follow-up request sent", description: "The user will receive a notification to accept." });
+    } catch (e) {
+      setFollowupSubmitMessage("Failed to send request. Please try again.");
+    } finally {
+      setFollowupSubmitLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Reset selections whenever dialog opens/closes or source date changes
     if (!customCopyOpen) {
@@ -261,6 +318,20 @@ export default function ExpenseTracker() {
     return () => {
       try { stopIn?.(); } catch {}
       try { stopOut?.(); } catch {}
+    };
+  }, [user?.uid, isVerified]);
+
+  // Subscribe to follow-ups inbox/outbox when verified
+  useEffect(() => {
+    let stopFUIn: null | (() => void) = null;
+    let stopFUOut: null | (() => void) = null;
+    if (user && isVerified) {
+      stopFUIn = subscribeToIncomingFollowups(user.uid, setIncomingFollowups);
+      stopFUOut = subscribeToOutgoingFollowups(user.uid, setOutgoingFollowups);
+    }
+    return () => {
+      try { stopFUIn?.(); } catch {}
+      try { stopFUOut?.(); } catch {}
     };
   }, [user?.uid, isVerified]);
 
@@ -331,6 +402,51 @@ export default function ExpenseTracker() {
       stopPartnerDocRef.current = null;
     };
   }, [user?.uid, isVerified, hasAcceptedRequest]);
+
+  // Follow-ups: when this user has accepted outgoing follow-ups, allow them to view the target user's data under the Followups tab
+  const [followupViewer, setFollowupViewer] = useState<{ uid: string; name: string } | null>(null);
+  const [followupData, setFollowupData] = useState<{ categories: Category[]; expenses: Expense[]; recurring: RecurringExpense[] } | null>(null);
+  const stopFollowupDocRef = useRef<null | (() => void)>(null);
+  const [followupLastUpdatedMs, setFollowupLastUpdatedMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!user || !isVerified) return;
+    let stop: null | (() => void) = null;
+    stop = subscribeToAcceptedFollowups(user.uid, (accepted) => {
+      // We care only about requests where current user is sender (outgoing accepted) → they can view the other user
+      const outgoingAccepted = accepted.filter(r => r.fromUid === user.uid);
+      if (outgoingAccepted.length === 0) {
+        setFollowupViewer(null);
+        setFollowupData(null);
+        try { stopFollowupDocRef.current?.(); } catch {}
+        stopFollowupDocRef.current = null;
+        return;
+      }
+      const first = outgoingAccepted[0];
+      const otherUid = first.toUid;
+      setFollowupViewer({ uid: otherUid, name: first.toName || first.toEmail });
+      try { stopFollowupDocRef.current?.(); } catch {}
+      stopFollowupDocRef.current = subscribeToUserDoc(otherUid, (data) => {
+        if (!data) {
+          setFollowupData({ categories: [], expenses: [], recurring: [] });
+          setFollowupLastUpdatedMs(null);
+          return;
+        }
+        setFollowupData({
+          categories: (data.categories as any[]) || [],
+          expenses: (data.expenses as any[]) || [],
+          recurring: (data.recurring as any[]) || [],
+        });
+        const ts: any = (data as any).updatedAt;
+        const ms = ts?.toDate ? ts.toDate().getTime() : (typeof ts === 'number' ? ts : null);
+        setFollowupLastUpdatedMs(ms);
+      });
+    });
+    return () => {
+      try { stop?.(); } catch {}
+      try { stopFollowupDocRef.current?.(); } catch {}
+      stopFollowupDocRef.current = null;
+    };
+  }, [user?.uid, isVerified]);
 
   const hasPendingIncoming = useMemo(() => incomingRequests.some(r => r.status === 'pending'), [incomingRequests]);
   const pendingOutgoing = useMemo(() => outgoingRequests.filter(r => r.status === 'pending'), [outgoingRequests]);
@@ -577,6 +693,9 @@ export default function ExpenseTracker() {
               >
                 <div className="relative">
                   <FollowupsTwoPeopleSimpleIcon className="w-9 h-9 stroke-[1.3] translate-y-0.5" />
+                  {(incomingFollowups.some(r => r.status === 'pending')) && (
+                    <span className="absolute -top-1 -right-1 inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500" title="Incoming follow-up request" />
+                  )}
                 </div>
                 <span className="sr-only">FollowUps</span>
               </TabsTrigger>
@@ -1010,86 +1129,75 @@ export default function ExpenseTracker() {
           )
         ) : topTab === 'followups' ? (
           <div className="relative">
-            {/* Placeholder scaffold (optional minimal content behind blur) */}
-            <div className="space-y-4 sm:space-y-6 opacity-70 pointer-events-none select-none">
-              <Card>
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">Followups</h2>
-                      <p className="text-sm text-muted-foreground">Monitor expenses of dependents and family members</p>
+            {!followupViewer || !followupData ? (
+              <>
+                <div className="space-y-4 sm:space-y-6 opacity-70 pointer-events-none select-none">
+                  <Card>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-xl sm:text-2xl font-semibold text-foreground/80 mb-1">Followups</h2>
+                          <p className="text-sm text-muted-foreground">Monitor expenses of dependents and family members</p>
+                        </div>
+                        <div className="h-8 w-24 rounded bg-yellow-500/20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
+                <div className="fixed left-0 right-0 bottom-0 flex flex-col items-center justify-center gap-2 z-[80]" style={{ top: overlayTopPx }}>
+                  <Button onClick={handleOpenAddFollowup} size={isMobile ? 'default' : 'lg'} className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                    Add a User to Follow
+                  </Button>
+                  {outgoingFollowups.filter(r => r.status === 'pending').length > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs sm:text-sm px-3 py-2">
+                      Request sent to {(outgoingFollowups.filter(r => r.status === 'pending').map(r => r.toName || r.toEmail)).join(', ')} — waiting for approval
                     </div>
-                    <div className="h-8 w-24 rounded bg-yellow-500/20" />
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {currentView === "entry" && (
+                  <PartnerHomeReadOnly
+                    currency={expensesCurrency}
+                    data={followupData}
+                    setCurrentPartnerDate={setCurrentPartnerDate}
+                    partnerName={followupViewer.name}
+                  />
+                )}
+                {currentView === "calendar" && (
+                  <PartnerCalendarReadOnly
+                    currency={expensesCurrency}
+                    data={followupData}
+                    partnerName={followupViewer.name}
+                  />
+                )}
+                {currentView === "recurring" && (
+                  <PartnerRecurringReadOnly
+                    currency={expensesCurrency}
+                    data={{ categories: followupData.categories, recurring: followupData.recurring }}
+                    partnerName={followupViewer.name}
+                  />
+                )}
+                {currentView === "charts" && (
+                  <FollowupChartsView
+                    currency={expensesCurrency}
+                    data={followupData}
+                    partnerName={followupViewer.name}
+                  />
+                )}
+                {/* No data / last updated hint */}
+                {followupData && followupData.categories.length === 0 && followupData.expenses.length === 0 && followupData.recurring.length === 0 && (
+                  <div className="mt-3 text-xs text-muted-foreground text-center">
+                    No data yet. Ask {followupViewer.name?.split(' ')[0] || 'the user'} to open the app while signed in to sync their data.
+                    {typeof followupLastUpdatedMs === 'number' && (
+                      <span> Last updated {new Date(followupLastUpdatedMs).toLocaleString()}.</span>
+                    )}
                   </div>
-                  {(() => {
-                    const mockCategories = [
-                      { id: 'food', name: 'Food', color: '#EAB308' },    // yellow-500
-                      { id: 'travel', name: 'Travel', color: '#F59E0B' }, // amber-500
-                      { id: 'groceries', name: 'Groceries', color: '#FCD34D' }, // yellow-300
-                      { id: 'shopping', name: 'Shopping', color: '#FBBF24' }, // amber-400
-                      { id: 'entertain', name: 'Entertainment', color: '#FDE047' }, // yellow-200
-                    ];
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mt-4">
-                        {mockCategories.map((category) => (
-                          <div
-                            key={category.id}
-                            className="border rounded-lg p-2 sm:p-3 text-center"
-                            style={{ backgroundColor: `${category.color}10`, borderColor: `${category.color}40` }}
-                          >
-                            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2" style={{ backgroundColor: category.color }} />
-                            <div className="h-3 w-16 mx-auto rounded-sm mb-1" style={{ backgroundColor: `${category.color}30` }} />
-                            <div className="h-4 w-20 mx-auto rounded-sm" style={{ backgroundColor: `${category.color}20` }} />
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div className="lg:col-span-2">
-                  <Card>
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="h-40 rounded bg-muted" />
-                    </CardContent>
-                  </Card>
-                </div>
-                <div>
-                  <Card>
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="space-y-2">
-                        <div className="h-4 w-32 rounded bg-muted" />
-                        <div className="h-4 w-24 rounded bg-muted" />
-                        <div className="h-4 w-28 rounded bg-muted" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </div>
-
-            {/* Full-screen blur overlay below the tabs */}
-            <div className="fixed left-0 right-0 bottom-0 z-[60] backdrop-blur-sm bg-background/30" style={{ top: overlayTopPx }} />
-
-            {/* Centered CTA */}
-            <div className="fixed left-0 right-0 bottom-0 z-[80] flex items-center justify-center" style={{ top: overlayTopPx }}>
-              <div className="flex flex-col items-center gap-3">
-                <Button
-                  size={isMobile ? 'default' : 'lg'}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                  onClick={() => {
-                    toast({ 
-                      title: "🚀 Coming Soon!", 
-                      description: "The follow-ups feature is currently in development. Stay tuned for exciting updates!",
-                      duration: 4000
-                    });
-                  }}
-                >
-                  Add a User to Follow
-                </Button>
-              </div>
-            </div>
+                )}
+              </>
+            )}
           </div>
         ) : (
           <div />
@@ -1455,6 +1563,41 @@ export default function ExpenseTracker() {
         </DialogContent>
       </Dialog>
 
+      {/* Add Follow-up Dialog */}
+      <Dialog open={addFollowupOpen} onOpenChange={setAddFollowupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a User to Follow</DialogTitle>
+          </DialogHeader>
+          {!!followupSubmitMessage && (
+            <Alert className="mb-2">
+              <AlertTitle>Status</AlertTitle>
+              <AlertDescription>{followupSubmitMessage}</AlertDescription>
+            </Alert>
+          )}
+          {isVerified && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Name</label>
+                <Input value={followupName} onChange={(e) => setFollowupName(e.target.value)} placeholder="Enter user's name" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email</label>
+                <Input value={followupEmail} onChange={(e) => setFollowupEmail(e.target.value)} placeholder="Enter user's email" type="email" />
+              </div>
+              <p className="text-xs text-muted-foreground">The user must be verified for you to follow them.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddFollowupOpen(false)}>Close</Button>
+            {isVerified && (
+              <Button className="bg-yellow-500 hover:bg-yellow-600 text-white" onClick={handleSubmitFollowup} disabled={followupSubmitLoading}>
+                {followupSubmitLoading ? "Sending..." : "Send Request"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Trips: Add Trip Dialog */}
       <Dialog open={addTripOpen} onOpenChange={(v) => { setAddTripOpen(v); if (!v) resetAddTripState(); }}>
         <DialogContent>
@@ -3704,6 +3847,140 @@ function PartnerRecurringReadOnly({ currency, data, partnerName }: { currency: C
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Followups charts matching the same UI as ChartsView but fed from read-only data
+function FollowupChartsView({ currency, data, partnerName }: { currency: CurrencyCode; data: { categories: Category[]; expenses: Expense[]; recurring?: RecurringExpense[] }; partnerName?: string }) {
+  const [selectedDate, setSelectedDate] = useState(getToday());
+  const symbol = CURRENCIES[currency].symbol;
+
+  const categoryById = useMemo(() => {
+    const map = new Map<string, Category>();
+    (data.categories || []).forEach(c => map.set(c.id, c));
+    return map;
+  }, [data.categories]);
+
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<string, { total: number; category: Category }>();
+    (data.expenses || []).filter(e => e.date === selectedDate).forEach(e => {
+      const cat = e.categoryId ? categoryById.get(e.categoryId) : undefined;
+      const key = cat ? cat.id : 'uncategorized';
+      const category: Category = cat || { id: 'uncategorized', name: 'Uncategorized', color: '#94A3B8', createdAt: '' } as any;
+      const prev = totals.get(key);
+      const nextTotal = (prev?.total || 0) + parseFloat(e.amount || '0');
+      totals.set(key, { total: nextTotal, category });
+    });
+    return Array.from(totals.values());
+  }, [data.expenses, selectedDate, categoryById]);
+
+  const weekly = useMemo(() => {
+    const start = new Date(selectedDate);
+    const days: { date: string; total: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(start);
+      d.setDate(start.getDate() - i);
+      const dateStr = formatDate(d);
+      const total = (data.expenses || []).filter(e => e.date === dateStr).reduce((s, e) => s + parseFloat(e.amount || '0'), 0);
+      days.push({ date: dateStr, total });
+    }
+    return days;
+  }, [data.expenses, selectedDate]);
+
+  const monthlyTotals = useMemo(() => {
+    const d = new Date(selectedDate);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const map = new Map<string, number>();
+    (data.expenses || []).forEach(e => {
+      const ed = new Date(e.date);
+      if (ed.getFullYear() === year && ed.getMonth() === month) {
+        map.set(e.date, (map.get(e.date) || 0) + parseFloat(e.amount || '0'));
+      }
+    });
+    return Array.from(map.entries()).map(([date, total]) => ({ date, total }));
+  }, [data.expenses, selectedDate]);
+
+  const totalExpense = categoryTotals.reduce((sum, ct) => sum + ct.total, 0);
+  const monthlyHighest = monthlyTotals.length > 0 ? Math.max(...monthlyTotals.map(mt => mt.total)) : 0;
+  const monthlyAverage = monthlyTotals.length > 0 ? monthlyTotals.reduce((sum, mt) => sum + mt.total, 0) / monthlyTotals.length : 0;
+  const highestDayData = monthlyTotals.find(mt => mt.total === monthlyHighest);
+
+  // Match ChartsView visual structure
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Expense Analytics</h2>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-foreground/80">Select Date:</label>
+              <DatePicker value={selectedDate} onChange={setSelectedDate} className="h-9" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+          <CardContent className="p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Category Distribution</h3>
+            {categoryTotals.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">No category data available</div>
+            ) : (
+              <div className="space-y-2">
+                {categoryTotals.map((ct) => (
+                  <div key={ct.category.id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center min-w-0 flex-1">
+                      <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: ct.category.color }} />
+                      <span className="truncate">{ct.category.name}</span>
+                    </div>
+                    <span className="font-medium">{symbol}{formatAmountDisplay(ct.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Weekly Comparison</h3>
+            <div className="grid grid-cols-7 gap-2">
+              {weekly.map((d, idx) => (
+                <div key={idx} className="text-center">
+                  <div className="text-xs text-muted-foreground">{new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div className="font-semibold">{symbol}{formatAmountDisplay(d.total)}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Overview</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            <div className="text-center p-4 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
+              <div className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</div>
+              <div className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyHighest)}</div>
+              <div className="text-xs text-muted-foreground">{highestDayData ? new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'This month'}</div>
+            </div>
+            <div className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+              <div className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</div>
+              <div className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyAverage)}</div>
+              <div className="text-xs text-muted-foreground">This month</div>
+            </div>
+            <div className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+              <div className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</div>
+              <div className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</div>
+              <div className="text-xs text-muted-foreground">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

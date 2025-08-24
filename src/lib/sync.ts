@@ -312,6 +312,159 @@ export function subscribeToAcceptedIncomingPartners(
   });
 }
 
+// ----- Follow-ups request helpers (one-way view permissions) -----
+
+export type FollowupRequest = {
+  id: string;
+  fromUid: string;
+  fromEmail: string;
+  fromName: string;
+  toUid: string;
+  toEmail: string;
+  toName: string;
+  status: "pending" | "accepted" | "rejected" | "cancelled";
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+/** Create a follow-up request document */
+export async function createFollowupRequest(params: {
+  fromUid: string;
+  fromEmail: string;
+  fromName: string;
+  toUid: string;
+  toEmail: string;
+  toName: string;
+}): Promise<FollowupRequest> {
+  const id = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload: FollowupRequest = {
+    id,
+    fromUid: params.fromUid,
+    fromEmail: params.fromEmail,
+    fromName: params.fromName,
+    toUid: params.toUid,
+    toEmail: params.toEmail,
+    toName: params.toName,
+    status: "pending",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  await setDoc(doc(db, "followupRequests", id), payload as any, { merge: true });
+  return payload;
+}
+
+/** Subscribe to incoming follow-up requests for a user */
+export function subscribeToIncomingFollowups(userId: string, onChange: (requests: FollowupRequest[]) => void): Unsubscribe {
+  const qIncoming = query(
+    collection(db, "followupRequests"),
+    where("toUid", "==", userId),
+    where("status", "==", "pending")
+  );
+  return onSnapshot(qIncoming, (snap) => {
+    const list: FollowupRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as FollowupRequest));
+    onChange(list);
+  });
+}
+
+/** Subscribe to outgoing follow-up requests for a user */
+export function subscribeToOutgoingFollowups(userId: string, onChange: (requests: FollowupRequest[]) => void): Unsubscribe {
+  const qOutgoing = query(
+    collection(db, "followupRequests"),
+    where("fromUid", "==", userId)
+  );
+  return onSnapshot(qOutgoing, (snap) => {
+    const list: FollowupRequest[] = [];
+    snap.forEach((d) => {
+      if (d.exists()) {
+        const data = d.data() as FollowupRequest;
+        if (data.id && data.fromUid && data.toUid && data.status) {
+          list.push(data);
+        }
+      }
+    });
+    onChange(list);
+  });
+}
+
+/** Update a follow-up request's status */
+export async function updateFollowupRequestStatus(id: string, status: FollowupRequest["status"]): Promise<void> {
+  const ref = doc(db, "followupRequests", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data() as FollowupRequest;
+  const next = { ...data, status, updatedAt: serverTimestamp() } as any;
+  await setDoc(ref, next, { merge: true });
+}
+
+/** Delete a follow-up request */
+export async function deleteFollowupRequest(id: string): Promise<void> {
+  const ref = doc(db, "followupRequests", id);
+  await deleteDoc(ref);
+}
+
+/** Subscribe to accepted follow-up relationships for a user (both directions) */
+export function subscribeToAcceptedFollowups(
+  userId: string,
+  onChange: (requests: FollowupRequest[]) => void
+): Unsubscribe {
+  const qFrom = query(
+    collection(db, "followupRequests"),
+    where("fromUid", "==", userId),
+    where("status", "==", "accepted")
+  );
+  const qTo = query(
+    collection(db, "followupRequests"),
+    where("toUid", "==", userId),
+    where("status", "==", "accepted")
+  );
+
+  let latestFrom: FollowupRequest[] = [];
+  let latestTo: FollowupRequest[] = [];
+
+  const emit = () => {
+    const map = new Map<string, FollowupRequest>();
+    [...latestFrom, ...latestTo].forEach((r) => map.set(r.id, r));
+    onChange(Array.from(map.values()));
+  };
+
+  const stopFrom = onSnapshot(qFrom, (snap) => {
+    const list: FollowupRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as FollowupRequest));
+    latestFrom = list;
+    emit();
+  });
+
+  const stopTo = onSnapshot(qTo, (snap) => {
+    const list: FollowupRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as FollowupRequest));
+    latestTo = list;
+    emit();
+  });
+
+  return () => {
+    try { stopFrom(); } catch {}
+    try { stopTo(); } catch {}
+  };
+}
+
+/** Subscribe to accepted follow-up requests where the current user is the toUid (people who can view you) */
+export function subscribeToAcceptedIncomingFollowups(
+  userId: string,
+  onChange: (requests: FollowupRequest[]) => void
+): Unsubscribe {
+  const qAcceptedIncoming = query(
+    collection(db, "followupRequests"),
+    where("toUid", "==", userId),
+    where("status", "==", "accepted")
+  );
+  return onSnapshot(qAcceptedIncoming, (snap) => {
+    const list: FollowupRequest[] = [];
+    snap.forEach((d) => list.push(d.data() as FollowupRequest));
+    onChange(list);
+  });
+}
+
 
 // ----- 1:1 Chat helpers -----
 
