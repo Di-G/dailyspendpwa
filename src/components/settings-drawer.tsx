@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { type CurrencyCode, CURRENCIES } from "@/lib/currencies";
+import { SheetClose } from "@/components/ui/sheet";
 
 interface SettingsDrawerProps {
   currency: CurrencyCode;
@@ -854,6 +855,26 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
   const [tripNameInput, setTripNameInput] = useState<string>("");
   const [selectedFriendsCount, setSelectedFriendsCount] = useState<number | null>(null);
   const [friendNames, setFriendNames] = useState<string[]>([]);
+  const [showMoreFriends, setShowMoreFriends] = useState<boolean>(false);
+  const [activeTripIdSelected, setActiveTripIdSelected] = useState<string>(() => {
+    try { return localStorage.getItem('dailyspend_active_trip_id') || ''; } catch { return ''; }
+  });
+
+  useEffect(() => {
+    const onSetActive = () => {
+      try { setActiveTripIdSelected(localStorage.getItem('dailyspend_active_trip_id') || ''); } catch {}
+    };
+    window.addEventListener('dailyspend:set-active-trip', onSetActive);
+    return () => window.removeEventListener('dailyspend:set-active-trip', onSetActive);
+  }, []);
+
+  const setActiveTripGlobally = (id: string) => {
+    try {
+      localStorage.setItem('dailyspend_active_trip_id', id);
+      window.dispatchEvent(new CustomEvent('dailyspend:set-active-trip', { detail: { id } }));
+    } catch {}
+    setActiveTripIdSelected(id);
+  };
 
   useEffect(() => {
     // Refresh on open
@@ -994,7 +1015,18 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
       ) : (
         <div className="space-y-3">
           {trips.map((trip, index) => (
-            <div key={trip.id} className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/20 transition-all duration-200">
+            <SheetClose asChild key={trip.id}>
+              <div
+                className={`flex items-center justify-between p-3 border rounded-lg transition-colors cursor-pointer ${
+                  (activeTripIdSelected === trip.id)
+                    ? 'border-emerald-400 bg-emerald-100 dark:bg-emerald-900/40'
+                    : 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                }`}
+                onClick={() => { setActiveTripGlobally(trip.id); try { window.dispatchEvent(new CustomEvent('dailyspend:navigate-trips')); } catch {} }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTripGlobally(trip.id); try { window.dispatchEvent(new CustomEvent('dailyspend:navigate-trips')); } catch {} } }}
+              >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center space-x-3">
                   <div 
@@ -1016,15 +1048,16 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
                 </div>
               </div>
               <Button 
-                variant="destructive" 
-                size="icon" 
+                variant="ghost" 
+                size="sm" 
                 title="Delete trip" 
-                onClick={() => promptDeleteTrip({ id: trip.id, name: trip.name })}
-                className="ml-3 hover:scale-105 transition-transform"
+                onClick={(e) => { e.stopPropagation(); promptDeleteTrip({ id: trip.id, name: trip.name }); }}
+                className="text-red-600 hover:text-red-700 hover:bg-red-100 p-2 h-8 w-8 ml-2"
               >
                 <Trash className="w-4 h-4" />
               </Button>
             </div>
+            </SheetClose>
           ))}
         </div>
       )}
@@ -1067,6 +1100,50 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
                   </Button>
                 ))}
               </div>
+              {!showMoreFriends ? (
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                    onClick={() => setShowMoreFriends(true)}
+                  >
+                    Show 6–15
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-5 gap-2">
+                    {Array.from({ length: 10 }, (_, i) => i + 6).map((n) => (
+                      <Button
+                        key={n}
+                        type="button"
+                        variant={selectedFriendsCount === n ? 'default' : 'outline'}
+                        className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm' : 'border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'}
+                        onClick={() => {
+                          setSelectedFriendsCount(n);
+                          setFriendNames((prev) => {
+                            const next = Array.from({ length: n }, (_, idx) => prev[idx] || '');
+                            return next;
+                          });
+                        }}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full text-blue-800 dark:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                      onClick={() => setShowMoreFriends(false)}
+                    >
+                      Hide extras
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             {selectedFriendsCount != null && (
               <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
@@ -1164,12 +1241,20 @@ function ManageFriends({ onTripsChanged }: { onTripsChanged?: (hasTrips: boolean
   }, []);
 
   const COLOR_OPTIONS = [
-    "#14B8A6", // teal
-    "#6366F1", // indigo
-    "#84CC16", // lime
-    "#D946EF", // fuchsia
+    "#EF4444", // red
     "#F97316", // orange
+    "#F59E0B", // amber
+    "#84CC16", // lime
+    "#22C55E", // green
+    "#10B981", // emerald
+    "#14B8A6", // teal
+    "#06B6D4", // cyan
     "#0EA5E9", // sky
+    "#3B82F6", // blue
+    "#6366F1", // indigo
+    "#8B5CF6", // violet
+    "#A855F7", // purple
+    "#D946EF", // fuchsia
     "#F43F5E", // rose
   ];
 

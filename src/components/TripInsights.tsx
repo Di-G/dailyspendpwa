@@ -471,12 +471,22 @@ export default function TripInsights({ currency }: TripInsightsProps) {
                         className="w-3 h-3 rounded-full shadow-sm" 
                         style={{ 
                           backgroundColor: [
-                            '#14B8A6', // teal
-                            '#6366F1', // indigo
-                            '#84CC16', // lime
-                            '#D946EF', // fuchsia
+                            '#EF4444', // red
                             '#F97316', // orange
-                          ][index % 5]
+                            '#F59E0B', // amber
+                            '#84CC16', // lime
+                            '#22C55E', // green
+                            '#10B981', // emerald
+                            '#14B8A6', // teal
+                            '#06B6D4', // cyan
+                            '#0EA5E9', // sky
+                            '#3B82F6', // blue
+                            '#6366F1', // indigo
+                            '#8B5CF6', // violet
+                            '#A855F7', // purple
+                            '#D946EF', // fuchsia
+                            '#F43F5E', // rose
+                          ][index % 15]
                         }} 
                       />
                       <div>

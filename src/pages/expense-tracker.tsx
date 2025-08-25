@@ -112,6 +112,7 @@ export default function ExpenseTracker() {
   const [tripNameInput, setTripNameInput] = useState<string>("");
   const [selectedFriendsCount, setSelectedFriendsCount] = useState<number | null>(null);
   const [friendNames, setFriendNames] = useState<string[]>([]);
+  const [showMoreFriends, setShowMoreFriends] = useState<boolean>(false);
   const [hasTrips, setHasTrips] = useState<boolean>(() => {
     try { return (JSON.parse(localStorage.getItem('dailyspend_trips') || '[]') as any[]).length > 0; } catch { return false; }
   });
@@ -1671,29 +1672,30 @@ export default function ExpenseTracker() {
       </Dialog>
       {/* Trips: Add Trip Dialog */}
       <Dialog open={addTripOpen} onOpenChange={(v) => { setAddTripOpen(v); if (!v) resetAddTripState(); }}>
-        <DialogContent>
+        <DialogContent className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Add a Trip</DialogTitle>
+            <DialogTitle className="text-emerald-800 dark:text-emerald-200">Add a Trip</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Trip name</label>
+            <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <label className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Trip name</label>
               <Input
                 value={tripNameInput}
                 onChange={(e) => setTripNameInput(e.target.value)}
                 placeholder={`e.g. ${getNextDefaultTripName()}`}
+                className="mt-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800"
               />
-              <p className="text-xs text-muted-foreground mt-1">Leave empty to use the next available default name.</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Leave empty to use the next available default name.</p>
             </div>
-            <div>
-              <label className="text-sm font-medium">Number of friends to add</label>
+            <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <label className="text-sm font-medium text-blue-800 dark:text-blue-200">Number of friends to add</label>
               <div className="mt-2 grid grid-cols-5 gap-2">
                 {Array.from({ length: 5 }, (_, i) => i + 1).map((n) => (
                   <Button
                     key={n}
                     type="button"
                     variant={selectedFriendsCount === n ? 'default' : 'outline'}
-                    className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                    className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm' : 'border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'}
                     onClick={() => {
                       setSelectedFriendsCount(n);
                       setFriendNames((prev) => {
@@ -1706,32 +1708,79 @@ export default function ExpenseTracker() {
                   </Button>
                 ))}
               </div>
+              {!showMoreFriends ? (
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                    onClick={() => setShowMoreFriends(true)}
+                  >
+                    Show 6–15
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-5 gap-2">
+                    {Array.from({ length: 10 }, (_, i) => i + 6).map((n) => (
+                      <Button
+                        key={n}
+                        type="button"
+                        variant={selectedFriendsCount === n ? 'default' : 'outline'}
+                        className={selectedFriendsCount === n ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm' : 'border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'}
+                        onClick={() => {
+                          setSelectedFriendsCount(n);
+                          setFriendNames((prev) => {
+                            const next = Array.from({ length: n }, (_, idx) => prev[idx] || '');
+                            return next;
+                          });
+                        }}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full text-blue-800 dark:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                      onClick={() => setShowMoreFriends(false)}
+                    >
+                      Hide extras
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             {selectedFriendsCount != null && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Friend names</label>
-                {Array.from({ length: selectedFriendsCount }, (_, idx) => (
-                  <Input
-                    key={idx}
-                    value={friendNames[idx] || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFriendNames((prev) => {
-                        const copy = [...prev];
-                        copy[idx] = val;
-                        return copy;
-                      });
-                    }}
-                    placeholder={`Friend ${idx + 1}`}
-                  />
-                ))}
-                <p className="text-xs text-muted-foreground">Leave any blank to auto-name as Friend 1, Friend 2, ...</p>
+              <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <label className="text-sm font-medium text-purple-800 dark:text-purple-200">Friend names</label>
+                <div className="mt-2 space-y-2">
+                  {Array.from({ length: selectedFriendsCount }, (_, idx) => (
+                    <Input
+                      key={idx}
+                      value={friendNames[idx] || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFriendNames((prev) => {
+                          const copy = [...prev];
+                          copy[idx] = val;
+                          return copy;
+                        });
+                      }}
+                      placeholder={`Friend ${idx + 1}`}
+                      className="border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-800"
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">Leave any blank to auto-name as Friend 1, Friend 2, ...</p>
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setAddTripOpen(false); resetAddTripState(); }}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateTrip} disabled={selectedFriendsCount == null}>
+          <DialogFooter className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="outline" onClick={() => { setAddTripOpen(false); resetAddTripState(); }} className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-sm" onClick={handleCreateTrip} disabled={selectedFriendsCount == null}>
               Create Trip
             </Button>
           </DialogFooter>
@@ -1835,6 +1884,35 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
     cleanupOrphanedTripData();
   }, []);
 
+  // Hydrate active trip from localStorage if available
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('dailyspend_active_trip_id');
+      if (saved && trips.some(t => t.id === saved)) {
+        setActiveTripId(saved);
+      }
+    } catch {}
+  }, [trips]);
+
+  // Persist active trip to localStorage
+  useEffect(() => {
+    try {
+      if (activeTripId) localStorage.setItem('dailyspend_active_trip_id', activeTripId);
+    } catch {}
+  }, [activeTripId]);
+
+  // Listen for global request to set active trip (from Settings → Trips)
+  useEffect(() => {
+    const onSetActiveTrip = (e: any) => {
+      try {
+        const id = e?.detail?.id || localStorage.getItem('dailyspend_active_trip_id') || '';
+        if (id) setActiveTripId(id);
+      } catch {}
+    };
+    window.addEventListener('dailyspend:set-active-trip', onSetActiveTrip);
+    return () => window.removeEventListener('dailyspend:set-active-trip', onSetActiveTrip);
+  }, []);
+
   useEffect(() => {
     if (!activeTrip && trips[0]) setActiveTripId(trips[0].id);
   }, [trips, activeTrip]);
@@ -1896,11 +1974,21 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
   }, [activeTrip?.id, date, tripDataRev]);
 
   const FRIEND_COLORS = [
-    '#14B8A6', // teal
-    '#6366F1', // indigo
-    '#FF6B35', // vibrant orange-red
-    '#D946EF', // fuchsia
+    '#EF4444', // red
     '#F97316', // orange
+    '#F59E0B', // amber
+    '#84CC16', // lime
+    '#22C55E', // green
+    '#10B981', // emerald
+    '#14B8A6', // teal
+    '#06B6D4', // cyan
+    '#0EA5E9', // sky
+    '#3B82F6', // blue
+    '#6366F1', // indigo
+    '#8B5CF6', // violet
+    '#A855F7', // purple
+    '#D946EF', // fuchsia
+    '#F43F5E', // rose
   ];
 
   const handleAddExpense = async () => {
