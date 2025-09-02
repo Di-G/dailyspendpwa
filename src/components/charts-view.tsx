@@ -575,10 +575,10 @@ export default function ChartsView({ currency }: ChartsViewProps) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Charts Header with Date Selector */}
+      {/* Daily Expense Analytics with Category Distribution */}
       <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800">
         <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Daily Expense Analytics</h2>
               <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
@@ -595,13 +595,6 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                 </UIButton>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Expense Analytics Daily - Category Distribution */}
-      <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
-        <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Daily Category Distribution</h3>
           <div className="relative h-48 sm:h-64">
             {categoryTotals.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -657,17 +650,17 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       </Card>
 
       {/* Monthly Expense Analytics - Categories + Wheel */}
-      <Card>
+      <Card className="bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 dark:from-purple-950/30 dark:via-pink-950/30 dark:to-indigo-950/30 border-purple-200 dark:border-purple-800/50 shadow-lg">
         <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-foreground">Monthly Expense Analytics</h3>
-            <UIButton
-              onClick={() => { setAnalyticsMonthDialogOpen(true); setAnalyticsMonthYearView(analyticsParsed.year); }}
-              size={isMobile ? "sm" : "sm"}
-              variant={"outline" as any}
-            >
-              Change Month
-            </UIButton>
+            <h3 className="text-lg font-semibold text-foreground">Monthly Expense Analytics - 
+              <button
+                onClick={() => { setAnalyticsMonthDialogOpen(true); setAnalyticsMonthYearView(analyticsParsed.year); }}
+                className="ml-2 text-primary hover:text-primary/80 underline cursor-pointer transition-colors"
+              >
+                {analyticsMonthLabel}
+              </button>
+            </h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {allCategories.length === 0 ? (
@@ -699,7 +692,6 @@ export default function ChartsView({ currency }: ChartsViewProps) {
               })
             )}
           </div>
-          <p className="mt-2 text-[10px] sm:text-xs text-muted-foreground">{analyticsMonthLabel}</p>
 
           <div className="mt-4">
             <div className="relative h-48 sm:h-64">
@@ -775,30 +767,30 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       </Dialog>
 
       {/* Monthly Overview */}
-      <Card>
+      <Card className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-cyan-950/30 border-emerald-200 dark:border-emerald-800/50 shadow-lg">
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Overview</h3>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-6">
-            <button type="button" onClick={() => { setMonthDialogOpen(true); setMonthYearView(selectedParsed.year); }} className="text-center p-4 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
-              <Calculator className="text-red-500 dark:text-red-300 text-xl sm:text-2xl mb-2 mx-auto" />
+            <button type="button" onClick={() => { setMonthDialogOpen(true); setMonthYearView(selectedParsed.year); }} className="text-center p-4 rounded-lg border bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/40 dark:to-pink-950/40 border-rose-300 dark:border-rose-700/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <Calculator className="text-rose-600 dark:text-rose-400 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">{totalMonthTitle}</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedMonthTotal)}</p>
               <p className="text-xs text-muted-foreground">Tap to change month</p>
             </button>
-            <button type="button" onClick={() => setRangeDialogOpen(true)} className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-              <Calendar className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
+            <button type="button" onClick={() => setRangeDialogOpen(true)} className="text-center p-4 rounded-lg border bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/40 dark:to-blue-950/40 border-sky-300 dark:border-sky-700/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <Calendar className="text-sky-600 dark:text-sky-400 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">{rangeTitle}</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(totalRangeSum)}</p>
               <p className="text-xs text-muted-foreground">{rangeStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {rangeEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
             </button>
-            <button type="button" onClick={() => { setAvgMonthDialogOpen(true); setAvgMonthYearView(avgSelectedParsed.year); }} className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-              <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
+            <button type="button" onClick={() => { setAvgMonthDialogOpen(true); setAvgMonthYearView(avgSelectedParsed.year); }} className="text-center p-4 rounded-lg border bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/40 dark:to-green-950/40 border-emerald-300 dark:border-emerald-700/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <BarChart3 className="text-emerald-600 dark:text-emerald-400 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">{avgMonthTitle}</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(avgSelectedMonthAverage)}</p>
               <p className="text-xs text-muted-foreground">Tap to change month</p>
             </button>
-            <div className="text-center p-4 rounded-lg border bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
-              <TrendingUp className="text-purple-500 dark:text-purple-300 text-xl sm:text-2xl mb-2 mx-auto" />
+            <div className="text-center p-4 rounded-lg border bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/40 dark:to-purple-950/40 border-violet-300 dark:border-violet-700/50">
+              <TrendingUp className="text-violet-600 dark:text-violet-400 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyHighest)}</p>
               <p className="text-xs text-muted-foreground">
