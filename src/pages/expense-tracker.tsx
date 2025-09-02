@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { getToday, getMonthInfo, generateCalendarDays, formatDate } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { getCategories, createExpense, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
+import { getCategories, createExpense, createCategory, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1607,9 +1607,20 @@ export default function ExpenseTracker() {
                   if (items.length === 0) return;
                   const myCategories = getCategories();
                   items.forEach((e) => {
-                    const mappedCategoryId = myCategories.some(c => c.id === (e.categoryId || ''))
-                      ? (e.categoryId as string)
-                      : null;
+                    let mappedCategoryId: string | null = null;
+                    if (e.categoryId) {
+                      const partnerCat = (partnerData?.categories || []).find(c => c.id === e.categoryId);
+                      if (partnerCat) {
+                        const normalize = (s: string) => s.trim().toLowerCase();
+                        const mineByName = myCategories.find(c => normalize(c.name) === normalize(partnerCat.name));
+                        if (mineByName) {
+                          mappedCategoryId = mineByName.id;
+                        } else {
+                          const created = createCategory({ name: partnerCat.name, color: partnerCat.color });
+                          mappedCategoryId = created.id;
+                        }
+                      }
+                    }
                     createExpense({
                       name: e.name,
                       amount: e.amount,
@@ -3349,11 +3360,24 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
     setCopyLoading(true);
     try {
       const targetDate = useCustomDate ? customDate : getToday();
-      // Map partner categoryId to my categories if present; otherwise unset
+      // Map partner category to my categories by name; create if missing.
       const myCategories = getCategories();
-      const mappedCategoryId = myCategories.some(c => c.id === (selectedExpense.categoryId || ''))
-        ? (selectedExpense.categoryId as string)
-        : null;
+      let mappedCategoryId: string | null = null;
+      if (selectedExpense.categoryId) {
+        const partnerCat = (data.categories || []).find(c => c.id === selectedExpense.categoryId);
+        if (partnerCat) {
+          // Find my category by name (case-insensitive). If found, keep my color.
+          const normalize = (s: string) => s.trim().toLowerCase();
+          const mineByName = myCategories.find(c => normalize(c.name) === normalize(partnerCat.name));
+          if (mineByName) {
+            mappedCategoryId = mineByName.id;
+          } else {
+            // Create a new category locally with partner's name and color
+            const created = createCategory({ name: partnerCat.name, color: partnerCat.color });
+            mappedCategoryId = created.id;
+          }
+        }
+      }
 
       // Create a new expense with the specified date
       await createExpense({
@@ -3732,13 +3756,29 @@ function PartnerCalendarReadOnly({ currency, data, partnerName, disableInteracti
     setCopyLoading(true);
     try {
       const targetDate = useCustomDate ? customDate : getToday();
-      
+      // Map partner category by name; create if missing
+      const myCategories = getCategories();
+      let mappedCategoryId: string | null = null;
+      if (selectedExpense.categoryId) {
+        const partnerCat = (data.categories || []).find(c => c.id === selectedExpense.categoryId);
+        if (partnerCat) {
+          const normalize = (s: string) => s.trim().toLowerCase();
+          const mineByName = myCategories.find(c => normalize(c.name) === normalize(partnerCat.name));
+          if (mineByName) {
+            mappedCategoryId = mineByName.id;
+          } else {
+            const created = createCategory({ name: partnerCat.name, color: partnerCat.color });
+            mappedCategoryId = created.id;
+          }
+        }
+      }
+
       // Create a new expense with the specified date
       await createExpense({
         name: selectedExpense.name,
         amount: selectedExpense.amount,
         details: selectedExpense.details ?? undefined,
-        categoryId: selectedExpense.categoryId ?? undefined,
+        categoryId: mappedCategoryId ?? undefined,
         date: targetDate,
       });
       
