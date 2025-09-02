@@ -32,6 +32,7 @@ import { getToday, getMonthInfo, generateCalendarDays, formatDate } from "@/lib/
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { getCategories, createExpense, createCategory, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData, getTrips as getStoredTrips } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as UICalendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -4242,9 +4243,46 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
   }, []);
 
   const totalExpense = categoryTotals.reduce((sum, ct) => sum + ct.total, 0);
+
+  // Range selection state
+  const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
+  const [totalRange, setTotalRange] = useState<{ mode: 'week' | 'lastNDays' | 'custom'; days?: number; startDate?: string }>({ mode: 'week' });
+
+  // Resolve current Monday..selected range and dynamic range choice
+  const selectedForWeek = new Date(selectedDate);
+  const weekStart = new Date(selectedForWeek);
+  {
+    const day = selectedForWeek.getDay();
+    const diffToMonday = (day + 6) % 7;
+    weekStart.setDate(selectedForWeek.getDate() - diffToMonday);
+  }
+  const rangeStart = useMemo(() => {
+    if (totalRange.mode === 'week') return weekStart;
+    if (totalRange.mode === 'lastNDays') {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() - ((totalRange.days || 1) - 1));
+      return d;
+    }
+    if (totalRange.mode === 'custom' && totalRange.startDate) return new Date(totalRange.startDate);
+    return weekStart;
+  }, [totalRange, selectedDate]);
+  const rangeEnd = new Date(selectedDate);
+  const thisRangeSum = useMemo(() => {
+    const startStr = formatDate(rangeStart);
+    const endStr = formatDate(rangeEnd);
+    return (data.expenses || [])
+      .filter(e => e.date >= startStr && e.date <= endStr)
+      .reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
+  }, [data.expenses, rangeStart, rangeEnd]);
+  const rangeTitle = totalRange.mode === 'week'
+    ? 'Total This Week'
+    : totalRange.mode === 'lastNDays'
+      ? `Total Last ${totalRange.days} Day${(totalRange.days || 0) > 1 ? 's' : ''}`
+      : 'Total Since';
   const selectedMonth = new Date(selectedDate);
   const monthlyHighest = monthlyTotals.length > 0 ? Math.max(...monthlyTotals.map(mt => mt.total)) : 0;
   const monthlyAverage = monthlyTotals.length > 0 ? monthlyTotals.reduce((sum, mt) => sum + mt.total, 0) / monthlyTotals.length : 0;
+  const weeklySum = weeklyData.reduce((sum, v) => sum + v, 0);
   const highestDayData = monthlyTotals.find(mt => mt.total === monthlyHighest);
   const highestDayName = highestDayData ? new Date(highestDayData.date).toLocaleDateString('en-US', { weekday: 'long' }) : '';
   const highestDayDate = highestDayData ? new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -4323,12 +4361,18 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
       <Card>
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Overview</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-            <div className="text-center p-4 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
-              <TrendingUp className="text-red-500 dark:text-red-300 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyHighest)}</p>
-              <p className="text-xs text-muted-foreground">{highestDayData ? `${new Date(highestDayData.date).toLocaleDateString('en-US', { weekday: 'long' })}, ${new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'This month'}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-6">
+            <button type="button" onClick={() => setRangeDialogOpen(true)} className="text-center p-4 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
+              <Calendar className="text-red-500 dark:text-red-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">{rangeTitle}</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(thisRangeSum)}</p>
+              <p className="text-xs text-muted-foreground">{rangeStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {rangeEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+            </button>
+            <div className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+              <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
+              <p className="text-xs text-muted-foreground">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
             </div>
             <div className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
               <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
@@ -4336,15 +4380,93 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
               <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyAverage)}</p>
               <p className="text-xs text-muted-foreground">This month</p>
             </div>
-            <div className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-              <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
-              <p className="text-xs text-muted-foreground">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+            <div className="text-center p-4 rounded-lg border bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
+              <TrendingUp className="text-purple-500 dark:text-purple-300 text-xl sm:text-2xl mb-2 mx-auto" />
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{symbol}{formatAmountDisplay(monthlyHighest)}</p>
+              <p className="text-xs text-muted-foreground">{highestDayData ? `${new Date(highestDayData.date).toLocaleDateString('en-US', { weekday: 'long' })}, ${new Date(highestDayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'This month'}</p>
             </div>
           </div>
         </CardContent>
       </Card>
+      {/* Range selection dialog */}
+      <Dialog open={rangeDialogOpen} onOpenChange={setRangeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select total range</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setTotalRange({ mode: 'week' }); setRangeDialogOpen(false); }}
+                className="p-3 rounded-lg border bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-left hover:opacity-90"
+              >
+                <div className="text-xs text-foreground/80">Quick</div>
+                <div className="text-sm font-semibold">Total This Week</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTotalRange({ mode: 'lastNDays', days: 2 }); setRangeDialogOpen(false); }}
+                className="p-3 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-left hover:opacity-90"
+              >
+                <div className="text-xs text-foreground/80">Quick</div>
+                <div className="text-sm font-semibold">Total of last 2 days</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTotalRange({ mode: 'lastNDays', days: 3 }); setRangeDialogOpen(false); }}
+                className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-left hover:opacity-90"
+              >
+                <div className="text-xs text-foreground/80">Quick</div>
+                <div className="text-sm font-semibold">Total of last 3 days</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTotalRange({ mode: 'lastNDays', days: 4 }); setRangeDialogOpen(false); }}
+                className="p-3 rounded-lg border bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800 text-left hover:opacity-90"
+              >
+                <div className="text-xs text-foreground/80">Quick</div>
+                <div className="text-sm font-semibold">Total of last 4 days</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTotalRange({ mode: 'lastNDays', days: 5 }); setRangeDialogOpen(false); }}
+                className="p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-left hover:opacity-90"
+              >
+                <div className="text-xs text-foreground/80">Quick</div>
+                <div className="text-sm font-semibold">Total of last 5 days</div>
+              </button>
+              <div className="p-3 rounded-lg border bg-muted/40 border-border">
+                <div className="text-xs text-foreground/80 mb-2">Custom</div>
+                <UICalendar
+                  mode="single"
+                  selected={rangeStart}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    const today = new Date();
+                    const limit = new Date(today);
+                    limit.setMonth(limit.getMonth() - 3);
+                    limit.setDate(1);
+                    if (d < limit) return;
+                    setTotalRange({ mode: 'custom', startDate: formatDate(d) });
+                    setRangeDialogOpen(false);
+                  }}
+                  disabled={(date) => {
+                    const today = new Date();
+                    const limit = new Date(today);
+                    limit.setMonth(limit.getMonth() - 3);
+                    limit.setDate(1);
+                    return date < limit || date > new Date(selectedDate);
+                  }}
+                  initialFocus
+                />
+                <div className="mt-2 text-xs text-muted-foreground">Select a start date (up to last 3 months)</div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
