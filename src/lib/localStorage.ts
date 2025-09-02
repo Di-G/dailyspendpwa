@@ -75,6 +75,13 @@ export const createCategory = (data: InsertCategory): Category => {
 
 export const deleteCategory = (id: string): void => {
   const categories = getCategories();
+  const categoryToDelete = categories.find(cat => cat.id === id);
+  
+  // Prevent deletion of Uncategorized category
+  if (categoryToDelete && categoryToDelete.name === 'Uncategorized') {
+    throw new Error('Cannot delete the Uncategorized category');
+  }
+  
   const updatedCategories = categories.filter(cat => cat.id !== id);
   setToStorage(CATEGORIES_KEY, updatedCategories);
   
@@ -92,6 +99,13 @@ export const updateCategory = (
   data: { name?: string; color?: string }
 ): Category | null => {
   const categories = getCategories();
+  const categoryToUpdate = categories.find(cat => cat.id === id);
+  
+  // Prevent editing of Uncategorized category
+  if (categoryToUpdate && categoryToUpdate.name === 'Uncategorized') {
+    throw new Error('Cannot edit the Uncategorized category');
+  }
+  
   let updated: Category | null = null;
   const updatedCategories = categories.map(cat => {
     if (cat.id !== id) return cat;
@@ -133,12 +147,20 @@ export const getExpensesByDateRange = (startDate: string, endDate: string): Expe
 
 export const createExpense = (data: InsertExpense): Expense => {
   const expenses = getExpenses();
+  
+  // If no category is provided, assign to uncategorized category
+  let categoryId = data.categoryId;
+  if (!categoryId) {
+    const uncategorizedCategory = getOrCreateUncategorizedCategory();
+    categoryId = uncategorizedCategory.id;
+  }
+  
   const newExpense: Expense = {
     id: generateId(),
     name: data.name,
     amount: data.amount,
     details: data.details || null,
-    categoryId: data.categoryId || null,
+    categoryId: categoryId,
     date: data.date,
     createdAt: new Date().toISOString(),
   };
@@ -209,12 +231,20 @@ export const createRecurringExpense = (data: InsertRecurringExpense): RecurringE
   if (data.startDate < todayStr) {
     throw new Error('Start date cannot be in the past');
   }
+  
+  // If no category is provided, assign to uncategorized category
+  let categoryId = data.categoryId;
+  if (!categoryId) {
+    const uncategorizedCategory = getOrCreateUncategorizedCategory();
+    categoryId = uncategorizedCategory.id;
+  }
+  
   const newRecurringExpense: RecurringExpense = {
     id: generateId(),
     name: data.name,
     amount: data.amount,
     details: data.details || null,
-    categoryId: data.categoryId || null,
+    categoryId: categoryId,
     frequency: data.frequency,
     customDays: data.customDays,
     startDate: data.startDate,
@@ -415,7 +445,7 @@ export const getCategoryTotals = (date: string): Array<{ categoryId: string; tot
     const category = categories.find(cat => cat.id === categoryId) || ({
       id: categoryId,
       name: 'Uncategorized',
-      color: '#94A3B8',
+      color: '#B0B0B0',
       createdAt: new Date(0).toISOString(),
     } as Category);
     return {
@@ -468,6 +498,176 @@ export const getWeeklyTotals = (date: string): Array<{ date: string; total: numb
   }));
 };
 
+// Get or create the uncategorized category
+export const getOrCreateUncategorizedCategory = (): Category => {
+  const categories = getCategories();
+  let uncategorized = categories.find(cat => cat.name === 'Uncategorized');
+  
+  if (!uncategorized) {
+    uncategorized = createCategory({
+      name: 'Uncategorized',
+      color: '#B0B0B0'
+    });
+  }
+  
+  return uncategorized;
+};
+
+// Scan and fix existing expenses without categories
+export const fixExpensesWithoutCategories = (): number => {
+  const expenses = getExpenses();
+  const uncategorizedCategory = getOrCreateUncategorizedCategory();
+  let fixedCount = 0;
+  
+  const updatedExpenses = expenses.map(expense => {
+    if (!expense.categoryId) {
+      fixedCount++;
+      return {
+        ...expense,
+        categoryId: uncategorizedCategory.id
+      };
+    }
+    return expense;
+  });
+  
+  if (fixedCount > 0) {
+    setToStorage(EXPENSES_KEY, updatedExpenses);
+    emitDataChanged();
+    console.log(`Fixed ${fixedCount} expenses without categories by assigning them to 'Uncategorized'`);
+  }
+  
+  return fixedCount;
+};
+
+// Scan and fix existing recurring expenses without categories
+export const fixRecurringExpensesWithoutCategories = (): number => {
+  const recurringExpenses = getRecurringExpenses();
+  const uncategorizedCategory = getOrCreateUncategorizedCategory();
+  let fixedCount = 0;
+  
+  const updatedRecurringExpenses = recurringExpenses.map(expense => {
+    if (!expense.categoryId) {
+      fixedCount++;
+      return {
+        ...expense,
+        categoryId: uncategorizedCategory.id
+      };
+    }
+    return expense;
+  });
+  
+  if (fixedCount > 0) {
+    setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+    emitDataChanged();
+    console.log(`Fixed ${fixedCount} recurring expenses without categories by assigning them to 'Uncategorized'`);
+  }
+  
+  return fixedCount;
+};
+
+// Scan and fix expenses with invalid category references (categories that no longer exist)
+export const fixExpensesWithInvalidCategories = (): number => {
+  const expenses = getExpenses();
+  const categories = getCategories();
+  const uncategorizedCategory = getOrCreateUncategorizedCategory();
+  let fixedCount = 0;
+  
+  // Create a set of valid category IDs for quick lookup
+  const validCategoryIds = new Set(categories.map(cat => cat.id));
+  
+  const updatedExpenses = expenses.map(expense => {
+    // Check if expense has a categoryId that doesn't exist in current categories
+    if (expense.categoryId && !validCategoryIds.has(expense.categoryId)) {
+      fixedCount++;
+      return {
+        ...expense,
+        categoryId: uncategorizedCategory.id
+      };
+    }
+    return expense;
+  });
+  
+  if (fixedCount > 0) {
+    setToStorage(EXPENSES_KEY, updatedExpenses);
+    emitDataChanged();
+    console.log(`Fixed ${fixedCount} expenses with invalid category references by assigning them to 'Uncategorized'`);
+  }
+  
+  return fixedCount;
+};
+
+// Scan and fix recurring expenses with invalid category references
+export const fixRecurringExpensesWithInvalidCategories = (): number => {
+  const recurringExpenses = getRecurringExpenses();
+  const categories = getCategories();
+  const uncategorizedCategory = getOrCreateUncategorizedCategory();
+  let fixedCount = 0;
+  
+  // Create a set of valid category IDs for quick lookup
+  const validCategoryIds = new Set(categories.map(cat => cat.id));
+  
+  const updatedRecurringExpenses = recurringExpenses.map(expense => {
+    // Check if expense has a categoryId that doesn't exist in current categories
+    if (expense.categoryId && !validCategoryIds.has(expense.categoryId)) {
+      fixedCount++;
+      return {
+        ...expense,
+        categoryId: uncategorizedCategory.id
+      };
+    }
+    return expense;
+  });
+  
+  if (fixedCount > 0) {
+    setToStorage(RECURRING_EXPENSES_KEY, updatedRecurringExpenses);
+    emitDataChanged();
+    console.log(`Fixed ${fixedCount} recurring expenses with invalid category references by assigning them to 'Uncategorized'`);
+  }
+  
+  return fixedCount;
+};
+
+// Comprehensive function to fix all category-related issues
+export const fixAllCategoryIssues = (): { 
+  fixedExpensesWithoutCategories: number;
+  fixedRecurringWithoutCategories: number;
+  fixedExpensesWithInvalidCategories: number;
+  fixedRecurringWithInvalidCategories: number;
+  totalFixed: number;
+} => {
+  console.log('Starting comprehensive category fix...');
+  
+  // Ensure uncategorized category exists
+  getOrCreateUncategorizedCategory();
+  
+  // Fix all types of category issues
+  const fixedExpensesWithoutCategories = fixExpensesWithoutCategories();
+  const fixedRecurringWithoutCategories = fixRecurringExpensesWithoutCategories();
+  const fixedExpensesWithInvalidCategories = fixExpensesWithInvalidCategories();
+  const fixedRecurringWithInvalidCategories = fixRecurringExpensesWithInvalidCategories();
+  
+  const totalFixed = fixedExpensesWithoutCategories + fixedRecurringWithoutCategories + 
+                    fixedExpensesWithInvalidCategories + fixedRecurringWithInvalidCategories;
+  
+  if (totalFixed > 0) {
+    console.log(`Category fix completed: ${totalFixed} total items fixed`);
+    console.log(`- ${fixedExpensesWithoutCategories} expenses without categories`);
+    console.log(`- ${fixedRecurringWithoutCategories} recurring expenses without categories`);
+    console.log(`- ${fixedExpensesWithInvalidCategories} expenses with invalid category references`);
+    console.log(`- ${fixedRecurringWithInvalidCategories} recurring expenses with invalid category references`);
+  } else {
+    console.log('No category issues found - all data is properly categorized');
+  }
+  
+  return {
+    fixedExpensesWithoutCategories,
+    fixedRecurringWithoutCategories,
+    fixedExpensesWithInvalidCategories,
+    fixedRecurringWithInvalidCategories,
+    totalFixed
+  };
+};
+
 // Initialize default categories if none exist
 export const initializeDefaultCategories = (): void => {
   try {
@@ -484,6 +684,23 @@ export const initializeDefaultCategories = (): void => {
       
       defaultCategories.forEach(category => createCategory(category));
       console.log('Default categories initialized successfully');
+    }
+    
+    // Ensure uncategorized category exists
+    getOrCreateUncategorizedCategory();
+    
+    // Fix any existing expenses without categories
+    const fixedExpensesCount = fixExpensesWithoutCategories();
+    const fixedRecurringCount = fixRecurringExpensesWithoutCategories();
+    
+    // Fix any expenses with invalid category references (categories that no longer exist)
+    const fixedInvalidExpensesCount = fixExpensesWithInvalidCategories();
+    const fixedInvalidRecurringCount = fixRecurringExpensesWithInvalidCategories();
+    
+    const totalFixed = fixedExpensesCount + fixedRecurringCount + fixedInvalidExpensesCount + fixedInvalidRecurringCount;
+    if (totalFixed > 0) {
+      console.log(`Fixed ${fixedExpensesCount} expenses and ${fixedRecurringCount} recurring expenses without categories`);
+      console.log(`Fixed ${fixedInvalidExpensesCount} expenses and ${fixedInvalidRecurringCount} recurring expenses with invalid category references`);
     }
   } catch (error) {
     console.error('Error initializing default categories:', error);
@@ -502,6 +719,18 @@ export const updateAllData = (
     setToStorage(CATEGORIES_KEY, categories);
     setToStorage(EXPENSES_KEY, expenses);
     setToStorage(RECURRING_EXPENSES_KEY, recurring);
+    
+    // Ensure uncategorized category exists after data update
+    getOrCreateUncategorizedCategory();
+    
+    // Fix any expenses with invalid category references after data merge/upload
+    const fixedInvalidExpensesCount = fixExpensesWithInvalidCategories();
+    const fixedInvalidRecurringCount = fixRecurringExpensesWithInvalidCategories();
+    
+    if (fixedInvalidExpensesCount > 0 || fixedInvalidRecurringCount > 0) {
+      console.log(`After data update: Fixed ${fixedInvalidExpensesCount} expenses and ${fixedInvalidRecurringCount} recurring expenses with invalid category references`);
+    }
+    
     emitDataChanged();
   } catch (error) {
     console.error('Error updating all data:', error);

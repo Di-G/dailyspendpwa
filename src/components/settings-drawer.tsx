@@ -6,7 +6,7 @@ import CategoryManagement from "@/components/category-management";
 import PartnerManagement from "@/components/partner-management";
 import FollowupsManagement from "@/components/followups-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw, cleanupOrphanedTripData, setTrips as setStoredTrips } from "@/lib/localStorage";
+import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw, cleanupOrphanedTripData, setTrips as setStoredTrips, fixAllCategoryIssues, getOrCreateUncategorizedCategory } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
 import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest, subscribeToIncomingFollowups, subscribeToOutgoingFollowups, subscribeToAcceptedIncomingFollowups, updateFollowupRequestStatus, deleteFollowupRequest, type FollowupRequest } from "@/lib/sync";
 import { Trash, Plus } from "lucide-react";
@@ -41,8 +41,49 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
   const [outgoingFollowups, setOutgoingFollowups] = useState<FollowupRequest[]>([]);
   const [incomingFollowups, setIncomingFollowups] = useState<FollowupRequest[]>([]);
   const [acceptedIncomingFollowups, setAcceptedIncomingFollowups] = useState<FollowupRequest[]>([]);
+  const [hasCategoryIssues, setHasCategoryIssues] = useState(false);
+
+  // Function to check if there are any category issues
+  const checkCategoryIssues = () => {
+    try {
+      const expenses = getExpenses();
+      const recurringExpenses = getRecurringExpensesRaw();
+      const categories = getCategories();
+      const uncategorizedCategory = getOrCreateUncategorizedCategory();
+      
+      // Create a set of valid category IDs for quick lookup
+      const validCategoryIds = new Set(categories.map(cat => cat.id));
+      
+      // Check for expenses without categories
+      const hasExpensesWithoutCategories = expenses.some(expense => !expense.categoryId);
+      
+      // Check for recurring expenses without categories
+      const hasRecurringWithoutCategories = recurringExpenses.some(expense => !expense.categoryId);
+      
+      // Check for expenses with invalid category references
+      const hasExpensesWithInvalidCategories = expenses.some(expense => 
+        expense.categoryId && !validCategoryIds.has(expense.categoryId)
+      );
+      
+      // Check for recurring expenses with invalid category references
+      const hasRecurringWithInvalidCategories = recurringExpenses.some(expense => 
+        expense.categoryId && !validCategoryIds.has(expense.categoryId)
+      );
+      
+      const hasIssues = hasExpensesWithoutCategories || hasRecurringWithoutCategories || 
+                       hasExpensesWithInvalidCategories || hasRecurringWithInvalidCategories;
+      
+      setHasCategoryIssues(hasIssues);
+    } catch (error) {
+      console.error('Error checking category issues:', error);
+      setHasCategoryIssues(false);
+    }
+  };
 
   useEffect(() => {
+    // Check for category issues when component mounts
+    checkCategoryIssues();
+    
     let stopOut: null | (() => void) = null;
     let stopIn: null | (() => void) = null;
     let stopAcceptedIncoming: null | (() => void) = null;
@@ -762,13 +803,63 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
             <>
               <button
                 className="w-full text-left text-sm font-medium text-foreground py-2"
-                onClick={() => toggle("categories")}
+                onClick={() => {
+                  toggle("categories");
+                  // Check for category issues when opening the categories section
+                  if (!open.categories) {
+                    checkCategoryIssues();
+                  }
+                }}
               >
                 Manage Categories
               </button>
               <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
-                <div className="pt-2">
+                <div className="pt-2 space-y-3">
                   <CategoryManagement hideHeader />
+                  
+                  {/* Fix Category Issues Button - Only show when there are issues */}
+                  {hasCategoryIssues && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">Fix Category Issues</h4>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">Fix expenses with missing or invalid categories</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            try {
+                              const result = fixAllCategoryIssues();
+                              if (result.totalFixed > 0) {
+                                toast({
+                                  title: "Category Issues Fixed",
+                                  description: `Fixed ${result.totalFixed} items with category issues. Check console for details.`,
+                                });
+                                // Re-check for issues after fixing
+                                checkCategoryIssues();
+                              } else {
+                                toast({
+                                  title: "No Issues Found",
+                                  description: "All expenses are properly categorized.",
+                                });
+                                setHasCategoryIssues(false);
+                              }
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to fix category issues. Check console for details.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/20"
+                        >
+                          Fix Now
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </>

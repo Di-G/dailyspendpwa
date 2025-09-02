@@ -66,8 +66,8 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
       try {
         deleteCategory(id);
         return { success: true };
-      } catch (error) {
-        throw new Error('Failed to delete category');
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to delete category');
       }
     },
     onSuccess: () => {
@@ -118,6 +118,8 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
       toast({ title: "Renamed", description: "Category name updated" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update category", variant: "destructive" });
     } finally {
       setEditingId(null);
       setEditingName("");
@@ -224,20 +226,42 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
                   />
                 ) : (
                   <button
-                    className="text-left text-sm font-medium text-foreground truncate"
-                    onClick={() => { setEditingId(category.id); setEditingName(category.name); }}
-                    title="Click to rename"
+                    className={`text-left text-sm font-medium truncate ${
+                      category.name === 'Uncategorized' 
+                        ? 'text-muted-foreground cursor-not-allowed' 
+                        : 'text-foreground'
+                    }`}
+                    onClick={() => { 
+                      if (category.name !== 'Uncategorized') {
+                        setEditingId(category.id); 
+                        setEditingName(category.name); 
+                      }
+                    }}
+                    title={category.name === 'Uncategorized' ? 'Uncategorized category cannot be edited' : 'Click to rename'}
+                    disabled={category.name === 'Uncategorized'}
                   >
                     {category.name}
+                    {category.name === 'Uncategorized' && (
+                      <span className="ml-1 text-xs text-muted-foreground">(Protected)</span>
+                    )}
                   </button>
                 )}
               </div>
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-red-500 hover:text-red-700 text-sm p-1 sm:p-2 flex-shrink-0"
-                onClick={() => deleteCategoryMutation.mutate(category.id)}
-                disabled={deleteCategoryMutation.isPending}
+                className={`text-sm p-1 sm:p-2 flex-shrink-0 ${
+                  category.name === 'Uncategorized'
+                    ? 'text-muted-foreground cursor-not-allowed'
+                    : 'text-red-500 hover:text-red-700'
+                }`}
+                onClick={() => {
+                  if (category.name !== 'Uncategorized') {
+                    deleteCategoryMutation.mutate(category.id);
+                  }
+                }}
+                disabled={deleteCategoryMutation.isPending || category.name === 'Uncategorized'}
+                title={category.name === 'Uncategorized' ? 'Uncategorized category cannot be deleted' : 'Delete category'}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>

@@ -166,6 +166,10 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
   const [deletedExpense, setDeletedExpense] = useState<ExpenseWithCategory | null>(null);
   const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
   
+  // Warning dialog state for uncategorized expenses
+  const [showUncategorizedWarning, setShowUncategorizedWarning] = useState(false);
+  const [pendingExpenseData, setPendingExpenseData] = useState<any>(null);
+  
 
 
   const openEdit = (expense: ExpenseWithCategory) => {
@@ -284,10 +288,33 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
       return;
     }
     
+    // Check if no category is selected
+    if (!data.categoryId || data.categoryId === "") {
+      setPendingExpenseData({
+        ...data,
+        amount: amount.toString(),
+      });
+      setShowUncategorizedWarning(true);
+      return;
+    }
+    
     addExpenseMutation.mutate({
       ...data,
       amount: amount.toString(),
     });
+  };
+
+  const handleConfirmUncategorized = () => {
+    if (pendingExpenseData) {
+      addExpenseMutation.mutate(pendingExpenseData);
+    }
+    setShowUncategorizedWarning(false);
+    setPendingExpenseData(null);
+  };
+
+  const handleCancelUncategorized = () => {
+    setShowUncategorizedWarning(false);
+    setPendingExpenseData(null);
   };
 
   // Removed auto-generation on viewing other dates. Recurring is processed centrally at midnight or on app start.
@@ -686,6 +713,31 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
             {updateExpenseMutation.isPending ? "Saving..." : "Save Changes"}
           </Button>
         </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Uncategorized Warning Dialog */}
+      <Dialog open={showUncategorizedWarning} onOpenChange={setShowUncategorizedWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>No Category Selected</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              You haven't selected a category for this expense. It will be automatically assigned to the "Uncategorized" category.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Would you like to continue or go back to select a category?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelUncategorized}>
+              Go Back
+            </Button>
+            <Button onClick={handleConfirmUncategorized}>
+              Continue with Uncategorized
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
