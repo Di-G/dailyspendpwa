@@ -6,7 +6,7 @@ import CategoryManagement from "@/components/category-management";
 import PartnerManagement from "@/components/partner-management";
 import FollowupsManagement from "@/components/followups-management";
 import { useToast } from "@/hooks/use-toast";
-import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
+import { getExpenses, getCategories, updateAllData, initializeDefaultCategories, getTripExpensesRaw, setTripExpensesRaw, getTripRecurringRaw, setTripRecurringRaw, cleanupOrphanedTripData, setTrips as setStoredTrips } from "@/lib/localStorage";
 import { useAuth } from "@/lib/auth";
 import { subscribeToIncomingRequests, subscribeToOutgoingRequests, updatePartnerRequestStatus, deletePartnerRequest, subscribeToAcceptedIncomingPartners, type PartnerRequest, subscribeToIncomingFollowups, subscribeToOutgoingFollowups, subscribeToAcceptedIncomingFollowups, updateFollowupRequestStatus, deleteFollowupRequest, type FollowupRequest } from "@/lib/sync";
 import { Trash, Plus } from "lucide-react";
@@ -615,42 +615,58 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
         <TripsManagement onTripsChanged={onTripsChanged} />
       )}
 
-      {/* Currency (hidden on followups) */}
+      {/* Swap order on Trips tab: show Manage Friends here instead of Currency */}
       {topTab !== 'couple' && topTab !== 'followups' && (
-        <div>
-          <button
-            className="w-full text-left text-sm font-medium text-foreground py-2"
-            onClick={() => toggle("currency")}
-          >
-            Currency
-          </button>
-          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-[800px]' : 'max-h-0'}`}>
-            <div className="pt-2">
-              <div className="space-y-2">
-                <div className="text-sm text-muted-foreground">
-                  Current: {currency ? `${CURRENCIES[currency].symbol} ${currency} - ${CURRENCIES[currency].name}` : "None selected"}
-                </div>
-                <Select value={currency} onValueChange={onCurrencyChange}>
-                  <SelectTrigger className="w-64">
-                    <SelectValue>
-                      {currency ? `${CURRENCIES[currency].symbol} ${currency}` : "Select currency"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className={`${topTab === 'trips' ? 'max-h-[40vh]' : 'max-h-[60vh]'} overflow-y-auto z-[9999]`} style={{ maxHeight: topTab === 'trips' ? '40vh' : '60vh' }}>
-                    {Object.entries(CURRENCIES).map(([code, curr]) => (
-                      <SelectItem key={code} value={code}>
-                        {curr.symbol} {code} - {curr.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="text-xs text-muted-foreground">
-                  Click the dropdown above to select a currency
+        topTab === 'trips' ? (
+          <div>
+            <button
+              className="w-full text-left text-sm font-medium text-foreground py-2"
+              onClick={() => toggle("categories")}
+            >
+              Manage Friends
+            </button>
+            <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
+              <div className="pt-2">
+                <ManageFriends onTripsChanged={onTripsChanged} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <button
+              className="w-full text-left text-sm font-medium text-foreground py-2"
+              onClick={() => toggle("currency")}
+            >
+              Currency
+            </button>
+            <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-[800px]' : 'max-h-0'}`}>
+              <div className="pt-2">
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">
+                    Current: {currency ? `${CURRENCIES[currency].symbol} ${currency} - ${CURRENCIES[currency].name}` : "None selected"}
+                  </div>
+                  <Select value={currency} onValueChange={onCurrencyChange}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue>
+                        {currency ? `${CURRENCIES[currency].symbol} ${currency}` : "Select currency"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className={`${topTab === 'trips' ? 'max-h-[40vh]' : 'max-h-[60vh]'} overflow-y-auto z-[9999]`} style={{ maxHeight: topTab === 'trips' ? '40vh' : '60vh' }}>
+                      {Object.entries(CURRENCIES).map(([code, curr]) => (
+                        <SelectItem key={code} value={code}>
+                          {curr.symbol} {code} - {curr.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-muted-foreground">
+                    Click the dropdown above to select a currency
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Manage Partners Heading for Couple Tab */}
@@ -706,21 +722,57 @@ export default function SettingsDrawer({ currency, setCurrency, topTab = "my", o
         </div>
       ) : (
         <div>
-          <button
-            className="w-full text-left text-sm font-medium text-foreground py-2"
-            onClick={() => toggle("categories")}
-          >
-            {topTab === 'trips' ? 'Manage Friends' : 'Manage Categories'}
-          </button>
-          <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
-            <div className="pt-2">
-              {topTab === 'trips' ? (
-                <ManageFriends onTripsChanged={onTripsChanged} />
-              ) : (
-                <CategoryManagement hideHeader />
-              )}
+          {topTab === 'trips' ? (
+            // Currency goes here for Trips tab (swapped position)
+            <div>
+              <button
+                className="w-full text-left text-sm font-medium text-foreground py-2"
+                onClick={() => toggle("currency")}
+              >
+                Currency
+              </button>
+              <div className={`overflow-hidden transition-[max-height] duration-300 ${open.currency ? 'max-h-[800px]' : 'max-h-0'}`}>
+                <div className="pt-2">
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">
+                      Current: {currency ? `${CURRENCIES[currency].symbol} ${currency} - ${CURRENCIES[currency].name}` : "None selected"}
+                    </div>
+                    <Select value={currency} onValueChange={onCurrencyChange}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue>
+                          {currency ? `${CURRENCIES[currency].symbol} ${currency}` : "Select currency"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className={`${topTab === 'trips' ? 'max-h-[40vh]' : 'max-h-[60vh]'} overflow-y-auto z-[9999]`} style={{ maxHeight: topTab === 'trips' ? '40vh' : '60vh' }}>
+                        {Object.entries(CURRENCIES).map(([code, curr]) => (
+                          <SelectItem key={code} value={code}>
+                            {curr.symbol} {code} - {curr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="text-xs text-muted-foreground">
+                      Click the dropdown above to select a currency
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <button
+                className="w-full text-left text-sm font-medium text-foreground py-2"
+                onClick={() => toggle("categories")}
+              >
+                Manage Categories
+              </button>
+              <div className={`overflow-hidden transition-[max-height] duration-300 ${open.categories ? 'max-h-[999px]' : 'max-h-0'}`}>
+                <div className="pt-2">
+                  <CategoryManagement hideHeader />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -911,7 +963,7 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
     const newTrip = { id: `${Date.now()}-${Math.floor(Math.random() * 1e6)}`, name: finalName, friends: finalFriends };
     const trips = getStoredTrips();
     trips.push(newTrip);
-    try { localStorage.setItem('dailyspend_trips', JSON.stringify(trips)); } catch {}
+    try { setStoredTrips(trips as any); } catch {}
     
     // Trigger immediate upload to Firebase
     try {
@@ -937,7 +989,7 @@ function TripsManagement({ onTripsChanged }: { onTripsChanged?: (hasTrips: boole
       
       // Delete the trip
       const next = trips.filter(t => t.id !== id);
-      localStorage.setItem('dailyspend_trips', JSON.stringify(next));
+      setStoredTrips(next as any);
       setTrips(next);
       console.log(`[Trip Delete] Removed trip: ${tripName}`);
       
@@ -1259,7 +1311,7 @@ function ManageFriends({ onTripsChanged }: { onTripsChanged?: (hasTrips: boolean
   ];
 
   const persistTrips = (next: typeof trips) => {
-    try { localStorage.setItem('dailyspend_trips', JSON.stringify(next)); } catch {}
+    try { setStoredTrips(next as any); } catch {}
     setTrips(next);
     onTripsChanged?.(next.length > 0);
   };

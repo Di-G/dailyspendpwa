@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { getToday, getMonthInfo, generateCalendarDays, formatDate } from "@/lib/date-utils";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { getCategories, createExpense, createCategory, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData } from "@/lib/localStorage";
+import { getCategories, createExpense, createCategory, getTripRecurringRaw, getTripExpensesRaw, setTripExpensesRaw, cleanupOrphanedTripData, getTrips as getStoredTrips } from "@/lib/localStorage";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1963,6 +1963,11 @@ function TripHome({ currency, focusAmountTrigger, onFocusAmountConsumed }: {
     const onChanged = () => {
       // Increment revision to force recompute
       setTripDataRev((v) => v + 1);
+      try {
+        // Refresh trips immediately so friend add/rename/remove reflects
+        const latestTrips = getStoredTrips();
+        setTrips(latestTrips as any);
+      } catch {}
     };
     window.addEventListener('dailyspend:data-changed', onChanged);
     return () => window.removeEventListener('dailyspend:data-changed', onChanged);
