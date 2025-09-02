@@ -127,14 +127,14 @@ export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(f
   return (
     <div className="space-y-4">
       {!hideHeader && (
-        <Card className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800">
+        <Card className="bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/30 dark:via-yellow-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800/50 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center">
-                <span className="text-yellow-600 dark:text-yellow-400 mr-2">👀</span>
+                <span className="text-amber-600 dark:text-amber-400 mr-2">👀</span>
                 Manage Follow-ups
               </h3>
-              <Button onClick={handleOpenAdd} size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white shadow-md">
+              <Button onClick={handleOpenAdd} size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg transition-all duration-300 hover:scale-105">
                 <Plus className="w-4 h-4 mr-2" />
                 Add User
               </Button>
@@ -214,13 +214,13 @@ export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(f
       {/* Tracking daily expenses of */}
       <div className="space-y-3">
         <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <h4 className="text-base font-medium text-green-700 dark:text-green-300">Tracking daily expenses of</h4>
+          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+          <h4 className="text-base font-medium text-emerald-700 dark:text-emerald-300">Tracking daily expenses of</h4>
         </div>
         {accepted.length > 0 ? (
           <div className="pl-4 space-y-3">
             {accepted.map((request) => (
-              <div key={request.id} className="flex items-center justify-between p-3 border border-green-200 rounded-lg bg-green-50 dark:bg-green-950/30">
+              <div key={request.id} className="flex items-center justify-between p-3 border border-emerald-300 dark:border-emerald-700/50 rounded-lg bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/40 dark:to-green-950/40 hover:shadow-md transition-all duration-300">
                 <SheetClose asChild>
                   <button
                     type="button"
@@ -228,10 +228,10 @@ export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(f
                     onClick={() => onSelectFollowup?.(request.toUid)}
                     title="Open this user's expenses"
                   >
-                    <Users className="w-4 h-4 text-green-600" />
+                    <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <div>
                       <div className="text-sm font-medium">{request.toName || request.toEmail}</div>
-                      <div className="text-xs text-green-600 dark:text-green-400">Tap to open their expenses</div>
+                      <div className="text-xs text-emerald-600 dark:text-emerald-400">Tap to open their expenses</div>
                     </div>
                   </button>
                 </SheetClose>
@@ -305,20 +305,20 @@ export default forwardRef<FollowupsManagementHandle, FollowupsManagementProps>(f
       {/* Follow-up Requests */}
       <div className="space-y-3">
         <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-          <h4 className="text-base font-medium text-blue-700 dark:text-blue-300">Follow-up Requests</h4>
+          <div className="w-2 h-2 bg-sky-500 rounded-full"></div>
+          <h4 className="text-base font-medium text-sky-700 dark:text-sky-300">Follow-up Requests</h4>
         </div>
         {/* Incoming Requests */}
         {incomingRequests.length > 0 && (
           <div className="pl-4 space-y-3">
-            <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Incoming</div>
+            <div className="text-sm font-medium text-sky-700 dark:text-sky-300 mb-2">Incoming</div>
             {incomingRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between p-3 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+              <div key={request.id} className="flex items-center justify-between p-3 border border-sky-300 dark:border-sky-700/50 rounded-lg bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/40 dark:to-blue-950/40 hover:shadow-md transition-all duration-300">
                 <div className="flex items-center space-x-2">
-                  <Users className="w-4 h-4 text-blue-600" />
+                  <Users className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                   <div>
                     <div className="text-sm font-medium">{request.fromName || request.fromEmail}</div>
-                    <div className="text-xs text-blue-600 dark:text-blue-400">Wants to follow your expenses</div>
+                    <div className="text-xs text-sky-600 dark:text-sky-400">Wants to follow your expenses</div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
