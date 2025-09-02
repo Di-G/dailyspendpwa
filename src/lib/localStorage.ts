@@ -411,11 +411,17 @@ export const getCategoryTotals = (date: string): Array<{ categoryId: string; tot
   });
   
   return Array.from(categoryTotals.entries()).map(([categoryId, total]) => {
-    const category = categories.find(cat => cat.id === categoryId);
+    // Fallback safely if category no longer exists locally (e.g., after copying from partner)
+    const category = categories.find(cat => cat.id === categoryId) || ({
+      id: categoryId,
+      name: 'Uncategorized',
+      color: '#94A3B8',
+      createdAt: new Date(0).toISOString(),
+    } as Category);
     return {
       categoryId,
       total,
-      category: category!,
+      category,
     };
   });
 };

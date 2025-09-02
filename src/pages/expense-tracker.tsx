@@ -1606,16 +1606,15 @@ export default function ExpenseTracker() {
                   }
                   if (items.length === 0) return;
                   const myCategories = getCategories();
-                  const uncategorizedId = (() => {
-                    const found = myCategories.find(c => c.id === 'uncategorized');
-                    return found ? found.id : null;
-                  })();
                   items.forEach((e) => {
+                    const mappedCategoryId = myCategories.some(c => c.id === (e.categoryId || ''))
+                      ? (e.categoryId as string)
+                      : null;
                     createExpense({
                       name: e.name,
                       amount: e.amount,
                       details: e.details || undefined,
-                      categoryId: e.categoryId || uncategorizedId || undefined,
+                      categoryId: mappedCategoryId || undefined,
                       date: copyDestDate,
                     });
                   });
@@ -3350,13 +3349,18 @@ function PartnerHomeReadOnly({ currency, data, setCurrentPartnerDate, partnerNam
     setCopyLoading(true);
     try {
       const targetDate = useCustomDate ? customDate : getToday();
-      
+      // Map partner categoryId to my categories if present; otherwise unset
+      const myCategories = getCategories();
+      const mappedCategoryId = myCategories.some(c => c.id === (selectedExpense.categoryId || ''))
+        ? (selectedExpense.categoryId as string)
+        : null;
+
       // Create a new expense with the specified date
       await createExpense({
         name: selectedExpense.name,
         amount: selectedExpense.amount,
         details: selectedExpense.details ?? undefined,
-        categoryId: selectedExpense.categoryId ?? undefined,
+        categoryId: mappedCategoryId ?? undefined,
         date: targetDate,
       });
       
