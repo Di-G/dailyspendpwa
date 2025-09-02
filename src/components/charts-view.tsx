@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { getToday, formatDate } from "@/lib/date-utils";
-import { RefreshCw, TrendingUp, Calculator, BarChart3, Calendar } from "lucide-react";
+import { RefreshCw, TrendingUp, Calculator, BarChart3, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
 import type { Category, Expense } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -444,6 +444,23 @@ export default function ChartsView({ currency }: ChartsViewProps) {
       : totalRange.mode === 'custom'
         ? `Total Since`
         : 'Total This Week';
+
+  // Month picker for "Total This Month"
+  const [monthDialogOpen, setMonthDialogOpen] = useState(false);
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() => `${selectedMonth.getFullYear()}-${selectedMonth.getMonth()}`);
+  const nowYear = new Date().getFullYear();
+  const nowMonthIdx = new Date().getMonth();
+  const [monthYearView, setMonthYearView] = useState<number>(nowYear);
+  const parseMonthKey = (key: string) => {
+    const [y, m] = key.split('-').map((v) => parseInt(v));
+    return { year: y, monthIdx: m };
+  };
+  const selectedParsed = parseMonthKey(selectedMonthKey);
+  const selectedMonthLabel = new Date(selectedParsed.year, selectedParsed.monthIdx, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const { data: selectedMonthTotals = [] } = useQuery<Array<{ date: string; total: number }>>({
+    queryKey: ["/api/analytics/monthly-totals", { year: selectedParsed.year, month: (selectedParsed.monthIdx) + 1 }],
+  });
+  const selectedMonthTotal = useMemo(() => selectedMonthTotals.reduce((s, t) => s + t.total, 0), [selectedMonthTotals]);
   
   // Find highest day with date and day name
   const highestDayData = monthlyTotals.find(mt => mt.total === monthlyHighest);
@@ -559,12 +576,12 @@ export default function ChartsView({ currency }: ChartsViewProps) {
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(totalRangeSum)}</p>
               <p className="text-xs text-muted-foreground">{rangeStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {rangeEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
             </button>
-            <div className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+            <button type="button" onClick={() => { setMonthDialogOpen(true); setMonthYearView(selectedParsed.year); }} className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
               <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyTotals.reduce((s, mt) => s + mt.total, 0))}</p>
-              <p className="text-xs text-muted-foreground">{selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
-            </div>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedMonthTotal)}</p>
+              <p className="text-xs text-muted-foreground">{selectedMonthLabel}</p>
+            </button>
             <div className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
               <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</p>
@@ -660,6 +677,64 @@ export default function ChartsView({ currency }: ChartsViewProps) {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Month selection dialog */}
+      <Dialog open={monthDialogOpen} onOpenChange={setMonthDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                className="p-2 rounded-md hover:bg-accent"
+                onClick={() => setMonthYearView((y) => y - 1)}
+                disabled={monthYearView <= 2000}
+                title="Previous year"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <DialogTitle className="text-base">{monthYearView}</DialogTitle>
+              <button
+                type="button"
+                className="p-2 rounded-md hover:bg-accent"
+                onClick={() => setMonthYearView((y) => Math.min(y + 1, nowYear))}
+                disabled={monthYearView >= nowYear}
+                title="Next year"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 12 }).map((_, idx) => {
+              const year = monthYearView;
+              const monthIdx = idx;
+              const label = new Date(year, monthIdx, 1).toLocaleDateString('en-US', { month: 'short' });
+              const key = `${year}-${monthIdx}`;
+              const isDisabled = year < 2000 || (year === nowYear && monthIdx > nowMonthIdx);
+              const isSelected = key === selectedMonthKey;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (isDisabled) {
+                      alert('Please select a month from year 2000 onwards, not in the future.');
+                      return;
+                    }
+                    setSelectedMonthKey(key);
+                    setMonthDialogOpen(false);
+                  }}
+                  disabled={isDisabled}
+                  className={`p-3 rounded-lg border text-center hover:opacity-90 ${isSelected ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700' : 'bg-card border-border'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="text-sm font-semibold">{label}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="pt-3 text-xs text-muted-foreground">Months available from Jan 2000 to current. Use the arrows to navigate years.</div>
         </DialogContent>
       </Dialog>
     </div>
