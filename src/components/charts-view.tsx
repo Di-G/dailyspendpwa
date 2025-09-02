@@ -461,6 +461,26 @@ export default function ChartsView({ currency }: ChartsViewProps) {
     queryKey: ["/api/analytics/monthly-totals", { year: selectedParsed.year, month: (selectedParsed.monthIdx) + 1 }],
   });
   const selectedMonthTotal = useMemo(() => selectedMonthTotals.reduce((s, t) => s + t.total, 0), [selectedMonthTotals]);
+  const isCurrentSelectedMonth = selectedParsed.year === nowYear && selectedParsed.monthIdx === nowMonthIdx;
+  const totalMonthTitle = isCurrentSelectedMonth ? 'Total This Month' : `Total – ${selectedMonthLabel}`;
+
+  // Average month selector
+  const [avgMonthDialogOpen, setAvgMonthDialogOpen] = useState(false);
+  const [avgSelectedMonthKey, setAvgSelectedMonthKey] = useState<string>(() => `${selectedMonth.getFullYear()}-${selectedMonth.getMonth()}`);
+  const [avgMonthYearView, setAvgMonthYearView] = useState<number>(nowYear);
+  const avgSelectedParsed = parseMonthKey(avgSelectedMonthKey);
+  const avgSelectedMonthLabel = new Date(avgSelectedParsed.year, avgSelectedParsed.monthIdx, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const isCurrentAvgMonth = avgSelectedParsed.year === nowYear && avgSelectedParsed.monthIdx === nowMonthIdx;
+  const avgMonthTitle = isCurrentAvgMonth ? 'Average This Month' : `Average – ${avgSelectedMonthLabel}`;
+  const { data: avgMonthTotals = [] } = useQuery<Array<{ date: string; total: number }>>({
+    queryKey: ["/api/analytics/monthly-totals", { year: avgSelectedParsed.year, month: avgSelectedParsed.monthIdx + 1 }],
+  });
+  const avgSelectedMonthAverage = useMemo(() => {
+    if (avgMonthTotals.length === 0) return 0;
+    const days = avgMonthTotals.length;
+    const sum = avgMonthTotals.reduce((s, t) => s + t.total, 0);
+    return sum / days;
+  }, [avgMonthTotals]);
   
   // Find highest day with date and day name
   const highestDayData = monthlyTotals.find(mt => mt.total === monthlyHighest);
@@ -578,16 +598,16 @@ export default function ChartsView({ currency }: ChartsViewProps) {
             </button>
             <button type="button" onClick={() => { setMonthDialogOpen(true); setMonthYearView(selectedParsed.year); }} className="text-center p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
               <Calculator className="text-blue-500 dark:text-blue-300 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-foreground/80">Total This Month</p>
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">{totalMonthTitle}</p>
               <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(selectedMonthTotal)}</p>
-              <p className="text-xs text-muted-foreground">{selectedMonthLabel}</p>
+              <p className="text-xs text-muted-foreground">Tap to change month</p>
             </button>
-            <div className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+            <button type="button" onClick={() => { setAvgMonthDialogOpen(true); setAvgMonthYearView(avgSelectedParsed.year); }} className="text-center p-4 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
               <BarChart3 className="text-green-500 dark:text-green-300 text-xl sm:text-2xl mb-2 mx-auto" />
-              <p className="text-xs sm:text-sm font-medium text-foreground/80">Average Daily</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(monthlyAverage)}</p>
-              <p className="text-xs text-muted-foreground">This month</p>
-            </div>
+              <p className="text-xs sm:text-sm font-medium text-foreground/80">{avgMonthTitle}</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{CURRENCIES[currency].symbol}{formatAmountDisplay(avgSelectedMonthAverage)}</p>
+              <p className="text-xs text-muted-foreground">Tap to change month</p>
+            </button>
             <div className="text-center p-4 rounded-lg border bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
               <TrendingUp className="text-purple-500 dark:text-purple-300 text-xl sm:text-2xl mb-2 mx-auto" />
               <p className="text-xs sm:text-sm font-medium text-foreground/80">Highest Day</p>
@@ -728,6 +748,64 @@ export default function ChartsView({ currency }: ChartsViewProps) {
                   }}
                   disabled={isDisabled}
                   className={`p-3 rounded-lg border text-center hover:opacity-90 ${isSelected ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700' : 'bg-card border-border'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="text-sm font-semibold">{label}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="pt-3 text-xs text-muted-foreground">Months available from Jan 2000 to current. Use the arrows to navigate years.</div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Average month selection dialog */}
+      <Dialog open={avgMonthDialogOpen} onOpenChange={setAvgMonthDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                className="p-2 rounded-md hover:bg-accent"
+                onClick={() => setAvgMonthYearView((y) => y - 1)}
+                disabled={avgMonthYearView <= 2000}
+                title="Previous year"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <DialogTitle className="text-base">{avgMonthYearView}</DialogTitle>
+              <button
+                type="button"
+                className="p-2 rounded-md hover:bg-accent"
+                onClick={() => setAvgMonthYearView((y) => Math.min(y + 1, nowYear))}
+                disabled={avgMonthYearView >= nowYear}
+                title="Next year"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 12 }).map((_, idx) => {
+              const year = avgMonthYearView;
+              const monthIdx = idx;
+              const label = new Date(year, monthIdx, 1).toLocaleDateString('en-US', { month: 'short' });
+              const key = `${year}-${monthIdx}`;
+              const isDisabled = year < 2000 || (year === nowYear && monthIdx > nowMonthIdx);
+              const isSelected = key === avgSelectedMonthKey;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (isDisabled) {
+                      alert('Please select a month from year 2000 onwards, not in the future.');
+                      return;
+                    }
+                    setAvgSelectedMonthKey(key);
+                    setAvgMonthDialogOpen(false);
+                  }}
+                  disabled={isDisabled}
+                  className={`p-3 rounded-lg border text-center hover:opacity-90 ${isSelected ? 'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700' : 'bg-card border-border'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="text-sm font-semibold">{label}</div>
                 </button>
