@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, Button as UIButton } from "@/components/ui/button";
 import { Wallet, Calendar, PieChart, Settings as SettingsIcon, Users, Check, ChevronLeft, ChevronRight, Repeat, BarChart3, TrendingUp, Calculator, ArrowDown, ArrowUp, Plus, Edit, ChevronDown } from "lucide-react";
 import { HiOutlineUserGroup } from "react-icons/hi2";
 import { formatAmountDisplay } from "@/lib/utils";
@@ -4087,7 +4087,22 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
   const barChartRef = useRef<HTMLCanvasElement>(null);
   const pieChartInstance = useRef<any>(null);
   const barChartInstance = useRef<any>(null);
+  const monthlyPieRef = useRef<HTMLCanvasElement>(null);
+  const monthlyPieInstance = useRef<any>(null);
   const symbol = CURRENCIES[currency].symbol;
+
+  // Month selection for Monthly Expense Analytics
+  const parseMonthKeyAnalytics = (key: string) => {
+    const [y, m] = key.split('-').map((v) => parseInt(v));
+    return { year: y, monthIdx: m };
+  };
+  const [analyticsMonthKey, setAnalyticsMonthKey] = useState<string>(() => `${new Date().getFullYear()}-${new Date().getMonth()}`);
+  const [analyticsMonthYearView, setAnalyticsMonthYearView] = useState<number>(new Date().getFullYear());
+  const [analyticsMonthDialogOpen, setAnalyticsMonthDialogOpen] = useState(false);
+  const analyticsParsed = useMemo(() => parseMonthKeyAnalytics(analyticsMonthKey), [analyticsMonthKey]);
+  const analyticsMonthLabel = useMemo(() => new Date(analyticsParsed.year, analyticsParsed.monthIdx, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), [analyticsParsed]);
+  const nowYear = new Date().getFullYear();
+  const isCurrentMonth = analyticsParsed.year === nowYear && analyticsParsed.monthIdx === new Date().getMonth();
 
   const categoryById = useMemo(() => {
     const map = new Map<string, Category>();
@@ -4108,6 +4123,25 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
     });
     return Array.from(totals.values());
   }, [data.expenses, selectedDate, categoryById]);
+
+  // Monthly category totals for selected month (for wheel and tiles)
+  const monthlyCategoryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    (data.expenses || []).forEach(e => {
+      const d = new Date(e.date);
+      if (d.getFullYear() === analyticsParsed.year && d.getMonth() === analyticsParsed.monthIdx) {
+        if (!e.categoryId) return;
+        const amt = parseFloat(e.amount || '0');
+        totals.set(e.categoryId, (totals.get(e.categoryId) || 0) + amt);
+      }
+    });
+    return totals;
+  }, [data.expenses, analyticsParsed]);
+  const monthlyCategoryItems = useMemo(() => {
+    return (data.categories || [])
+      .map(c => ({ category: c, total: monthlyCategoryTotals.get(c.id) || 0 }))
+      .filter(item => item.total > 0);
+  }, [data.categories, monthlyCategoryTotals]);
 
   // Weekly totals for last 7 days from selected date
   const weeklyDays = useMemo(() => {
@@ -4155,6 +4189,7 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
     // Destroy existing charts
     if (pieChartInstance.current) pieChartInstance.current.destroy();
     if (barChartInstance.current) barChartInstance.current.destroy();
+    if (monthlyPieInstance.current) monthlyPieInstance.current.destroy();
 
     // Resolve theme colors from CSS variables
     const css = getComputedStyle(document.documentElement);
@@ -4228,7 +4263,37 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
         }
       });
     }
-  }, [categoryTotals, weeklyData, weeklyDays, symbol]);
+
+    // Monthly Category Wheel
+    if (monthlyPieRef.current && monthlyCategoryItems.length > 0) {
+      const ctx = monthlyPieRef.current.getContext('2d');
+      monthlyPieInstance.current = new (window as any).Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: monthlyCategoryItems.map(i => i.category.name),
+          datasets: [{
+            data: monthlyCategoryItems.map(i => i.total),
+            backgroundColor: monthlyCategoryItems.map(i => i.category.color),
+            borderWidth: 0,
+            borderColor: 'transparent',
+            cutout: '50%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context: any) => `${context.label}: ${symbol}${formatAmountDisplay(context.parsed)}`
+              }
+            }
+          }
+        }
+      });
+    }
+  }, [categoryTotals, weeklyData, weeklyDays, symbol, monthlyCategoryItems]);
 
   useEffect(() => {
     const t = setTimeout(initializeCharts, 100);
@@ -4239,6 +4304,7 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
     return () => {
       try { pieChartInstance.current?.destroy?.(); } catch {}
       try { barChartInstance.current?.destroy?.(); } catch {}
+      try { monthlyPieInstance.current?.destroy?.(); } catch {}
     };
   }, []);
 
@@ -4290,7 +4356,6 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
   // Month picker for "Total This Month"
   const [monthDialogOpen, setMonthDialogOpen] = useState(false);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(() => `${selectedMonth.getFullYear()}-${selectedMonth.getMonth()}`);
-  const nowYear = new Date().getFullYear();
   const nowMonthIdx = new Date().getMonth();
   const [monthYearView, setMonthYearView] = useState<number>(nowYear);
   const parseMonthKey = (key: string) => {
@@ -4341,7 +4406,7 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
       <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Expense Analytics</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 sm:mb-0">Daily Expense Analytics</h2>
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 <label className="text-sm font-medium text-foreground/80">Select Date:</label>
@@ -4356,7 +4421,7 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
         {/* Pie Chart */}
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
           <CardContent className="p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Category Distribution</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Daily Category Distribution</h3>
             <div className="relative h-48 sm:h-64">
               {categoryTotals.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -4405,6 +4470,123 @@ function FollowupChartsView({ currency, data, partnerName }: { currency: Currenc
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Expense Analytics - Categories + Wheel */}
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-foreground">Monthly Expense Analytics</h3>
+            <UIButton
+              onClick={() => { setAnalyticsMonthDialogOpen(true); setAnalyticsMonthYearView(analyticsParsed.year); }}
+              size={isCurrentMonth ? "sm" : "sm"}
+              variant={"outline" as any}
+            >
+              Change Month
+            </UIButton>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {(data.categories || []).length === 0 ? (
+              <div className="col-span-2 sm:col-span-4 text-center py-4">
+                <p className="text-sm text-muted-foreground">No categories available</p>
+              </div>
+            ) : (
+              (data.categories || []).map((category) => {
+                const total = monthlyCategoryTotals.get(category.id) || 0;
+                return (
+                  <div
+                    key={category.id}
+                    className="border rounded-lg p-2 sm:p-3 text-center hover:shadow-md transition-all duration-200"
+                    style={{
+                      backgroundColor: `${category.color}15`,
+                      borderColor: `${category.color}50`,
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 sm:w-4 sm:h-4 rounded-full mx-auto mb-1 sm:mb-2 shadow-sm"
+                      style={{ backgroundColor: category.color }}
+                    ></div>
+                    <p className="text-xs font-medium text-muted-foreground truncate">{category.name}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-foreground">
+                      {symbol}{formatAmountDisplay(total)}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <p className="mt-2 text-[10px] sm:text-xs text-muted-foreground">{analyticsMonthLabel}</p>
+          <div className="mt-4">
+            <div className="relative h-48 sm:h-64">
+              {monthlyCategoryItems.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="text-center">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No category data this month</p>
+                    <p className="text-xs text-muted-foreground">Add expenses to see monthly distribution</p>
+                  </div>
+                </div>
+              ) : (
+                <canvas ref={monthlyPieRef} className="w-full h-full" />
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Month selection dialog for Monthly Expense Analytics (Followups) */}
+      <Dialog open={analyticsMonthDialogOpen} onOpenChange={setAnalyticsMonthDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                className="p-2 rounded-md hover:bg-accent"
+                onClick={() => setAnalyticsMonthYearView((y) => y - 1)}
+                disabled={analyticsMonthYearView <= 2000}
+                title="Previous year"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <DialogTitle className="text-base">{analyticsMonthYearView}</DialogTitle>
+              <button
+                type="button"
+                className="p-2 rounded-md hover:bg-accent"
+                onClick={() => setAnalyticsMonthYearView((y) => Math.min(y + 1, nowYear))}
+                disabled={analyticsMonthYearView >= nowYear}
+                title="Next year"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 12 }).map((_, idx) => {
+              const year = analyticsMonthYearView;
+              const monthIdx = idx;
+              const label = new Date(year, monthIdx, 1).toLocaleDateString('en-US', { month: 'short' });
+              const key = `${year}-${monthIdx}`;
+              const isDisabled = year < 2000 || (year === nowYear && monthIdx > new Date().getMonth());
+              const isSelected = key === analyticsMonthKey;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (isDisabled) return;
+                    setAnalyticsMonthKey(key);
+                    setAnalyticsMonthDialogOpen(false);
+                  }}
+                  disabled={isDisabled}
+                  className={`p-3 rounded-lg border text-center hover:opacity-90 ${isSelected ? 'bg-yellow-100 dark:bg-yellow-900/40 border-yellow-300 dark:border-yellow-700' : 'bg-card border-border'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="text-sm font-semibold">{label}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="pt-3 text-xs text-muted-foreground">Select a month up to the current month.</div>
+        </DialogContent>
+      </Dialog>
 
       {/* Monthly Overview */}
       <Card>
