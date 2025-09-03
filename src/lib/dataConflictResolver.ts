@@ -312,11 +312,10 @@ export function mergeData(
     const onlineExpensesRemapped = (onlineData.expenses || []).map(remapExpenseCategoryId);
     const onlineRecurringRemapped = (onlineData.recurring || []).map(remapRecurringCategoryId);
 
-    // Merge expenses/recurring by timestamp as usual
-    mergedExpenses = mergeArraysByTimestamp(
+    // Merge expenses using specialized logic for category conflicts
+    mergedExpenses = mergeExpensesByTimestamp(
       localData.expenses,
-      onlineExpensesRemapped,
-      'createdAt'
+      onlineExpensesRemapped
     );
 
     mergedRecurring = mergeArraysByTimestamp(
@@ -345,11 +344,10 @@ export function mergeData(
     const localRecurringRemapped = localData.recurring.map(remapRecurringCategoryId);
     const onlineRecurringRemapped = (onlineData.recurring || []).map(remapRecurringCategoryId);
 
-    // Merge expenses/recurring by timestamp as usual
-    mergedExpenses = mergeArraysByTimestamp(
+    // Merge expenses using specialized logic for category conflicts
+    mergedExpenses = mergeExpensesByTimestamp(
       localExpensesRemapped,
-      onlineExpensesRemapped,
-      'createdAt'
+      onlineExpensesRemapped
     );
     mergedRecurring = mergeArraysByTimestamp(
       localRecurringRemapped,
@@ -467,6 +465,60 @@ function mergeArraysByTimestamp<T extends { id: string; createdAt: string }>(
     const existing = merged.get(item.id);
     if (!existing || new Date(item[timestampKey] as string) > new Date(existing[timestampKey] as string)) {
       merged.set(item.id, item);
+    }
+  });
+  
+  return Array.from(merged.values());
+}
+
+/**
+ * Specialized merge function for expenses that handles category conflicts intelligently
+ * When the same expense (same name and amount) exists with different categories,
+ * prefer the local version with a specific category over the online version with "uncategorized"
+ */
+function mergeExpensesByTimestamp(
+  local: Expense[],
+  online: Expense[]
+): Expense[] {
+  const merged = new Map<string, Expense>();
+  
+  // Add local items
+  local.forEach(item => {
+    merged.set(item.id, item);
+  });
+  
+  // Add/override with online items, but with special logic for category conflicts
+  online.forEach(onlineItem => {
+    const existing = merged.get(onlineItem.id);
+    if (!existing) {
+      // No local version exists, use online version
+      merged.set(onlineItem.id, onlineItem);
+    } else {
+      // Both local and online versions exist - apply smart conflict resolution
+      const onlineDate = new Date((onlineItem as any).lastModified || onlineItem.createdAt);
+      const localDate = new Date((existing as any).lastModified || existing.createdAt);
+      
+      // If online is significantly newer (more than 1 minute), use online
+      if (onlineDate.getTime() - localDate.getTime() > 60000) {
+        merged.set(onlineItem.id, onlineItem);
+      } else {
+        // Times are close or local is newer - check for category conflict
+        const isOnlineUncategorized = !onlineItem.categoryId || onlineItem.categoryId === 'uncategorized';
+        const isLocalCategorized = existing.categoryId && existing.categoryId !== 'uncategorized';
+        
+        // If online is uncategorized and local has a specific category, prefer local
+        if (isOnlineUncategorized && isLocalCategorized) {
+          // Keep local version (with specific category)
+          merged.set(onlineItem.id, existing);
+        } else {
+          // Use timestamp-based resolution for other cases
+          if (onlineDate > localDate) {
+            merged.set(onlineItem.id, onlineItem);
+          } else {
+            merged.set(onlineItem.id, existing);
+          }
+        }
+      }
     }
   });
   

@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { insertCategorySchema } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
-import { createCategory, deleteCategory, updateCategory } from "@/lib/localStorage";
+import { createCategory, deleteCategory, updateCategory, getExpensesCountByCategory } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import type { Category } from "@shared/schema";
 
 const COLOR_OPTIONS = [
@@ -34,6 +35,8 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
   const colorInputRef = useRef<HTMLInputElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string; expenseCount: number } | null>(null);
 
   // Query
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -64,13 +67,13 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: string) => {
       try {
-        deleteCategory(id);
-        return { success: true };
+        const result = deleteCategory(id);
+        return result;
       } catch (error: any) {
         throw new Error(error.message || 'Failed to delete category');
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -78,10 +81,28 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/category-totals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-totals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/weekly-totals"] });
-      toast({ title: "Success", description: "Category deleted successfully" });
+      
+      // Show success message with details about moved expenses
+      if (result.movedExpensesCount > 0) {
+        toast({ 
+          title: "Category deleted successfully", 
+          description: `${result.movedExpensesCount} expense${result.movedExpensesCount === 1 ? '' : 's'} from "${result.categoryName}" moved to uncategorized expenses.` 
+        });
+      } else {
+        toast({ 
+          title: "Category deleted successfully", 
+          description: `"${result.categoryName}" category has been removed.` 
+        });
+      }
+      
+      // Close confirmation dialog
+      setDeleteConfirmOpen(false);
+      setCategoryToDelete(null);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete category", variant: "destructive" });
+      setDeleteConfirmOpen(false);
+      setCategoryToDelete(null);
     },
   });
 
@@ -123,6 +144,24 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
     } finally {
       setEditingId(null);
       setEditingName("");
+    }
+  };
+
+  const handleDeleteClick = (category: Category) => {
+    if (category.name === 'Uncategorized') return;
+    
+    const expenseCount = getExpensesCountByCategory(category.id);
+    setCategoryToDelete({
+      id: category.id,
+      name: category.name,
+      expenseCount
+    });
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (categoryToDelete) {
+      deleteCategoryMutation.mutate(categoryToDelete.id);
     }
   };
 
@@ -255,11 +294,7 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
                     ? 'text-muted-foreground cursor-not-allowed'
                     : 'text-red-500 hover:text-red-700'
                 }`}
-                onClick={() => {
-                  if (category.name !== 'Uncategorized') {
-                    deleteCategoryMutation.mutate(category.id);
-                  }
-                }}
+                onClick={() => handleDeleteClick(category)}
                 disabled={deleteCategoryMutation.isPending || category.name === 'Uncategorized'}
                 title={category.name === 'Uncategorized' ? 'Uncategorized category cannot be deleted' : 'Delete category'}
               >
@@ -269,6 +304,45 @@ export default function CategoryManagement({ hideHeader = false }: CategoryManag
           ))
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              Delete Category
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the category "{categoryToDelete?.name}"?
+              {categoryToDelete?.expenseCount && categoryToDelete.expenseCount > 0 && (
+                <span className="block mt-2 text-sm text-muted-foreground">
+                  This will move <strong>{categoryToDelete.expenseCount} expense{categoryToDelete.expenseCount === 1 ? '' : 's'}</strong> from this category to the "Uncategorized" category.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setCategoryToDelete(null);
+              }}
+              disabled={deleteCategoryMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteCategoryMutation.isPending}
+            >
+              {deleteCategoryMutation.isPending ? "Deleting..." : "Delete Category"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

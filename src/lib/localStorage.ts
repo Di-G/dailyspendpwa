@@ -73,7 +73,12 @@ export const createCategory = (data: InsertCategory): Category => {
   return newCategory;
 };
 
-export const deleteCategory = (id: string): void => {
+export const getExpensesCountByCategory = (categoryId: string): number => {
+  const expenses = getExpenses();
+  return expenses.filter(expense => expense.categoryId === categoryId).length;
+};
+
+export const deleteCategory = (id: string): { movedExpensesCount: number; categoryName: string } => {
   const categories = getCategories();
   const categoryToDelete = categories.find(cat => cat.id === id);
   
@@ -82,16 +87,30 @@ export const deleteCategory = (id: string): void => {
     throw new Error('Cannot delete the Uncategorized category');
   }
   
+  if (!categoryToDelete) {
+    throw new Error('Category not found');
+  }
+  
   const updatedCategories = categories.filter(cat => cat.id !== id);
   setToStorage(CATEGORIES_KEY, updatedCategories);
   
-  // Also remove category from expenses
+  // Get uncategorized category ID
+  const uncategorizedCategory = getOrCreateUncategorizedCategory();
+  
+  // Move all expenses from this category to uncategorized
   const expenses = getExpenses();
-  const updatedExpenses = expenses.map(expense => 
-    expense.categoryId === id ? { ...expense, categoryId: null } : expense
-  );
+  let movedExpensesCount = 0;
+  const updatedExpenses = expenses.map(expense => {
+    if (expense.categoryId === id) {
+      movedExpensesCount++;
+      return { ...expense, categoryId: uncategorizedCategory.id };
+    }
+    return expense;
+  });
   setToStorage(EXPENSES_KEY, updatedExpenses);
   emitDataChanged();
+  
+  return { movedExpensesCount, categoryName: categoryToDelete.name };
 };
 
 export const updateCategory = (
@@ -206,6 +225,8 @@ export const updateExpense = (
       details: data.details !== undefined ? data.details : expense.details,
       categoryId: data.categoryId !== undefined ? data.categoryId : expense.categoryId,
       date: data.date !== undefined ? data.date : expense.date,
+      // Add lastModified timestamp to track when expense was updated
+      lastModified: new Date().toISOString(),
     };
     return updated;
   });

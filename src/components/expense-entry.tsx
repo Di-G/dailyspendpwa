@@ -214,6 +214,7 @@ export default function ExpenseEntry({ currency, setCurrency, focusAmountTrigger
 
   const updateExpenseMutation = useMutation({
     mutationFn: async (payload: { id: string; updates: any }) => {
+      // Make this synchronous to ensure it works offline
       const result = updateExpense(payload.id, payload.updates);
       if (!result) throw new Error("Failed to update expense");
       return result;
